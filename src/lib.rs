@@ -1,11 +1,12 @@
 use derive_more::{From, TryInto};
 use serde::{Deserialize, Serialize, Serializer};
 
+mod event;
 mod step;
 
 use step::{StepError, WorkflowStep};
 
-use crate::step::{StepWithSettings, StepWithSettingsAndEvent};
+use crate::step::{FullyQualifiedStep, StepWithSettings};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 struct InstanceId(i32);
@@ -16,11 +17,11 @@ impl ActiveStepQueue {
     async fn enqueue(
         &self,
         instance_id: InstanceId,
-        step: StepWithSettingsAndEvent,
+        step: FullyQualifiedStep,
     ) -> anyhow::Result<()> {
         todo!()
     }
-    async fn dequeue(&self, instance_id: InstanceId) -> anyhow::Result<StepWithSettingsAndEvent> {
+    async fn dequeue(&self, instance_id: InstanceId) -> anyhow::Result<FullyQualifiedStep> {
         todo!()
     }
 }
@@ -45,16 +46,19 @@ impl WaitingForEventStepQueue {
 
 struct CompletedStepQueue {}
 impl CompletedStepQueue {
-    async fn enqueue(&self, step: StepWithSettingsAndEvent) -> anyhow::Result<()> {
+    async fn enqueue(&self, step: FullyQualifiedStep) -> anyhow::Result<()> {
         todo!()
     }
-    async fn dequeue(&self, instance_id: InstanceId) -> anyhow::Result<StepWithSettingsAndEvent> {
+    async fn dequeue(&self, instance_id: InstanceId) -> anyhow::Result<FullyQualifiedStep> {
         todo!()
     }
 }
 
 mod runner {
-    use crate::step::{Step, StepSettings};
+    use crate::{
+        event::WorkflowEvent,
+        step::{Step, StepSettings},
+    };
 
     use super::*;
 
@@ -63,14 +67,15 @@ mod runner {
     }
 
     pub async fn handle_step(
-        StepWithSettingsAndEvent {
+        FullyQualifiedStep {
             event,
-            fqstep:
+            step:
                 StepWithSettings {
                     step,
                     settings: StepSettings { .. },
                 },
-        }: StepWithSettingsAndEvent,
+            retry_count,
+        }: FullyQualifiedStep,
         instance_id: InstanceId,
         waiting_for_event_step_queue: &WaitingForEventStepQueue,
         active_step_queue: &ActiveStepQueue,
@@ -95,7 +100,7 @@ mod runner {
 
     pub async fn handle_event(
         instance_id: InstanceId,
-        event: Event,
+        event: WorkflowEvent,
         waiting_for_step_queue: &WaitingForEventStepQueue,
         active_step_queue: &ActiveStepQueue,
     ) -> anyhow::Result<()> {
@@ -105,39 +110,15 @@ mod runner {
         active_step_queue
             .enqueue(
                 instance_id,
-                StepWithSettingsAndEvent {
-                    fqstep,
+                FullyQualifiedStep {
+                    step: fqstep,
                     event: Some(event),
+                    retry_count: 0,
                 },
             )
             .await?;
 
         Ok(())
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-enum EventDeserializationError {
-    #[error("Unknown step error")]
-    Unknown,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Event0 {}
-
-#[derive(Debug, From, TryInto)]
-enum Event {
-    Event0(Event0),
-}
-
-impl Serialize for Event {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            Event::Event0(inner) => inner.serialize(serializer),
-        }
     }
 }
 

@@ -3,15 +3,15 @@ mod step_1;
 
 use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Duration};
 use step_0::Step0;
 use step_1::Step1;
 
-use crate::{ActiveStepQueue, Event, InstanceId, WaitingForEventStepQueue};
+use crate::{event::WorkflowEvent, ActiveStepQueue, InstanceId, WaitingForEventStepQueue};
 
 #[enum_dispatch]
 pub trait Step: Serialize + for<'a> Deserialize<'a> + Debug {
-    async fn run_raw(&self, event: Option<Event>) -> Result<Option<StepWithSettings>, StepError>;
+    async fn run_raw(&self, event: Option<WorkflowEvent>) -> Result<Option<StepWithSettings>, StepError>;
     async fn enqueue(
         self,
         instance_id: InstanceId,
@@ -42,13 +42,13 @@ pub(crate) struct StepWithSettings {
 #[derive(Debug)]
 pub(crate) struct StepSettings {
     pub max_retry_count: u32,
-    pub retry_count: u32,
-    pub delay: u32,
+    pub delay: Option<Duration>,
     // TODO
     // backoff: u32,
 }
 
-pub(crate) struct StepWithSettingsAndEvent {
-    pub fqstep: StepWithSettings,
-    pub event: Option<Event>,
+pub(crate) struct FullyQualifiedStep {
+    pub step: StepWithSettings,
+    pub event: Option<WorkflowEvent>,
+    pub retry_count: u32,
 }

@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ActiveStepQueue, Event, InstanceId, StepError, StepWithSettings, StepWithSettingsAndEvent,
+    ActiveStepQueue, FullyQualifiedStep, InstanceId, StepError, StepWithSettings,
     WaitingForEventStepQueue,
+    event::WorkflowEvent,
     step::{Step, StepSettings},
 };
 
@@ -15,7 +16,7 @@ impl Step1 {
     }
 }
 impl Step for Step1 {
-    async fn run_raw(&self, event: Option<Event>) -> Result<Option<StepWithSettings>, StepError> {
+    async fn run_raw(&self, event: Option<WorkflowEvent>) -> Result<Option<StepWithSettings>, StepError> {
         self.run().await
     }
 
@@ -31,12 +32,13 @@ impl Step for Step1 {
         active_step_queue
             .enqueue(
                 instance_id,
-                StepWithSettingsAndEvent {
-                    fqstep: StepWithSettings {
+                FullyQualifiedStep {
+                    step: StepWithSettings {
                         step: self.into(),
                         settings,
                     },
                     event: None,
+                    retry_count: 0,
                 },
             )
             .await?;

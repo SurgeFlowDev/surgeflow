@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ActiveStepQueue, Event, Event0, InstanceId, StepError, StepWithSettings,
-    WaitingForEventStepQueue, WorkflowStep,
+    ActiveStepQueue, InstanceId, StepError, StepWithSettings, WaitingForEventStepQueue,
+    WorkflowStep,
+    event::{WorkflowEvent, event_0::Event0},
     step::{Step, Step1, StepSettings},
 };
 
@@ -15,21 +16,23 @@ impl Step0 {
         Ok(Some(StepWithSettings {
             step: WorkflowStep::Step1(Step1 {}),
             settings: StepSettings {
-                max_retry_count: 0, // TODO
-                retry_count: 0,     // TODO
-                delay: 0,           // TODO
+                max_retry_count: 0,
+                delay: None,
             },
         }))
     }
 }
 impl Step for Step0 {
-    async fn run_raw(&self, event: Option<Event>) -> Result<Option<StepWithSettings>, StepError> {
+    async fn run_raw(
+        &self,
+        event: Option<WorkflowEvent>,
+    ) -> Result<Option<StepWithSettings>, StepError> {
         let event = if let Some(event) = event {
             event
         } else {
             return Err(StepError::Unknown);
         };
-        let event = Event0::try_from(event).map_err(|_| StepError::Unknown)?;
+        let event = event.try_into().map_err(|_| StepError::Unknown)?;
 
         self.run(event).await
     }
