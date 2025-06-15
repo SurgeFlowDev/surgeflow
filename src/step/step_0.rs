@@ -1,16 +1,19 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de};
 
 use crate::{
-    ActiveStepQueue, InstanceId, StepError, StepWithSettings, WaitingForEventStepQueue,
-    WorkflowStep,
+    ActiveStepQueue, DelayedStepQueue, FullyQualifiedStep, InstanceId, StepError, StepWithSettings,
+    WaitingForEventStepQueue, WorkflowStep,
     event::{WorkflowEvent, event_0::Event0},
     step::{Step, Step1, StepSettings},
 };
+use macros::step;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Step0 {}
 
+#[step]
 impl Step0 {
+    #[run]
     async fn run(&self, event: Event0) -> Result<Option<StepWithSettings>, StepError> {
         // TODO
         Ok(Some(StepWithSettings {
@@ -21,47 +24,4 @@ impl Step0 {
             },
         }))
     }
-}
-impl Step for Step0 {
-    async fn run_raw(
-        &self,
-        event: Option<WorkflowEvent>,
-    ) -> Result<Option<StepWithSettings>, StepError> {
-        let event = if let Some(event) = event {
-            event
-        } else {
-            return Err(StepError::Unknown);
-        };
-        let event = event.try_into().map_err(|_| StepError::Unknown)?;
-
-        self.run(event).await
-    }
-
-    // each step can implement its own enqueue method, so we have to take both the active and waiting for step queues as parameters,
-    // and the step will decide which queue to enqueue itself into
-    async fn enqueue(
-        self,
-        instance_id: InstanceId,
-        settings: StepSettings,
-        active_step_queue: &ActiveStepQueue,
-        waiting_for_step_queue: &WaitingForEventStepQueue,
-    ) -> anyhow::Result<()> {
-        waiting_for_step_queue
-            .enqueue(
-                instance_id,
-                StepWithSettings {
-                    // TODO
-                    step: self.into(),
-                    settings,
-                },
-            )
-            .await?;
-        Ok(())
-    }
-
-    // fn try_deserialize_event(event: String) -> Result<Event, EventDeserializationError> {
-    //     let event: Event0 =
-    //         serde_json::from_str(&event).map_err(|_| EventDeserializationError::Unknown)?;
-    //     Ok(event.into())
-    // }
 }

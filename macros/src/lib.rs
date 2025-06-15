@@ -1,0 +1,134 @@
+use darling::ast::NestedMeta;
+use darling::{Error, FromDeriveInput, FromMeta};
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::punctuated::Punctuated;
+use syn::{Attribute, FnArg, ImplItem, ItemFn, ItemImpl, Pat, PatType, parse_quote};
+
+#[derive(FromMeta)]
+// #[darling(attributes(my_crate), forward_attrs(allow, doc, cfg))]
+struct StepOpts {
+    // ident: syn::Ident,
+    // attrs: Vec<syn::Attribute>,
+}
+
+#[proc_macro_attribute]
+pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
+    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(Error::from(e).write_errors());
+        }
+    };
+
+    let mut input = syn::parse_macro_input!(input as ItemImpl);
+
+    let step_type = &input.self_ty;
+
+    let run_fn = input.items.iter_mut().find_map(|item| {
+        if let ImplItem::Fn(item_fn) = item {
+            let attr = item_fn
+                .attrs
+                .extract_if(.., |attr| attr.path().is_ident("run"))
+                .next();
+            if let Some(attr) = attr {
+                Some((attr, item_fn))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    });
+
+    let (attr, run_fn) = match run_fn {
+        Some((attr, run_fn)) => (attr, run_fn),
+        None => {
+            return TokenStream::from(Error::missing_field("run").write_errors());
+        }
+    };
+    let event_arg = run_fn.sig.inputs.iter().find(|arg| {
+        if let FnArg::Typed(pat_type) = arg {
+            if let Pat::Ident(pat_ident) = &*pat_type.pat {
+                pat_ident.ident == "event"
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    });
+    // TODO
+    // let event_type = event_arg.and_then(|arg| {
+    //     if let FnArg::Typed(PatType { ty, .. }) = arg {
+    //         Some(ty)
+    //     } else {
+    //         None
+    //     }
+    // });
+
+    let args = match StepOpts::from_list(&attr_args) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(e.write_errors());
+        }
+    };
+
+    let mut run_args = Punctuated::<syn::Ident, syn::Token![,]>::new();
+    if event_arg.is_some() {
+        run_args.push(parse_quote!(event));
+    }
+
+    quote! {
+        #input
+    impl Step for #step_type {
+        async fn run_raw(
+            &self,
+            event: Option<WorkflowEvent>,
+        ) -> Result<Option<StepWithSettings>, StepError> {
+            let event = if let Some(event) = event {
+                event
+            } else {
+                return Err(StepError::Unknown);
+            };
+            let event = event.try_into().map_err(|_| StepError::Unknown)?;
+
+            self.run(#run_args).await
+        }
+
+        // each step can implement its own enqueue method, so we have to take both the active and waiting for step queues as parameters,
+        // and the step will decide which queue to enqueue itself into
+        async fn enqueue(
+            self,
+            instance_id: InstanceId,
+            settings: StepSettings,
+            active_step_queue: &ActiveStepQueue,
+            waiting_for_step_queue: &WaitingForEventStepQueue,
+            delayed_step_queue: &DelayedStepQueue,
+        ) -> anyhow::Result<()> {
+            let step_with_settings = StepWithSettings {
+                step: self.into(),
+                settings,
+            };
+            if let Some(delay) = step_with_settings.settings.delay {
+                delayed_step_queue
+                    .enqueue(
+                        instance_id,
+                        FullyQualifiedStep {
+                            step: step_with_settings,
+                            event: None,
+                            retry_count: 0,
+                        },
+                    )
+                    .await?;
+                return Ok(());
+            }
+            waiting_for_step_queue
+                .enqueue(instance_id, step_with_settings)
+                .await?;
+            Ok(())
+        }
+    }
+    }
+    .into()
+}

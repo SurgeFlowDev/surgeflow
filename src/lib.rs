@@ -36,13 +36,18 @@ impl WaitingForEventStepQueue {
     }
 }
 
-// struct WaitingForTimeoutStepQueue {}
-// impl WaitingForTimeoutStepQueue {
-//     async fn enqueue(&self, step: FullyQualifiedStep) -> anyhow::Result<()> {
-//         todo!()
-//     }
-//     // this queue won't have a dequeue method. steps from this queue will be automatically moved to active or waiting for event queues when the timeout expires.
-// }
+struct DelayedStepQueue {}
+impl DelayedStepQueue {
+    async fn enqueue(
+        &self,
+        instance_id: InstanceId,
+        step: FullyQualifiedStep,
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    // this queue won't have a dequeue method. steps from this queue will be automatically moved to active or waiting for event queues when the timeout expires.
+}
 
 struct CompletedStepQueue {}
 impl CompletedStepQueue {
@@ -79,6 +84,7 @@ mod runner {
         instance_id: InstanceId,
         waiting_for_event_step_queue: &WaitingForEventStepQueue,
         active_step_queue: &ActiveStepQueue,
+        delayed_step_queue: &DelayedStepQueue,
     ) -> anyhow::Result<()> {
         let next_step = step.run_raw(event).await?;
 
@@ -90,6 +96,7 @@ mod runner {
                     next_step.settings,
                     active_step_queue,
                     waiting_for_event_step_queue,
+                    delayed_step_queue,
                 )
                 .await?;
         } else {

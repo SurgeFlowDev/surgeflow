@@ -1,10 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ActiveStepQueue, FullyQualifiedStep, InstanceId, StepError, StepWithSettings,
-    WaitingForEventStepQueue,
-    event::WorkflowEvent,
-    step::{Step, StepSettings},
+    event::WorkflowEvent, step::{Step, StepSettings}, ActiveStepQueue, DelayedStepQueue, FullyQualifiedStep, InstanceId, StepError, StepWithSettings, WaitingForEventStepQueue
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -28,6 +25,7 @@ impl Step for Step1 {
         settings: StepSettings,
         active_step_queue: &ActiveStepQueue,
         waiting_for_step_queue: &WaitingForEventStepQueue,
+        delayed_step_queue: &DelayedStepQueue,
     ) -> anyhow::Result<()> {
         active_step_queue
             .enqueue(
