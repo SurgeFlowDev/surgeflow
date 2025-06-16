@@ -89,16 +89,17 @@ mod runner {
         let next_step = step.run_raw(event).await?;
 
         if let Some(next_step) = next_step {
-            next_step
-                .step
-                .enqueue(
-                    instance_id,
-                    next_step.settings,
-                    active_step_queue,
-                    waiting_for_event_step_queue,
-                    delayed_step_queue,
-                )
-                .await?;
+            // TODO
+            // next_step
+            //     .step
+            //     .enqueue(
+            //         instance_id,
+            //         next_step.settings,
+            //         active_step_queue,
+            //         waiting_for_event_step_queue,
+            //         delayed_step_queue,
+            //     )
+            //     .await?;
         } else {
             complete_workflow(instance_id).await?;
         }

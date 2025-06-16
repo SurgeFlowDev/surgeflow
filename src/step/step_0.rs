@@ -4,7 +4,7 @@ use crate::{
     ActiveStepQueue, DelayedStepQueue, FullyQualifiedStep, InstanceId, StepError, StepWithSettings,
     WaitingForEventStepQueue, WorkflowStep,
     event::{WorkflowEvent, event_0::Event0},
-    step::{Step, Step1, StepSettings},
+    step::{Step, Step1, StepSettings, StepWithEvent},
 };
 use macros::step;
 
@@ -15,7 +15,6 @@ pub(crate) struct Step0 {}
 impl Step0 {
     #[run]
     async fn run(&self, event: Event0) -> Result<Option<StepWithSettings>, StepError> {
-        // TODO
         Ok(Some(StepWithSettings {
             step: WorkflowStep::Step1(Step1 {}),
             settings: StepSettings {

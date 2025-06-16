@@ -7,21 +7,28 @@ use std::{fmt::Debug, time::Duration};
 use step_0::Step0;
 use step_1::Step1;
 
-use crate::{event::WorkflowEvent, ActiveStepQueue, DelayedStepQueue, InstanceId, WaitingForEventStepQueue};
+use crate::{
+    ActiveStepQueue, DelayedStepQueue, InstanceId, WaitingForEventStepQueue,
+    event::{Event, WorkflowEvent},
+};
 
 pub trait Step: Serialize + for<'a> Deserialize<'a> + Debug {
     async fn run_raw(
         &self,
         event: Option<WorkflowEvent>,
     ) -> Result<Option<StepWithSettings>, StepError>;
-    async fn enqueue(
-        self,
-        instance_id: InstanceId,
-        settings: StepSettings,
-        active_step_queue: &ActiveStepQueue,
-        waiting_for_step_queue: &WaitingForEventStepQueue,
-        delayed_step_queue: &DelayedStepQueue,
-    ) -> anyhow::Result<()>;
+    // async fn enqueue(
+    //     self,
+    //     instance_id: InstanceId,
+    //     settings: StepSettings,
+    //     active_step_queue: &ActiveStepQueue,
+    //     waiting_for_step_queue: &WaitingForEventStepQueue,
+    //     delayed_step_queue: &DelayedStepQueue,
+    // ) -> anyhow::Result<()>;
+}
+
+pub trait StepWithEvent: Step {
+    type Event: Event;
 }
 
 #[derive(Debug, Serialize, Deserialize, From, TryInto)]
@@ -41,39 +48,39 @@ impl Step for WorkflowStep {
         }
     }
 
-    async fn enqueue(
-        self,
-        instance_id: InstanceId,
-        settings: StepSettings,
-        active_step_queue: &ActiveStepQueue,
-        waiting_for_step_queue: &WaitingForEventStepQueue,
-        delayed_step_queue: &DelayedStepQueue,
-    ) -> anyhow::Result<()> {
-        match self {
-            WorkflowStep::Step0(step) => {
-                Step::enqueue(
-                    step,
-                    instance_id,
-                    settings,
-                    active_step_queue,
-                    waiting_for_step_queue,
-                    delayed_step_queue,
-                )
-                .await
-            }
-            WorkflowStep::Step1(step) => {
-                Step::enqueue(
-                    step,
-                    instance_id,
-                    settings,
-                    active_step_queue,
-                    waiting_for_step_queue,
-                    delayed_step_queue,
-                )
-                .await
-            }
-        }
-    }
+    // async fn enqueue(
+    //     self,
+    //     instance_id: InstanceId,
+    //     settings: StepSettings,
+    //     active_step_queue: &ActiveStepQueue,
+    //     waiting_for_step_queue: &WaitingForEventStepQueue,
+    //     delayed_step_queue: &DelayedStepQueue,
+    // ) -> anyhow::Result<()> {
+    //     match self {
+    //         WorkflowStep::Step0(step) => {
+    //             Step::enqueue(
+    //                 step,
+    //                 instance_id,
+    //                 settings,
+    //                 active_step_queue,
+    //                 waiting_for_step_queue,
+    //                 delayed_step_queue,
+    //             )
+    //             .await
+    //         }
+    //         WorkflowStep::Step1(step) => {
+    //             Step::enqueue(
+    //                 step,
+    //                 instance_id,
+    //                 settings,
+    //                 active_step_queue,
+    //                 waiting_for_step_queue,
+    //                 delayed_step_queue,
+    //             )
+    //             .await
+    //         }
+    //     }
+    // }
 }
 
 #[derive(Debug, thiserror::Error)]

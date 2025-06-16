@@ -79,55 +79,77 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
         run_args.push(parse_quote!(event));
     }
 
+    let (event_extraction, step_with_event_impl) = if let Some(event_arg) = event_arg {
+        let ty = if let FnArg::Typed(PatType { ty, .. }) = event_arg {
+            ty
+        } else {
+            return TokenStream::from(Error::missing_field("event").write_errors());
+        };
+        (
+            Some(quote! {
+                let event = if let Some(event) = event {
+                    event
+                } else {
+                    return Err(StepError::Unknown);
+                };
+                let event = <Self as StepWithEvent>::Event::try_from(event).map_err(|_| StepError::Unknown)?;
+            }),
+            Some(quote! {
+                impl StepWithEvent for #step_type {
+                    type Event = #ty;
+                }
+            }),
+        )
+    } else {
+        (None, None)
+    };
+
     quote! {
-        #input
+    #input
+    #step_with_event_impl
     impl Step for #step_type {
         async fn run_raw(
             &self,
             event: Option<WorkflowEvent>,
         ) -> Result<Option<StepWithSettings>, StepError> {
-            let event = if let Some(event) = event {
-                event
-            } else {
-                return Err(StepError::Unknown);
-            };
-            let event = event.try_into().map_err(|_| StepError::Unknown)?;
+            #event_extraction
 
             self.run(#run_args).await
         }
 
         // each step can implement its own enqueue method, so we have to take both the active and waiting for step queues as parameters,
         // and the step will decide which queue to enqueue itself into
-        async fn enqueue(
-            self,
-            instance_id: InstanceId,
-            settings: StepSettings,
-            active_step_queue: &ActiveStepQueue,
-            waiting_for_step_queue: &WaitingForEventStepQueue,
-            delayed_step_queue: &DelayedStepQueue,
-        ) -> anyhow::Result<()> {
-            let step_with_settings = StepWithSettings {
-                step: self.into(),
-                settings,
-            };
-            if let Some(delay) = step_with_settings.settings.delay {
-                delayed_step_queue
-                    .enqueue(
-                        instance_id,
-                        FullyQualifiedStep {
-                            step: step_with_settings,
-                            event: None,
-                            retry_count: 0,
-                        },
-                    )
-                    .await?;
-                return Ok(());
-            }
-            waiting_for_step_queue
-                .enqueue(instance_id, step_with_settings)
-                .await?;
-            Ok(())
-        }
+        // async fn enqueue(
+        //     self,
+        //     instance_id: InstanceId,
+        //     settings: StepSettings,
+        //     active_step_queue: &ActiveStepQueue,
+        //     waiting_for_step_queue: &WaitingForEventStepQueue,
+        //     delayed_step_queue: &DelayedStepQueue,
+        // ) -> anyhow::Result<()> {
+        //     Ok(())
+        //     // let step_with_settings = StepWithSettings {
+        //     //     step: self.into(),
+        //     //     settings,
+        //     // };
+        //     // if let Some(delay) = step_with_settings.settings.delay {
+        //     //     delayed_step_queue
+        //     //         .enqueue(
+        //     //             instance_id,
+        //     //             FullyQualifiedStep {
+        //     //                 step: step_with_settings,
+        //     //                 event: None,
+        //     //                 retry_count: 0,
+        //     //             },
+        //     //         )
+        //     //         .await?;
+        //     //     return Ok(());
+        //     // }
+        //     // waiting_for_step_queue
+        //     //     .enqueue(instance_id, step_with_settings)
+        //     //     .await?;
+        //     // Ok(())
+        // }
     }
     }
     .into()
