@@ -79,34 +79,36 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
         run_args.push(parse_quote!(event));
     }
 
-    let (event_extraction, step_with_event_impl) = if let Some(event_arg) = event_arg {
+    let event_extraction = if let Some(event_arg) = event_arg {
         let ty = if let FnArg::Typed(PatType { ty, .. }) = event_arg {
             ty
         } else {
             return TokenStream::from(Error::missing_field("event").write_errors());
         };
-        (
-            Some(quote! {
-                let event = if let Some(event) = event {
-                    event
-                } else {
-                    return Err(StepError::Unknown);
-                };
-                let event = <Self as StepWithEvent>::Event::try_from(event).map_err(|_| StepError::Unknown)?;
-            }),
-            Some(quote! {
-                impl StepWithEvent for #step_type {
-                    type Event = #ty;
-                }
-            }),
-        )
+
+        Some(quote! {
+            let event = if let Some(event) = event {
+                event
+            } else {
+                return Err(StepError::Unknown);
+            };
+            let event = #ty::try_from(event).map_err(|_| StepError::Unknown)?;
+        })
     } else {
-        (None, None)
+        None
     };
 
+    let wait_for_event = if event_arg.is_some() {
+        quote! { true }
+    } else {
+        quote! { false }
+    };
+    /////////////////////////////////////////////////
+    // remove wait_for_event. Every step should have an Event associated type, which can be "Immediate". from the outside
+    // I can check the type's TypeId and see if it is "Immediate" or not. this way I can avoid the need for a wait_for_event method.
+    /////////////////////////////////////////////////
     quote! {
     #input
-    #step_with_event_impl
     impl Step for #step_type {
         async fn run_raw(
             &self,
@@ -115,6 +117,9 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
             #event_extraction
 
             self.run(#run_args).await
+        }
+        fn wait_for_event(&self) -> bool {
+            #wait_for_event
         }
 
         // each step can implement its own enqueue method, so we have to take both the active and waiting for step queues as parameters,

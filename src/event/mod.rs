@@ -16,4 +16,4 @@ pub(crate) enum WorkflowEvent {
 
 impl Event for WorkflowEvent {}
 
-pub(crate) trait Event: Serialize + for<'a> Deserialize<'a> + Debug {}
+pub(crate) trait Event: Serialize + for<'a> Deserialize<'a> {}

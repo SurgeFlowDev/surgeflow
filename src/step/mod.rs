@@ -17,6 +17,8 @@ pub trait Step: Serialize + for<'a> Deserialize<'a> + Debug {
         &self,
         event: Option<WorkflowEvent>,
     ) -> Result<Option<StepWithSettings>, StepError>;
+
+    fn wait_for_event(&self) -> bool;
     // async fn enqueue(
     //     self,
     //     instance_id: InstanceId,
@@ -25,10 +27,6 @@ pub trait Step: Serialize + for<'a> Deserialize<'a> + Debug {
     //     waiting_for_step_queue: &WaitingForEventStepQueue,
     //     delayed_step_queue: &DelayedStepQueue,
     // ) -> anyhow::Result<()>;
-}
-
-pub trait StepWithEvent: Step {
-    type Event: Event;
 }
 
 #[derive(Debug, Serialize, Deserialize, From, TryInto)]
@@ -45,6 +43,12 @@ impl Step for WorkflowStep {
         match self {
             WorkflowStep::Step0(step) => Step::run_raw(step, event).await,
             WorkflowStep::Step1(step) => Step::run_raw(step, event).await,
+        }
+    }
+    fn wait_for_event(&self) -> bool {
+        match self {
+            WorkflowStep::Step0(step) => step.wait_for_event(),
+            WorkflowStep::Step1(step) => step.wait_for_event(),
         }
     }
 
