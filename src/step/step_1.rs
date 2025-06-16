@@ -1,7 +1,10 @@
+use crate::{
+    StepError, StepWithSettings,
+    event::{Immediate, WorkflowEvent},
+    step::Step,
+};
 use macros::step;
 use serde::{Deserialize, Serialize};
-
-use crate::{StepError, StepWithSettings, event::WorkflowEvent, step::Step};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Step1 {}

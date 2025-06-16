@@ -17,3 +17,8 @@ pub(crate) enum WorkflowEvent {
 impl Event for WorkflowEvent {}
 
 pub(crate) trait Event: Serialize + for<'a> Deserialize<'a> {}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Immediate;
+
+impl Event for Immediate {}

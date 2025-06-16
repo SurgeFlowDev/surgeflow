@@ -79,29 +79,26 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
         run_args.push(parse_quote!(event));
     }
 
-    let event_extraction = if let Some(event_arg) = event_arg {
+    let (event_extraction, ty) = if let Some(event_arg) = event_arg {
         let ty = if let FnArg::Typed(PatType { ty, .. }) = event_arg {
             ty
         } else {
             return TokenStream::from(Error::missing_field("event").write_errors());
         };
 
-        Some(quote! {
-            let event = if let Some(event) = event {
-                event
-            } else {
-                return Err(StepError::Unknown);
-            };
-            let event = #ty::try_from(event).map_err(|_| StepError::Unknown)?;
-        })
+        (
+            Some(quote! {
+                let event = if let Some(event) = event {
+                    event
+                } else {
+                    return Err(StepError::Unknown);
+                };
+                let event = #ty::try_from(event).map_err(|_| StepError::Unknown)?;
+            }),
+            ty.clone(),
+        )
     } else {
-        None
-    };
-
-    let wait_for_event = if event_arg.is_some() {
-        quote! { true }
-    } else {
-        quote! { false }
+        (None, parse_quote!(Immediate))
     };
     /////////////////////////////////////////////////
     // remove wait_for_event. Every step should have an Event associated type, which can be "Immediate". from the outside
@@ -110,6 +107,7 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
     quote! {
     #input
     impl Step for #step_type {
+        type Event = #ty;
         async fn run_raw(
             &self,
             event: Option<WorkflowEvent>,
@@ -117,9 +115,6 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
             #event_extraction
 
             self.run(#run_args).await
-        }
-        fn wait_for_event(&self) -> bool {
-            #wait_for_event
         }
 
         // each step can implement its own enqueue method, so we have to take both the active and waiting for step queues as parameters,

@@ -3,7 +3,7 @@ mod step_1;
 
 use derive_more::{From, TryInto};
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, time::Duration};
+use std::{any::TypeId, fmt::Debug, time::Duration};
 use step_0::Step0;
 use step_1::Step1;
 
@@ -13,12 +13,11 @@ use crate::{
 };
 
 pub trait Step: Serialize + for<'a> Deserialize<'a> + Debug {
+    type Event: Event;
     async fn run_raw(
         &self,
         event: Option<WorkflowEvent>,
     ) -> Result<Option<StepWithSettings>, StepError>;
-
-    fn wait_for_event(&self) -> bool;
     // async fn enqueue(
     //     self,
     //     instance_id: InstanceId,
@@ -34,8 +33,18 @@ pub(crate) enum WorkflowStep {
     Step0(Step0),
     Step1(Step1),
 }
+impl WorkflowStep {
+    /// Returns the TypeId of the event type associated with this step.
+    pub fn variant_event_type_id(&self) -> TypeId {
+        match self {
+            WorkflowStep::Step0(_) => TypeId::of::<<Step0 as Step>::Event>(),
+            WorkflowStep::Step1(_) => TypeId::of::<<Step1 as Step>::Event>(),
+        }
+    }
+}
 
 impl Step for WorkflowStep {
+    type Event = WorkflowEvent;
     async fn run_raw(
         &self,
         event: Option<WorkflowEvent>,
@@ -43,12 +52,6 @@ impl Step for WorkflowStep {
         match self {
             WorkflowStep::Step0(step) => Step::run_raw(step, event).await,
             WorkflowStep::Step1(step) => Step::run_raw(step, event).await,
-        }
-    }
-    fn wait_for_event(&self) -> bool {
-        match self {
-            WorkflowStep::Step0(step) => step.wait_for_event(),
-            WorkflowStep::Step1(step) => step.wait_for_event(),
         }
     }
 

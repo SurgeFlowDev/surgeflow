@@ -60,8 +60,10 @@ impl CompletedStepQueue {
 }
 
 mod runner {
+    use std::any::TypeId;
+
     use crate::{
-        event::WorkflowEvent,
+        event::{Immediate, WorkflowEvent},
         step::{Step, StepSettings},
     };
 
@@ -89,6 +91,24 @@ mod runner {
         let next_step = step.run_raw(event).await?;
 
         if let Some(next_step) = next_step {
+            if next_step.step.variant_event_type_id() != TypeId::of::<Immediate>() {
+                // If the next step requires an event, enqueue it in the waiting for event queue
+                waiting_for_event_step_queue
+                    .enqueue(instance_id, next_step)
+                    .await?;
+                return Ok(());
+            } else {
+                active_step_queue
+                    .enqueue(
+                        instance_id,
+                        FullyQualifiedStep {
+                            step: next_step,
+                            event: None,
+                            retry_count: 0,
+                        },
+                    )
+                    .await?;
+            }
             // TODO
             // next_step
             //     .step
