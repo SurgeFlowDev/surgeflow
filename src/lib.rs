@@ -14,35 +14,33 @@ struct InstanceId(i32);
 struct ActiveStepQueue {}
 
 impl ActiveStepQueue {
-    async fn enqueue(
-        &self,
-        instance_id: InstanceId,
-        step: FullyQualifiedStep,
-    ) -> anyhow::Result<()> {
+    async fn enqueue(&self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
         todo!()
     }
-    async fn dequeue(&self, instance_id: InstanceId) -> anyhow::Result<FullyQualifiedStep> {
+    async fn dequeue(
+        &self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<FullyQualifiedStep<WorkflowStep>> {
         todo!()
     }
 }
 
 struct WaitingForEventStepQueue {}
 impl WaitingForEventStepQueue {
-    async fn enqueue(&self, instance_id: InstanceId, step: StepWithSettings) -> anyhow::Result<()> {
+    async fn enqueue(&self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
         todo!()
     }
-    async fn dequeue(&self, instance_id: InstanceId) -> anyhow::Result<StepWithSettings> {
+    async fn dequeue(
+        &self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<FullyQualifiedStep<WorkflowStep>> {
         todo!()
     }
 }
 
 struct DelayedStepQueue {}
 impl DelayedStepQueue {
-    async fn enqueue(
-        &self,
-        instance_id: InstanceId,
-        step: FullyQualifiedStep,
-    ) -> anyhow::Result<()> {
+    async fn enqueue(&self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -51,10 +49,13 @@ impl DelayedStepQueue {
 
 struct CompletedStepQueue {}
 impl CompletedStepQueue {
-    async fn enqueue(&self, step: FullyQualifiedStep) -> anyhow::Result<()> {
+    async fn enqueue(&self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
         todo!()
     }
-    async fn dequeue(&self, instance_id: InstanceId) -> anyhow::Result<FullyQualifiedStep> {
+    async fn dequeue(
+        &self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<FullyQualifiedStep<WorkflowStep>> {
         todo!()
     }
 }
@@ -76,50 +77,68 @@ mod runner {
     pub async fn handle_step(
         FullyQualifiedStep {
             event,
+            instance_id,
             step:
                 StepWithSettings {
                     step,
-                    settings: StepSettings { .. },
+                    settings:
+                        StepSettings {
+                            max_retry_count,
+                            delay,
+                        },
                 },
             retry_count,
-        }: FullyQualifiedStep,
-        instance_id: InstanceId,
+        }: FullyQualifiedStep<WorkflowStep>,
         waiting_for_event_step_queue: &WaitingForEventStepQueue,
         active_step_queue: &ActiveStepQueue,
         delayed_step_queue: &DelayedStepQueue,
     ) -> anyhow::Result<()> {
-        let next_step = step.run_raw(event).await?;
+        let Ok(next_step) = step.run_raw(event).await else {
+            // If the step fails, we can either retry it or complete the workflow
+            if retry_count < max_retry_count {
+                let next_step = FullyQualifiedStep {
+                    instance_id,
+                    step: StepWithSettings {
+                        step,
+                        settings: StepSettings {
+                            max_retry_count,
+                            delay,
+                        },
+                    },
+                    event: None,
+                    retry_count: retry_count + 1,
+                };
+                active_step_queue.enqueue(next_step).await?;
+                return Ok(());
+            } else {
+                // If we reached the max retry count, we can complete the workflow
+                complete_workflow(instance_id).await?;
+                return Ok(());
+            }
+        };
 
         if let Some(next_step) = next_step {
             if next_step.step.variant_event_type_id() != TypeId::of::<Immediate>() {
                 // If the next step requires an event, enqueue it in the waiting for event queue
                 waiting_for_event_step_queue
-                    .enqueue(instance_id, next_step)
+                    .enqueue(FullyQualifiedStep {
+                        instance_id,
+                        step: next_step,
+                        event: None,
+                        retry_count: 0,
+                    })
                     .await?;
                 return Ok(());
             } else {
                 active_step_queue
-                    .enqueue(
+                    .enqueue(FullyQualifiedStep {
                         instance_id,
-                        FullyQualifiedStep {
-                            step: next_step,
-                            event: None,
-                            retry_count: 0,
-                        },
-                    )
+                        step: next_step,
+                        event: None,
+                        retry_count: 0,
+                    })
                     .await?;
             }
-            // TODO
-            // next_step
-            //     .step
-            //     .enqueue(
-            //         instance_id,
-            //         next_step.settings,
-            //         active_step_queue,
-            //         waiting_for_event_step_queue,
-            //         delayed_step_queue,
-            //     )
-            //     .await?;
         } else {
             complete_workflow(instance_id).await?;
         }
@@ -136,14 +155,10 @@ mod runner {
         // let event = step.try_deserialize_event(event)?;
 
         active_step_queue
-            .enqueue(
-                instance_id,
-                FullyQualifiedStep {
-                    step: fqstep,
-                    event: Some(event),
-                    retry_count: 0,
-                },
-            )
+            .enqueue(FullyQualifiedStep {
+                event: Some(event),
+                ..fqstep
+            })
             .await?;
 
         Ok(())

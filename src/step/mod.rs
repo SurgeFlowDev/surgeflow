@@ -9,23 +9,58 @@ use step_1::Step1;
 
 use crate::{
     ActiveStepQueue, DelayedStepQueue, InstanceId, WaitingForEventStepQueue,
-    event::{Event, WorkflowEvent},
+    event::{Event, Immediate, WorkflowEvent},
 };
 
-pub trait Step: Serialize + for<'a> Deserialize<'a> + Debug {
+pub trait Step: Serialize + for<'a> Deserialize<'a> + Debug
+where
+    WorkflowStep: From<Self>,
+{
     type Event: Event;
     async fn run_raw(
         &self,
         event: Option<WorkflowEvent>,
-    ) -> Result<Option<StepWithSettings>, StepError>;
-    // async fn enqueue(
-    //     self,
-    //     instance_id: InstanceId,
-    //     settings: StepSettings,
-    //     active_step_queue: &ActiveStepQueue,
-    //     waiting_for_step_queue: &WaitingForEventStepQueue,
-    //     delayed_step_queue: &DelayedStepQueue,
-    // ) -> anyhow::Result<()>;
+        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
+        // where we can get the WorkflowStep type from
+    ) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError>;
+    async fn enqueue(
+        step: FullyQualifiedStep<Self>,
+        active_step_queue: &ActiveStepQueue,
+        waiting_for_step_queue: &WaitingForEventStepQueue,
+        delayed_step_queue: &DelayedStepQueue,
+    ) -> anyhow::Result<()>
+    where
+        Self::Event: 'static,
+    {
+        if TypeId::of::<Self::Event>() != TypeId::of::<Immediate>() && step.event.is_none() {
+            // If the next step requires an event, enqueue it in the waiting for event queue
+            waiting_for_step_queue
+                .enqueue(FullyQualifiedStep::<WorkflowStep> {
+                    event: step.event,
+                    instance_id: step.instance_id,
+                    step: StepWithSettings::<WorkflowStep> {
+                        step: step.step.step.into(),
+                        settings: step.step.settings,
+                    },
+                    retry_count: step.retry_count,
+                })
+                .await?;
+            return Ok(());
+        } else {
+            active_step_queue
+                .enqueue(FullyQualifiedStep::<WorkflowStep> {
+                    event: step.event,
+                    instance_id: step.instance_id,
+                    step: StepWithSettings::<WorkflowStep> {
+                        step: step.step.step.into(),
+                        settings: step.step.settings,
+                    },
+                    retry_count: step.retry_count,
+                })
+                .await?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, From, TryInto)]
@@ -48,7 +83,7 @@ impl Step for WorkflowStep {
     async fn run_raw(
         &self,
         event: Option<WorkflowEvent>,
-    ) -> Result<Option<StepWithSettings>, StepError> {
+    ) -> Result<Option<StepWithSettings<Self>>, StepError> {
         match self {
             WorkflowStep::Step0(step) => Step::run_raw(step, event).await,
             WorkflowStep::Step1(step) => Step::run_raw(step, event).await,
@@ -56,38 +91,6 @@ impl Step for WorkflowStep {
     }
 
     // async fn enqueue(
-    //     self,
-    //     instance_id: InstanceId,
-    //     settings: StepSettings,
-    //     active_step_queue: &ActiveStepQueue,
-    //     waiting_for_step_queue: &WaitingForEventStepQueue,
-    //     delayed_step_queue: &DelayedStepQueue,
-    // ) -> anyhow::Result<()> {
-    //     match self {
-    //         WorkflowStep::Step0(step) => {
-    //             Step::enqueue(
-    //                 step,
-    //                 instance_id,
-    //                 settings,
-    //                 active_step_queue,
-    //                 waiting_for_step_queue,
-    //                 delayed_step_queue,
-    //             )
-    //             .await
-    //         }
-    //         WorkflowStep::Step1(step) => {
-    //             Step::enqueue(
-    //                 step,
-    //                 instance_id,
-    //                 settings,
-    //                 active_step_queue,
-    //                 waiting_for_step_queue,
-    //                 delayed_step_queue,
-    //             )
-    //             .await
-    //         }
-    //     }
-    // }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -96,8 +99,11 @@ pub(crate) enum StepError {
     Unknown,
 }
 
-pub(crate) struct StepWithSettings {
-    pub step: WorkflowStep,
+pub(crate) struct StepWithSettings<S: Step>
+where
+    WorkflowStep: From<S>,
+{
+    pub step: S,
     pub settings: StepSettings,
 }
 
@@ -109,8 +115,12 @@ pub(crate) struct StepSettings {
     // backoff: u32,
 }
 
-pub(crate) struct FullyQualifiedStep {
-    pub step: StepWithSettings,
+pub(crate) struct FullyQualifiedStep<S: Step>
+where
+    WorkflowStep: From<S>,
+{
+    pub instance_id: InstanceId,
+    pub step: StepWithSettings<S>,
     pub event: Option<WorkflowEvent>,
     pub retry_count: u32,
 }

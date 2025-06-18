@@ -13,7 +13,7 @@ pub(crate) struct Step0 {}
 #[step]
 impl Step0 {
     #[run]
-    async fn run(&self, event: Event0) -> Result<Option<StepWithSettings>, StepError> {
+    async fn run(&self, event: Event0) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
         Ok(Some(StepWithSettings {
             step: WorkflowStep::Step1(Step1 {}),
             settings: StepSettings {

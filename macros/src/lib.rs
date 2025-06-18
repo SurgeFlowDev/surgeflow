@@ -111,45 +111,11 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
         async fn run_raw(
             &self,
             event: Option<WorkflowEvent>,
-        ) -> Result<Option<StepWithSettings>, StepError> {
+        ) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
             #event_extraction
 
             self.run(#run_args).await
         }
-
-        // each step can implement its own enqueue method, so we have to take both the active and waiting for step queues as parameters,
-        // and the step will decide which queue to enqueue itself into
-        // async fn enqueue(
-        //     self,
-        //     instance_id: InstanceId,
-        //     settings: StepSettings,
-        //     active_step_queue: &ActiveStepQueue,
-        //     waiting_for_step_queue: &WaitingForEventStepQueue,
-        //     delayed_step_queue: &DelayedStepQueue,
-        // ) -> anyhow::Result<()> {
-        //     Ok(())
-        //     // let step_with_settings = StepWithSettings {
-        //     //     step: self.into(),
-        //     //     settings,
-        //     // };
-        //     // if let Some(delay) = step_with_settings.settings.delay {
-        //     //     delayed_step_queue
-        //     //         .enqueue(
-        //     //             instance_id,
-        //     //             FullyQualifiedStep {
-        //     //                 step: step_with_settings,
-        //     //                 event: None,
-        //     //                 retry_count: 0,
-        //     //             },
-        //     //         )
-        //     //         .await?;
-        //     //     return Ok(());
-        //     // }
-        //     // waiting_for_step_queue
-        //     //     .enqueue(instance_id, step_with_settings)
-        //     //     .await?;
-        //     // Ok(())
-        // }
     }
     }
     .into()
