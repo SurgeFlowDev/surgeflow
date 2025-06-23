@@ -38,14 +38,14 @@ impl WaitingForEventStepQueue {
     }
 }
 
-struct DelayedStepQueue {}
-impl DelayedStepQueue {
-    async fn enqueue(&self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
-        todo!()
-    }
+// struct DelayedStepQueue {}
+// impl DelayedStepQueue {
+//     async fn enqueue(&self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
+//         todo!()
+//     }
 
-    // this queue won't have a dequeue method. steps from this queue will be automatically moved to active or waiting for event queues when the timeout expires.
-}
+//     // this queue won't have a dequeue method. steps from this queue will be automatically moved to active or waiting for event queues when the timeout expires.
+// }
 
 struct CompletedStepQueue {}
 impl CompletedStepQueue {
@@ -84,14 +84,14 @@ mod runner {
                     settings:
                         StepSettings {
                             max_retry_count,
-                            delay,
+                            // delay,
                         },
                 },
             retry_count,
         }: FullyQualifiedStep<WorkflowStep>,
         waiting_for_event_step_queue: &WaitingForEventStepQueue,
         active_step_queue: &ActiveStepQueue,
-        delayed_step_queue: &DelayedStepQueue,
+        // delayed_step_queue: &DelayedStepQueue,
     ) -> anyhow::Result<()> {
         let Ok(next_step) = step.run_raw(event).await else {
             // If the step fails, we can either retry it or complete the workflow
@@ -102,7 +102,7 @@ mod runner {
                         step,
                         settings: StepSettings {
                             max_retry_count,
-                            delay,
+                            // delay,
                         },
                     },
                     event: None,

@@ -8,7 +8,7 @@ use step_0::Step0;
 use step_1::Step1;
 
 use crate::{
-    ActiveStepQueue, DelayedStepQueue, InstanceId, WaitingForEventStepQueue,
+    ActiveStepQueue, InstanceId, WaitingForEventStepQueue,
     event::{Event, Immediate, WorkflowEvent},
 };
 
@@ -27,7 +27,7 @@ where
         step: FullyQualifiedStep<Self>,
         active_step_queue: &ActiveStepQueue,
         waiting_for_step_queue: &WaitingForEventStepQueue,
-        delayed_step_queue: &DelayedStepQueue,
+        // delayed_step_queue: &DelayedStepQueue,
     ) -> anyhow::Result<()>
     where
         Self::Event: 'static,
@@ -110,7 +110,7 @@ where
 #[derive(Debug)]
 pub(crate) struct StepSettings {
     pub max_retry_count: u32,
-    pub delay: Option<Duration>,
+    // pub delay: Option<Duration>,
     // TODO
     // backoff: u32,
 }

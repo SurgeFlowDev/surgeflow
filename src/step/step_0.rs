@@ -18,7 +18,7 @@ impl Step0 {
             step: WorkflowStep::Step1(Step1 {}),
             settings: StepSettings {
                 max_retry_count: 0,
-                delay: None,
+                // delay: None,
             },
         }))
     }
