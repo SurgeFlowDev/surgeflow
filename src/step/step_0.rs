@@ -8,16 +8,20 @@ use crate::{
 use macros::step;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Step0 {}
+pub struct Step0 {}
 
 #[step]
 impl Step0 {
     #[run]
-    async fn run(&self, event: Event0) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
+    async fn run(
+        &self,
+        event: Event0,
+    ) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
+        println!("Running Step0 with event: {:?}", event);
         Ok(Some(StepWithSettings {
             step: WorkflowStep::Step1(Step1 {}),
             settings: StepSettings {
-                max_retry_count: 0,
+                max_retry_count: 1,
                 // delay: None,
             },
         }))

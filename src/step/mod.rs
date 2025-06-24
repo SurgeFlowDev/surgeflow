@@ -1,5 +1,5 @@
-mod step_0;
-mod step_1;
+pub mod step_0;
+pub mod step_1;
 
 use derive_more::{From, TryInto};
 use serde::{Deserialize, Serialize};
@@ -25,8 +25,8 @@ where
     ) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError>;
     async fn enqueue(
         step: FullyQualifiedStep<Self>,
-        active_step_queue: &ActiveStepQueue,
-        waiting_for_step_queue: &WaitingForEventStepQueue,
+        active_step_queue: &mut ActiveStepQueue,
+        waiting_for_step_queue: &mut WaitingForEventStepQueue,
         // delayed_step_queue: &DelayedStepQueue,
     ) -> anyhow::Result<()>
     where
@@ -64,7 +64,7 @@ where
 }
 
 #[derive(Debug, Serialize, Deserialize, From, TryInto)]
-pub(crate) enum WorkflowStep {
+pub enum WorkflowStep {
     Step0(Step0),
     Step1(Step1),
 }
@@ -94,12 +94,12 @@ impl Step for WorkflowStep {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum StepError {
+pub enum StepError {
     #[error("Unknown step error")]
     Unknown,
 }
 
-pub(crate) struct StepWithSettings<S: Step>
+pub struct StepWithSettings<S: Step>
 where
     WorkflowStep: From<S>,
 {
@@ -108,14 +108,14 @@ where
 }
 
 #[derive(Debug)]
-pub(crate) struct StepSettings {
+pub struct StepSettings {
     pub max_retry_count: u32,
     // pub delay: Option<Duration>,
     // TODO
     // backoff: u32,
 }
 
-pub(crate) struct FullyQualifiedStep<S: Step>
+pub struct FullyQualifiedStep<S: Step>
 where
     WorkflowStep: From<S>,
 {

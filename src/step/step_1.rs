@@ -5,12 +5,13 @@ use macros::step;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Step1 {}
+pub struct Step1 {}
 
 #[step]
 impl Step1 {
     #[run]
     async fn run(&self) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
+        println!("Running Step1");
         Ok(None)
     }
 }
