@@ -8,17 +8,20 @@ use step_0::Step0;
 use step_1::Step1;
 
 use crate::{
-    ActiveStepQueue, InstanceId, WaitingForEventStepQueue,
+    ActiveStepQueue, InstanceId, WaitingForEventStepQueue, Workflow, Workflow0,
     event::{Event, Immediate, WorkflowEvent},
 };
 
 pub trait Step: Serialize + for<'a> Deserialize<'a> + Debug
 where
     WorkflowStep: From<Self>,
+    WorkflowStep: From<<<Self as Step>::Workflow as Workflow>::Step>,
 {
     type Event: Event;
+    type Workflow: Workflow;
     async fn run_raw(
         &self,
+        wf: Self::Workflow,
         event: Option<WorkflowEvent>,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
@@ -80,13 +83,15 @@ impl WorkflowStep {
 
 impl Step for WorkflowStep {
     type Event = WorkflowEvent;
+    type Workflow = Workflow0;
     async fn run_raw(
         &self,
+        wf: Self::Workflow,
         event: Option<WorkflowEvent>,
     ) -> Result<Option<StepWithSettings<Self>>, StepError> {
         match self {
-            WorkflowStep::Step0(step) => Step::run_raw(step, event).await,
-            WorkflowStep::Step1(step) => Step::run_raw(step, event).await,
+            WorkflowStep::Step0(step) => Step::run_raw(step, wf, event).await,
+            WorkflowStep::Step1(step) => Step::run_raw(step, wf, event).await,
         }
     }
 
@@ -99,15 +104,18 @@ pub enum StepError {
     Unknown,
 }
 
-pub struct StepWithSettings<S: Step>
+#[derive(Debug, Deserialize, Serialize)]
+pub struct StepWithSettings<S: Debug + Step + for<'a> Deserialize<'a>>
 where
     WorkflowStep: From<S>,
+    WorkflowStep: From<<<S as Step>::Workflow as Workflow>::Step>,
 {
+    #[serde(bound = "")]
     pub step: S,
     pub settings: StepSettings,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct StepSettings {
     pub max_retry_count: u32,
     // pub delay: Option<Duration>,
@@ -115,11 +123,14 @@ pub struct StepSettings {
     // backoff: u32,
 }
 
-pub struct FullyQualifiedStep<S: Step>
+#[derive(Debug, Deserialize, Serialize)]
+pub struct FullyQualifiedStep<S: Debug + Step + for<'a> Deserialize<'a>>
 where
     WorkflowStep: From<S>,
+    WorkflowStep: From<<<S as Step>::Workflow as Workflow>::Step>,
 {
     pub instance_id: InstanceId,
+    #[serde(bound = "")]
     pub step: StepWithSettings<S>,
     pub event: Option<WorkflowEvent>,
     pub retry_count: u32,

@@ -1,5 +1,5 @@
 use crate::{
-    event::{Immediate, WorkflowEvent}, step::{Step, WorkflowStep}, StepError, StepWithSettings
+    event::{Immediate, WorkflowEvent}, step::{Step, WorkflowStep}, StepError, StepWithSettings, Workflow0
 };
 use macros::step;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ pub struct Step1 {}
 #[step]
 impl Step1 {
     #[run]
-    async fn run(&self) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
+    async fn run(&self, wf: Workflow0) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
         println!("Running Step1");
         Ok(None)
     }

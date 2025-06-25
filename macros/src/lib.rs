@@ -58,6 +58,18 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
             false
         }
     });
+
+     let wf_arg = run_fn.sig.inputs.iter().find(|arg| {
+        if let FnArg::Typed(pat_type) = arg {
+            if let Pat::Ident(pat_ident) = &*pat_type.pat {
+                pat_ident.ident == "wf"
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    });
     // TODO
     // let event_type = event_arg.and_then(|arg| {
     //     if let FnArg::Typed(PatType { ty, .. }) = arg {
@@ -100,6 +112,18 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
     } else {
         (None, parse_quote!(Immediate))
     };
+
+    let wf = if let Some(wf_arg) = wf_arg {
+        let ty = if let FnArg::Typed(PatType { ty, .. }) = wf_arg {
+            ty
+        } else {
+            return TokenStream::from(Error::missing_field("wf").write_errors());
+        };
+        Some(ty.clone())
+    } else {
+        None
+    };
+
     /////////////////////////////////////////////////
     // remove wait_for_event. Every step should have an Event associated type, which can be "Immediate". from the outside
     // I can check the type's TypeId and see if it is "Immediate" or not. this way I can avoid the need for a wait_for_event method.
@@ -107,14 +131,16 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
     quote! {
     #input
     impl Step for #step_type {
+        type Workflow = #wf;
         type Event = #ty;
         async fn run_raw(
             &self,
+            wf: Self::Workflow,
             event: Option<WorkflowEvent>,
         ) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
             #event_extraction
 
-            self.run(#run_args).await
+            self.run(wf, #run_args).await
         }
     }
     }
