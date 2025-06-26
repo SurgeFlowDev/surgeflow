@@ -5,6 +5,43 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
-    # stdin_open: true    # equivalent to -i
-    # tty: true           # equivalent to -t
-    # restart: "no"
+  pd:
+    image: pingcap/pd:v8.5.2
+    command:
+      - --name=pd
+      - --data-dir=/pd-data
+      - --client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://127.0.0.1:2379
+    volumes:
+      - pd-data:/pd-data
+    # ports:
+    #   - "2379:2379"
+    network_mode: host
+
+  tikv:
+    image: pingcap/tikv:v8.5.2
+    depends_on: [pd]
+    command:
+      - --pd=127.0.0.1:2379
+      - --data-dir=/tikv-data
+    volumes:
+      - tikv-data:/tikv-data
+    # ports:
+    #   - "20160:20160"
+    network_mode: host
+  db:
+    image: postgres:17
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: workflow
+      POSTGRES_PASSWORD: workflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d workflow -U workflow"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pd-data:
+  tikv-data:

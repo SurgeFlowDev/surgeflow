@@ -1,14 +1,21 @@
 use anyhow::Context;
+use fe2o3_amqp::{Receiver, Sender};
 use futures::{TryStreamExt, stream::StreamExt};
+use schemars::JsonSchema;
 use std::{
+    borrow::Cow,
     collections::{HashMap, VecDeque},
     hash::Hash,
+    sync::Arc,
     time::Duration,
 };
+use tikv_client::RawClient;
 
-use derive_more::{From, Into, TryInto};
+use derive_more::{Display, From, Into, TryInto};
 use lapin::{
-    options::{BasicAckOptions, BasicConsumeOptions, BasicPublishOptions}, types::FieldTable, BasicProperties, Channel, Consumer
+    BasicProperties, Channel, Consumer,
+    options::{BasicAckOptions, BasicConsumeOptions, BasicPublishOptions},
+    types::FieldTable,
 };
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -22,90 +29,81 @@ use crate::{
     step::{FullyQualifiedStep, Step, StepWithSettings},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into)]
-pub struct InstanceId(i32);
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema, Display,
+)]
+pub struct WorkflowInstanceId(i32);
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema, Display,
+)]
+pub struct WorkflowId(i32);
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema, Display,
+)]
+pub struct WorkflowName(String);
+
+impl AsRef<str> for WorkflowName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
 
 pub struct ActiveStepQueue {
     // pub queues: HashMap<InstanceId, VecDeque<FullyQualifiedStep<WorkflowStep>>>,
-    pub pub_channel: Channel,
-    pub sub_channel: Channel,
-    pub consumer: Consumer,
+    // pub pub_channel: Channel,
+    pub sender: Sender,
+    pub receiver: Receiver,
 }
 
 impl ActiveStepQueue {
-    // async fn enqueue(&mut self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
+    async fn enqueue(&mut self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
+        let payload = serde_json::to_vec(&step)?;
+        self.sender.send(&payload).await?;
+
+        Ok(())
+    }
+    pub async fn dequeue(&mut self) -> anyhow::Result<FullyQualifiedStep<WorkflowStep>> {
+        let delivery = self.receiver.recv::<Vec<u8>>().await.unwrap();
+        self.receiver.accept(&delivery).await.unwrap();
+
+        let data: FullyQualifiedStep<WorkflowStep> = serde_json::from_slice(delivery.body())?;
+
+        Ok(data)
+    }
+}
+
+#[derive(Clone)]
+pub struct WaitingForEventStepQueue {
+    // pub queues: HashMap<InstanceId, VecDeque<FullyQualifiedStep<WorkflowStep>>>,
+    pub queues: RawClient,
+}
+impl WaitingForEventStepQueue {
+    // pub async fn enqueue(&mut self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
     //     let instance_id = step.instance_id;
     //     self.queues.entry(instance_id).or_default().push_back(step);
     //     Ok(())
     // }
-    async fn enqueue(&mut self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
-        let payload = serde_json::to_vec(&step)?;
-        self.pub_channel
-            .basic_publish(
-                "",
-                "workflow-name",
-                BasicPublishOptions::default(),
-                &payload,
-                BasicProperties::default(),
-            )
-            .await?
-            .await?;
-
-        Ok(())
-    }
-    pub async fn dequeue(
-        &mut self,
-        instance_id: InstanceId,
-    ) -> anyhow::Result<FullyQualifiedStep<WorkflowStep>> {
-        
-        let next = self.consumer
-            .try_next()
-            .await?
-            .context("channel returned none")?;
-
-        let data: FullyQualifiedStep<WorkflowStep> = serde_json::from_slice(&next.data)?;
-
-        next.ack(BasicAckOptions::default()).await?;
-
-        Ok(data)
-    }
-    // pub async fn wait_until_dequeue(
-    //     &mut self,
-    //     instance_id: InstanceId,
-    // ) -> anyhow::Result<FullyQualifiedStep<WorkflowStep>> {
-    //     loop {
-    //         if let Some(queue) = self.queues.get_mut(&instance_id) {
-    //             if let Some(step) = queue.pop_front() {
-    //                 return Ok(step);
-    //             }
-    //         }
-    //         tokio::time::sleep(Duration::from_millis(100)).await;
-    //     }
-    // }
-}
-
-pub struct WaitingForEventStepQueue {
-    pub queues: HashMap<InstanceId, VecDeque<FullyQualifiedStep<WorkflowStep>>>,
-}
-impl WaitingForEventStepQueue {
     pub async fn enqueue(&mut self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
         let instance_id = step.instance_id;
-        self.queues.entry(instance_id).or_default().push_back(step);
+        let payload = serde_json::to_vec(&step)?;
+        self.queues
+            .put(format!("instance_{}", instance_id.0), payload)
+            .await?;
         Ok(())
     }
+
     async fn dequeue(
         &mut self,
-        instance_id: InstanceId,
+        instance_id: WorkflowInstanceId,
     ) -> anyhow::Result<FullyQualifiedStep<WorkflowStep>> {
-        if let Some(queue) = self.queues.get_mut(&instance_id) {
-            if let Some(step) = queue.pop_front() {
-                return Ok(step);
-            }
-        }
-        Err(anyhow::anyhow!(
-            "No waiting steps found for instance ID: {:?}",
-            instance_id
-        ))
+        let value = self
+            .queues
+            .get(format!("instance_{}", instance_id.0))
+            .await?
+            .context("no event")?;
+        let data: FullyQualifiedStep<WorkflowStep> = serde_json::from_slice(&value)?;
+        Ok(data)
     }
 }
 
@@ -119,7 +117,7 @@ impl WaitingForEventStepQueue {
 // }
 
 pub struct CompletedStepQueue {
-    pub queues: HashMap<InstanceId, VecDeque<FullyQualifiedStep<WorkflowStep>>>,
+    pub queues: HashMap<WorkflowInstanceId, VecDeque<FullyQualifiedStep<WorkflowStep>>>,
 }
 impl CompletedStepQueue {
     async fn enqueue(&mut self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
@@ -129,7 +127,7 @@ impl CompletedStepQueue {
     }
     async fn dequeue(
         &mut self,
-        instance_id: InstanceId,
+        instance_id: WorkflowInstanceId,
     ) -> anyhow::Result<FullyQualifiedStep<WorkflowStep>> {
         if let Some(queue) = self.queues.get_mut(&instance_id) {
             if let Some(step) = queue.pop_front() {
@@ -143,6 +141,11 @@ impl CompletedStepQueue {
     }
 }
 
+pub struct Ctx {
+    pub active: ActiveStepQueue,
+    pub waiting: WaitingForEventStepQueue,
+}
+
 pub mod runner {
     use std::any::TypeId;
     use tokio::time::{Duration, sleep};
@@ -154,7 +157,7 @@ pub mod runner {
 
     use super::*;
 
-    pub async fn complete_workflow(instance_id: InstanceId) -> anyhow::Result<()> {
+    pub async fn complete_workflow(instance_id: WorkflowInstanceId) -> anyhow::Result<()> {
         // TODO: Logic to complete the workflow, e.g., updating the database, notifying listeners, etc.
         println!("Completing workflow for instance ID: {:?}", instance_id);
         Ok(())
@@ -175,8 +178,7 @@ pub mod runner {
                 },
             retry_count,
         }: FullyQualifiedStep<WorkflowStep>,
-        waiting_for_event_step_queue: &mut WaitingForEventStepQueue,
-        active_step_queue: &mut ActiveStepQueue,
+        ctx: &mut Ctx,
         // delayed_step_queue: &DelayedStepQueue,
     ) -> anyhow::Result<bool> {
         // TODO: Workflow0 {} shouldn't be hard coded
@@ -195,7 +197,7 @@ pub mod runner {
                     event: None,
                     retry_count: retry_count + 1,
                 };
-                active_step_queue.enqueue(next_step).await?;
+                ctx.active.enqueue(next_step).await?;
                 return Ok(false);
             } else {
                 // If we reached the max retry count, we can complete the workflow
@@ -207,7 +209,7 @@ pub mod runner {
         if let Some(next_step) = next_step {
             if next_step.step.variant_event_type_id() != TypeId::of::<Immediate>() {
                 // If the next step requires an event, enqueue it in the waiting for event queue
-                waiting_for_event_step_queue
+                ctx.waiting
                     .enqueue(FullyQualifiedStep {
                         instance_id,
                         step: next_step,
@@ -217,7 +219,7 @@ pub mod runner {
                     .await?;
                 return Ok(false);
             } else {
-                active_step_queue
+                ctx.active
                     .enqueue(FullyQualifiedStep {
                         instance_id,
                         step: next_step,
@@ -234,15 +236,16 @@ pub mod runner {
     }
 
     pub async fn handle_event(
-        instance_id: InstanceId,
+        instance_id: WorkflowInstanceId,
         event: WorkflowEvent,
-        waiting_for_step_queue: &mut WaitingForEventStepQueue,
-        active_step_queue: &mut ActiveStepQueue,
+        ctx: &mut Ctx,
     ) -> anyhow::Result<()> {
-        let fqstep = waiting_for_step_queue.dequeue(instance_id).await?;
+        tracing::info!("started handle_event");
+        let fqstep = ctx.waiting.dequeue(instance_id).await?;
         // let event = step.try_deserialize_event(event)?;
 
-        active_step_queue
+        tracing::info!("enqueue active step");
+        ctx.active
             .enqueue(FullyQualifiedStep {
                 event: Some(event),
                 ..fqstep
@@ -258,6 +261,7 @@ pub struct Workflow0 {}
 impl Workflow for Workflow0 {
     type Event = WorkflowEvent;
     type Step = WorkflowStep;
+    const NAME: &'static str = "workflow_0";
 }
 
 pub trait Workflow
@@ -266,4 +270,16 @@ where
 {
     type Event: Event;
     type Step: Step<Workflow = Self, Event = Self::Event>;
+    const NAME: &'static str;
 }
+
+pub trait WorkflowExt: Workflow
+where
+    step::WorkflowStep: From<<Self as Workflow>::Step>,
+{
+    fn name() -> WorkflowName {
+        String::from(Self::NAME).into()
+    }
+}
+
+impl<T: Workflow> WorkflowExt for T where step::WorkflowStep: From<<T as Workflow>::Step> {}

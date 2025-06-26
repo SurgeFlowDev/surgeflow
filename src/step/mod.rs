@@ -8,7 +8,7 @@ use step_0::Step0;
 use step_1::Step1;
 
 use crate::{
-    ActiveStepQueue, InstanceId, WaitingForEventStepQueue, Workflow, Workflow0,
+    ActiveStepQueue, WorkflowInstanceId, WaitingForEventStepQueue, Workflow, Workflow0,
     event::{Event, Immediate, WorkflowEvent},
 };
 
@@ -129,7 +129,7 @@ where
     WorkflowStep: From<S>,
     WorkflowStep: From<<<S as Step>::Workflow as Workflow>::Step>,
 {
-    pub instance_id: InstanceId,
+    pub instance_id: WorkflowInstanceId,
     #[serde(bound = "")]
     pub step: StepWithSettings<S>,
     pub event: Option<WorkflowEvent>,
