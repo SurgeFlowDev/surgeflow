@@ -9,3 +9,8 @@ CREATE TABLE
         "id" INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         "workflow_id" INTEGER NOT NULL REFERENCES workflows ("id")
     );
+
+INSERT INTO
+    workflows ("name")
+VALUES
+    ('workflow_0');
