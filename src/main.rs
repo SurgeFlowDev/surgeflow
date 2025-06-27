@@ -1,14 +1,15 @@
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
 use axum_thiserror::ErrorStatus;
-use fe2o3_amqp::{Receiver, Sender, Session};
+use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
 use futures::lock::Mutex;
 use lapin::{Connection, ConnectionProperties, options::QueueDeclareOptions, types::FieldTable};
 use rust_workflow_2::{
-    ActiveStepQueue, Ctx, WaitingForEventStepQueue, Workflow0, WorkflowExt, WorkflowId,
+    ActiveStepQueue, Ctx, WaitingForEventStepQueue, Workflow, Workflow0, WorkflowExt, WorkflowId,
     WorkflowInstanceId, WorkflowName,
     event::{Event, WorkflowEvent, event_0::Event0},
     runner::{handle_event, handle_step},
+    step::{FullyQualifiedStep, StepSettings, StepWithSettings, WorkflowStep, step_0::Step0},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -56,13 +57,13 @@ impl<E: Event> EventSender<E> {
 }
 
 #[derive(Debug)]
-struct EventReceiver<E: Event>(Mutex<Receiver>, PhantomData<E>);
+struct EventReceiver<W: Workflow>(Mutex<Receiver>, PhantomData<W>);
 
-impl<E: Event> EventReceiver<E> {
+impl<W: Workflow> EventReceiver<W> {
     fn new(receiver: Receiver) -> Self {
         Self(Mutex::new(receiver), PhantomData::default())
     }
-    async fn recv(&self) -> anyhow::Result<E> {
+    async fn recv(&self) -> anyhow::Result<W::Event> {
         let mut receiver = self.0.lock().await;
 
         let event = receiver.recv::<String>().await?;
@@ -76,7 +77,7 @@ impl<E: Event> EventReceiver<E> {
 struct WorkflowInstanceManager {
     // TODO: could probably be a const param if they allowed &str
     workflow_name: WorkflowName,
-    sender: Sender,
+    sender: Mutex<Sender>,
 }
 
 impl WorkflowInstanceManager {
@@ -96,6 +97,8 @@ impl WorkflowInstanceManager {
         .await?;
 
         let res = res.try_into()?;
+        let msg = serde_json::to_string(&res)?;
+        self.sender.lock().await.send(msg).await?;
         Ok(res)
     }
 }
@@ -197,53 +200,88 @@ struct AppState {
     sqlx_pool: PgPool,
 }
 
+async fn workspace_instance_worker() -> anyhow::Result<()> {
+    let mut connection =
+        fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
+            .await?;
+
+    let mut session = Session::begin(&mut connection).await?;
+    let mut instance_receiver = Receiver::attach(
+        &mut session,
+        "workflow-0-instances-receiver-1",
+        "workflow-0-instances",
+    )
+    .await?;
+
+    let mut step_sender = Sender::attach(
+        &mut session,
+        "workflow-0-steps-sender-1",
+        "workflow-0-steps",
+    )
+    .await?;
+
+    loop {
+        let Ok(msg) = instance_receiver.recv::<String>().await else {
+            continue;
+        };
+        let Ok(instance) = serde_json::from_str::<WorkflowInstance>(msg.body()) else {
+            continue;
+        };
+        tracing::info!("{:?}", instance);
+        instance_receiver.accept(msg).await?;
+
+        let fully_qualified_step = FullyQualifiedStep {
+            instance_id: instance.id,
+            step: Workflow0::entrypoint(),
+            event: None,
+            retry_count: 0,
+        };
+        let Ok(fully_qualified_step) = serde_json::to_string(&fully_qualified_step) else {
+            continue;
+        };
+        if let Err(_) = step_sender.send(fully_qualified_step).await {
+            continue;
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
     let sqlx_pool = PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?;
 
-    let mut connection = fe2o3_amqp::Connection::open(
-        "connection-111",                    // container id
-        "amqp://guest:guest@127.0.0.1:5672", // url
-    )
-    .await?;
+    let mut connection =
+        fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
+            .await?;
 
     let mut session = Session::begin(&mut connection).await?;
 
-    let sender = Sender::attach(
-        &mut session,           // Session
-        "rust-sender-link-111", // link name
-        "workflow-name",        // target address
-    )
-    .await?;
+    let instance_worker = tokio::spawn(workspace_instance_worker());
 
     let event_sender = Sender::attach(
-        &mut session,           // Session
-        "rust-sender-link-111", // link name
-        "workflow-name",        // target address
+        &mut session,
+        "workflow-0-events-sender-1",
+        "workflow-0-events",
     )
     .await?;
 
     let instance_sender = Sender::attach(
-        &mut session,              // Session
-        "rust-sender-link-1111",   // link name
-        "workflow-name-instances", // target address
+        &mut session,
+        "workflow-0-instances-sender-1",
+        "workflow-0-instances",
     )
     .await?;
 
     let event_sender = EventSender::new(event_sender);
 
-    // let workflows = TypeMap::new();
-
     let app_state = Arc::new(AppState {
         event_sender,
         workflow_instance_manager: WorkflowInstanceManager {
             workflow_name: Workflow0::name(),
-            sender: instance_sender,
+            sender: instance_sender.into(),
         },
         sqlx_pool,
-        // workflows,
     });
     let router: ApiRouter = ApiRouter::new()
         .typed_api_route(post_workflow_instance)
@@ -264,7 +302,8 @@ async fn main() -> anyhow::Result<()> {
     let router = NormalizePathLayer::trim_trailing_slash().layer(router);
     let router = ServiceExt::<Request>::into_make_service(router);
 
-    tokio::try_join!(axum::serve(listener, router))?;
+    axum::serve(listener, router).await?;
+    instance_worker.await??;
     Ok(())
 }
 

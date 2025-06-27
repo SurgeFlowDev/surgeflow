@@ -3,21 +3,19 @@ pub mod step_1;
 
 use derive_more::{From, TryInto};
 use serde::{Deserialize, Serialize};
-use std::{any::TypeId, fmt::Debug, time::Duration};
+use std::{any::TypeId, fmt::Debug};
 use step_0::Step0;
 use step_1::Step1;
 
 use crate::{
-    ActiveStepQueue, WorkflowInstanceId, WaitingForEventStepQueue, Workflow, Workflow0,
+    ActiveStepQueue, WaitingForEventStepQueue, Workflow, Workflow0, WorkflowInstanceId,
     event::{Event, Immediate, WorkflowEvent},
 };
 
-pub trait Step: Serialize + for<'a> Deserialize<'a> + Debug
-where
-    WorkflowStep: From<Self>,
-    WorkflowStep: From<<<Self as Step>::Workflow as Workflow>::Step>,
+pub trait Step:
+    Serialize + for<'a> Deserialize<'a> + Debug + Into<<Self::Workflow as Workflow>::Step>
 {
-    type Event: Event;
+    type Event: Event<Workflow = Self::Workflow>;
     type Workflow: Workflow;
     async fn run_raw(
         &self,
@@ -25,7 +23,7 @@ where
         event: Option<WorkflowEvent>,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError>;
+    ) -> Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Step>>, StepError>;
     async fn enqueue(
         step: FullyQualifiedStep<Self>,
         active_step_queue: &mut ActiveStepQueue,
@@ -38,10 +36,10 @@ where
         if TypeId::of::<Self::Event>() != TypeId::of::<Immediate>() && step.event.is_none() {
             // If the next step requires an event, enqueue it in the waiting for event queue
             waiting_for_step_queue
-                .enqueue(FullyQualifiedStep::<WorkflowStep> {
+                .enqueue(FullyQualifiedStep::<<Self::Workflow as Workflow>::Step> {
                     event: step.event,
                     instance_id: step.instance_id,
-                    step: StepWithSettings::<WorkflowStep> {
+                    step: StepWithSettings::<<Self::Workflow as Workflow>::Step> {
                         step: step.step.step.into(),
                         settings: step.step.settings,
                     },
@@ -51,10 +49,10 @@ where
             return Ok(());
         } else {
             active_step_queue
-                .enqueue(FullyQualifiedStep::<WorkflowStep> {
+                .enqueue(FullyQualifiedStep::<<Self::Workflow as Workflow>::Step> {
                     event: step.event,
                     instance_id: step.instance_id,
-                    step: StepWithSettings::<WorkflowStep> {
+                    step: StepWithSettings::<<Self::Workflow as Workflow>::Step> {
                         step: step.step.step.into(),
                         settings: step.step.settings,
                     },
@@ -105,11 +103,7 @@ pub enum StepError {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct StepWithSettings<S: Debug + Step + for<'a> Deserialize<'a>>
-where
-    WorkflowStep: From<S>,
-    WorkflowStep: From<<<S as Step>::Workflow as Workflow>::Step>,
-{
+pub struct StepWithSettings<S: Debug + Step + for<'a> Deserialize<'a>> {
     #[serde(bound = "")]
     pub step: S,
     pub settings: StepSettings,
@@ -124,11 +118,7 @@ pub struct StepSettings {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct FullyQualifiedStep<S: Debug + Step + for<'a> Deserialize<'a>>
-where
-    WorkflowStep: From<S>,
-    WorkflowStep: From<<<S as Step>::Workflow as Workflow>::Step>,
-{
+pub struct FullyQualifiedStep<S: Debug + Step + for<'a> Deserialize<'a>> {
     pub instance_id: WorkflowInstanceId,
     #[serde(bound = "")]
     pub step: StepWithSettings<S>,

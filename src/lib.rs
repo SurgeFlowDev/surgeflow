@@ -26,7 +26,7 @@ use step::{StepError, WorkflowStep};
 
 use crate::{
     event::{Event, WorkflowEvent},
-    step::{FullyQualifiedStep, Step, StepWithSettings},
+    step::{FullyQualifiedStep, Step, StepSettings, StepWithSettings, step_0::Step0},
 };
 
 #[derive(
@@ -57,17 +57,17 @@ pub struct ActiveStepQueue {
 }
 
 impl ActiveStepQueue {
-    async fn enqueue(&mut self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
+    async fn enqueue<S: step::Step>(&mut self, step: FullyQualifiedStep<S>) -> anyhow::Result<()> {
         let payload = serde_json::to_vec(&step)?;
         self.sender.send(&payload).await?;
 
         Ok(())
     }
-    pub async fn dequeue(&mut self) -> anyhow::Result<FullyQualifiedStep<WorkflowStep>> {
+    pub async fn dequeue<S: step::Step>(&mut self) -> anyhow::Result<FullyQualifiedStep<S>> {
         let delivery = self.receiver.recv::<Vec<u8>>().await.unwrap();
         self.receiver.accept(&delivery).await.unwrap();
 
-        let data: FullyQualifiedStep<WorkflowStep> = serde_json::from_slice(delivery.body())?;
+        let data: FullyQualifiedStep<S> = serde_json::from_slice(delivery.body())?;
 
         Ok(data)
     }
@@ -84,7 +84,10 @@ impl WaitingForEventStepQueue {
     //     self.queues.entry(instance_id).or_default().push_back(step);
     //     Ok(())
     // }
-    pub async fn enqueue(&mut self, step: FullyQualifiedStep<WorkflowStep>) -> anyhow::Result<()> {
+    pub async fn enqueue<S: step::Step>(
+        &mut self,
+        step: FullyQualifiedStep<S>,
+    ) -> anyhow::Result<()> {
         let instance_id = step.instance_id;
         let payload = serde_json::to_vec(&step)?;
         self.queues
@@ -93,16 +96,16 @@ impl WaitingForEventStepQueue {
         Ok(())
     }
 
-    async fn dequeue(
+    async fn dequeue<S: step::Step>(
         &mut self,
         instance_id: WorkflowInstanceId,
-    ) -> anyhow::Result<FullyQualifiedStep<WorkflowStep>> {
+    ) -> anyhow::Result<FullyQualifiedStep<S>> {
         let value = self
             .queues
             .get(format!("instance_{}", instance_id.0))
             .await?
             .context("no event")?;
-        let data: FullyQualifiedStep<WorkflowStep> = serde_json::from_slice(&value)?;
+        let data: FullyQualifiedStep<S> = serde_json::from_slice(&value)?;
         Ok(data)
     }
 }
@@ -241,7 +244,7 @@ pub mod runner {
         ctx: &mut Ctx,
     ) -> anyhow::Result<()> {
         tracing::info!("started handle_event");
-        let fqstep = ctx.waiting.dequeue(instance_id).await?;
+        let fqstep = ctx.waiting.dequeue::<WorkflowStep>(instance_id).await?;
         // let event = step.try_deserialize_event(event)?;
 
         tracing::info!("enqueue active step");
@@ -262,24 +265,27 @@ impl Workflow for Workflow0 {
     type Event = WorkflowEvent;
     type Step = WorkflowStep;
     const NAME: &'static str = "workflow_0";
+
+    fn entrypoint() -> StepWithSettings<Self::Step> {
+        StepWithSettings {
+            step: Step0 {}.into(),
+            settings: StepSettings { max_retry_count: 1 },
+        }
+    }
 }
 
-pub trait Workflow
-where
-    step::WorkflowStep: From<<Self as Workflow>::Step>,
-{
-    type Event: Event;
+pub trait Workflow {
+    type Event: Event<Workflow = Self>;
     type Step: Step<Workflow = Self, Event = Self::Event>;
     const NAME: &'static str;
+
+    fn entrypoint() -> StepWithSettings<Self::Step>;
 }
 
-pub trait WorkflowExt: Workflow
-where
-    step::WorkflowStep: From<<Self as Workflow>::Step>,
-{
+pub trait WorkflowExt: Workflow {
     fn name() -> WorkflowName {
         String::from(Self::NAME).into()
     }
 }
 
-impl<T: Workflow> WorkflowExt for T where step::WorkflowStep: From<<T as Workflow>::Step> {}
+impl<T: Workflow> WorkflowExt for T {}
