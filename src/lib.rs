@@ -210,7 +210,7 @@ pub mod runner {
         };
 
         if let Some(next_step) = next_step {
-            if next_step.step.variant_event_type_id() != TypeId::of::<Immediate>() {
+            if next_step.step.variant_event_type_id() != TypeId::of::<Immediate<Workflow0>>() {
                 // If the next step requires an event, enqueue it in the waiting for event queue
                 ctx.waiting
                     .enqueue(FullyQualifiedStep {
@@ -275,7 +275,7 @@ impl Workflow for Workflow0 {
 }
 
 pub trait Workflow {
-    type Event: Event<Workflow = Self>;
+    type Event: Event<Workflow = Self> + JsonSchema;
     type Step: Step<Workflow = Self, Event = Self::Event>;
     const NAME: &'static str;
 

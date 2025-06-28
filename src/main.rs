@@ -5,11 +5,7 @@ use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
 use futures::lock::Mutex;
 use lapin::{Connection, ConnectionProperties, options::QueueDeclareOptions, types::FieldTable};
 use rust_workflow_2::{
-    ActiveStepQueue, Ctx, WaitingForEventStepQueue, Workflow, Workflow0, WorkflowExt, WorkflowId,
-    WorkflowInstanceId, WorkflowName,
-    event::{Event, WorkflowEvent, event_0::Event0},
-    runner::{handle_event, handle_step},
-    step::{FullyQualifiedStep, StepSettings, StepWithSettings, WorkflowStep, step_0::Step0},
+    event::{event_0::Event0, Event, EventSender, InstanceEvent, WorkflowEvent}, runner::{handle_event, handle_step}, step::{step_0::Step0, FullyQualifiedStep, StepSettings, StepWithSettings, WorkflowStep}, ActiveStepQueue, Ctx, WaitingForEventStepQueue, Workflow, Workflow0, WorkflowExt, WorkflowId, WorkflowInstanceId, WorkflowName
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -34,44 +30,9 @@ use axum_typed_routing::{TypedApiRouter, api_route};
 use tower_layer::Layer;
 use typemap_rev::TypeMap;
 
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
-struct InstanceEvent<E: Event> {
-    #[serde(bound = "")]
-    event: E,
-    instance_id: WorkflowInstanceId,
-}
 
-#[derive(Debug)]
-struct EventSender<E: Event>(Mutex<Sender>, PhantomData<E>);
 
-impl<E: Event> EventSender<E> {
-    fn new(sender: Sender) -> Self {
-        Self(Mutex::new(sender), PhantomData::default())
-    }
-    async fn send(&self, event: InstanceEvent<E>) -> anyhow::Result<()> {
-        let mut sender = self.0.lock().await;
-        let event = serde_json::to_string(&event)?;
-        sender.send(event).await?;
-        Ok(())
-    }
-}
 
-#[derive(Debug)]
-struct EventReceiver<W: Workflow>(Mutex<Receiver>, PhantomData<W>);
-
-impl<W: Workflow> EventReceiver<W> {
-    fn new(receiver: Receiver) -> Self {
-        Self(Mutex::new(receiver), PhantomData::default())
-    }
-    async fn recv(&self) -> anyhow::Result<W::Event> {
-        let mut receiver = self.0.lock().await;
-
-        let event = receiver.recv::<String>().await?;
-        let event = serde_json::from_str(event.body())?;
-
-        Ok(event)
-    }
-}
 
 #[derive(Debug)]
 struct WorkflowInstanceManager {
@@ -195,7 +156,7 @@ async fn post_workflow_event(
 }
 
 struct AppState {
-    event_sender: EventSender<WorkflowEvent>,
+    event_sender: EventSender<Workflow0>,
     workflow_instance_manager: WorkflowInstanceManager,
     sqlx_pool: PgPool,
 }

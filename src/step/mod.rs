@@ -32,8 +32,11 @@ pub trait Step:
     ) -> anyhow::Result<()>
     where
         Self::Event: 'static,
+        <Self as Step>::Workflow: 'static,
     {
-        if TypeId::of::<Self::Event>() != TypeId::of::<Immediate>() && step.event.is_none() {
+        if TypeId::of::<Self::Event>() != TypeId::of::<Immediate<Self::Workflow>>()
+            && step.event.is_none()
+        {
             // If the next step requires an event, enqueue it in the waiting for event queue
             waiting_for_step_queue
                 .enqueue(FullyQualifiedStep::<<Self::Workflow as Workflow>::Step> {
@@ -92,7 +95,6 @@ impl Step for WorkflowStep {
             WorkflowStep::Step1(step) => Step::run_raw(step, wf, event).await,
         }
     }
-
 }
 
 #[derive(Debug, thiserror::Error)]
