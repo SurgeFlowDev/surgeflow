@@ -5,7 +5,11 @@ use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
 use futures::lock::Mutex;
 use lapin::{Connection, ConnectionProperties, options::QueueDeclareOptions, types::FieldTable};
 use rust_workflow_2::{
-    event::{event_0::Event0, Event, EventSender, InstanceEvent, WorkflowEvent}, runner::{handle_event, handle_step}, step::{step_0::Step0, FullyQualifiedStep, StepSettings, StepWithSettings, WorkflowStep}, ActiveStepQueue, Ctx, WaitingForEventStepQueue, Workflow, Workflow0, WorkflowExt, WorkflowId, WorkflowInstanceId, WorkflowName
+    ActiveStepQueue, Ctx, WaitingForEventStepQueue, Workflow, Workflow0, WorkflowExt, WorkflowId,
+    WorkflowInstanceId, WorkflowName,
+    event::{Event, EventSender, InstanceEvent, WorkflowEvent, event_0::Event0},
+    runner::{handle_event, handle_step},
+    step::{FullyQualifiedStep, StepSettings, StepWithSettings, WorkflowStep, step_0::Step0},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -29,10 +33,6 @@ use axum_typed_routing::{TypedApiRouter, api_route};
 
 use tower_layer::Layer;
 use typemap_rev::TypeMap;
-
-
-
-
 
 #[derive(Debug)]
 struct WorkflowInstanceManager {
@@ -167,6 +167,7 @@ async fn workspace_instance_worker() -> anyhow::Result<()> {
             .await?;
 
     let mut session = Session::begin(&mut connection).await?;
+    
     let mut instance_receiver = Receiver::attach(
         &mut session,
         "workflow-0-instances-receiver-1",
@@ -191,13 +192,13 @@ async fn workspace_instance_worker() -> anyhow::Result<()> {
         tracing::info!("{:?}", instance);
         instance_receiver.accept(msg).await?;
 
-        let fully_qualified_step = FullyQualifiedStep {
+        let entrypoint = FullyQualifiedStep {
             instance_id: instance.id,
             step: Workflow0::entrypoint(),
             event: None,
             retry_count: 0,
         };
-        let Ok(fully_qualified_step) = serde_json::to_string(&fully_qualified_step) else {
+        let Ok(fully_qualified_step) = serde_json::to_string(&entrypoint) else {
             continue;
         };
         if let Err(_) = step_sender.send(fully_qualified_step).await {

@@ -1,11 +1,15 @@
 pub mod step_0;
 pub mod step_1;
 
+use anyhow::Context;
 use derive_more::{From, TryInto};
+use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
 use serde::{Deserialize, Serialize};
-use std::{any::TypeId, fmt::Debug};
+use std::{any::TypeId, fmt::Debug, marker::PhantomData};
 use step_0::Step0;
 use step_1::Step1;
+use tikv_client::RawClient;
+use tokio::sync::Mutex;
 
 use crate::{
     ActiveStepQueue, WaitingForEventStepQueue, Workflow, Workflow0, WorkflowInstanceId,
@@ -13,7 +17,7 @@ use crate::{
 };
 
 pub trait Step:
-    Serialize + for<'a> Deserialize<'a> + Debug + Into<<Self::Workflow as Workflow>::Step>
+    Serialize + for<'a> Deserialize<'a> + Debug + Into<<Self::Workflow as Workflow>::Step> + Send
 {
     type Event: Event<Workflow = Self::Workflow>;
     type Workflow: Workflow;
@@ -125,4 +129,82 @@ pub struct FullyQualifiedStep<S: Debug + Step + for<'a> Deserialize<'a>> {
     pub step: StepWithSettings<S>,
     pub event: Option<WorkflowEvent>,
     pub retry_count: u32,
+}
+
+#[derive(Clone)]
+pub struct StepsAwaitingEventManager<W: Workflow> {
+    tikv_client: RawClient,
+    _phantom: PhantomData<W>,
+}
+impl<W: Workflow> StepsAwaitingEventManager<W> {
+    pub fn new(tikv_client: RawClient) -> Self {
+        Self {
+            tikv_client,
+            _phantom: PhantomData,
+        }
+    }
+    pub async fn put_step(&mut self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
+        let instance_id = step.instance_id;
+        let payload = serde_json::to_vec(&step)?;
+        self.tikv_client
+            .put(format!("instance_{}", instance_id.0), payload)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_step(
+        &mut self,
+        instance_id: WorkflowInstanceId,
+    ) -> anyhow::Result<FullyQualifiedStep<W::Step>> {
+        let value = self
+            .tikv_client
+            .get(format!("instance_{}", instance_id.0))
+            .await?
+            .context("no event")?;
+        let data = serde_json::from_slice(&value)?;
+        Ok(data)
+    }
+}
+
+#[derive(Debug)]
+pub struct ActiveStepReceiver<W: Workflow>(Mutex<Receiver>, PhantomData<W>);
+
+impl<W: Workflow> ActiveStepReceiver<W> {
+    pub fn new(receiver: Receiver) -> Self {
+        Self(Mutex::new(receiver), PhantomData::default())
+    }
+    pub async fn recv(&self) -> anyhow::Result<FullyQualifiedStep<W::Step>> {
+        let mut receiver = self.0.lock().await;
+
+        // TODO: using string while developing, change to Vec<u8> in production
+        let event = receiver.recv::<String>().await?;
+        let event = serde_json::from_str(event.body())?;
+
+        Ok(event)
+    }
+}
+
+
+/// There can only ever be one ActiveStepSender instance per workflow type.
+/// The link name is derived from the workflow name. This is intentional, as having multiple senders
+/// for the same workflow type is not ever expected. This won't fail or panic, but it will cause the 
+/// earlier sender to be replaced by the new one.
+#[derive(Debug)]
+pub struct ActiveStepSender<W: Workflow>(Mutex<Sender>, PhantomData<W>);
+
+impl<W: Workflow> ActiveStepSender<W> {
+    pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
+        let addr = format!("{}-active-steps", W::NAME);
+        let link_name = format!("{}-active-steps-sender", W::NAME);
+        let sender = Sender::attach(session, link_name, addr).await?;
+        Ok(Self(Mutex::new(sender), PhantomData::default()))
+    }
+    pub async fn send(&self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
+        let mut sender = self.0.lock().await;
+
+        // TODO: using string while developing, change to Vec<u8> in production
+        let event = serde_json::to_string(&step)?;
+        sender.send(event).await?;
+        Ok(())
+    }
 }

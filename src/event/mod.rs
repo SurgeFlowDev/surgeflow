@@ -48,6 +48,7 @@ impl<W: Workflow> EventReceiver<W> {
     pub async fn recv(&self) -> anyhow::Result<W::Event> {
         let mut receiver = self.0.lock().await;
 
+        // TODO: using string while developing, change to Vec<u8> in production
         let event = receiver.recv::<String>().await?;
         let event = serde_json::from_str(event.body())?;
 
@@ -64,6 +65,8 @@ impl<W: Workflow> EventSender<W> {
     }
     pub async fn send(&self, event: InstanceEvent<W>) -> anyhow::Result<()> {
         let mut sender = self.0.lock().await;
+
+        // TODO: using string while developing, change to Vec<u8> in production
         let event = serde_json::to_string(&event)?;
         sender.send(event).await?;
         Ok(())
