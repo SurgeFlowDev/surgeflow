@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{event::{Event, WorkflowEvent}, Workflow0};
 
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
 pub struct Event0 {}
 
 impl Event for Event0 {

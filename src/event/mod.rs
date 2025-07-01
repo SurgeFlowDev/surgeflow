@@ -11,7 +11,7 @@ use crate::{Workflow, Workflow0, WorkflowInstanceId};
 
 pub mod event_0;
 
-#[derive(Debug, Serialize, Deserialize, From, TryInto, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, From, TryInto, JsonSchema, Clone)]
 pub enum WorkflowEvent {
     Event0(Event0),
 }
@@ -20,11 +20,11 @@ impl Event for WorkflowEvent {
     type Workflow = Workflow0;
 }
 
-pub trait Event: Serialize + for<'a> Deserialize<'a> {
+pub trait Event: Serialize + for<'a> Deserialize<'a> + Clone {
     type Workflow: Workflow;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Immediate<W: Workflow>(PhantomData<W>);
 
 impl<W: Workflow> Event for Immediate<W> {

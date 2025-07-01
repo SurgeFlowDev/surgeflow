@@ -10,6 +10,7 @@ use step_0::Step0;
 use step_1::Step1;
 use tikv_client::RawClient;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 use crate::{
     ActiveStepQueue, WaitingForEventStepQueue, Workflow, Workflow0, WorkflowInstanceId,
@@ -17,7 +18,12 @@ use crate::{
 };
 
 pub trait Step:
-    Serialize + for<'a> Deserialize<'a> + Debug + Into<<Self::Workflow as Workflow>::Step> + Send
+    Serialize
+    + for<'a> Deserialize<'a>
+    + Debug
+    + Into<<Self::Workflow as Workflow>::Step>
+    + Send
+    + Clone
 {
     type Event: Event<Workflow = Self::Workflow>;
     type Workflow: Workflow;
@@ -71,7 +77,7 @@ pub trait Step:
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, From, TryInto)]
+#[derive(Debug, Serialize, Deserialize, From, TryInto, Clone)]
 pub enum WorkflowStep {
     Step0(Step0),
     Step1(Step1),
@@ -107,22 +113,22 @@ pub enum StepError {
     Unknown,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct StepWithSettings<S: Debug + Step + for<'a> Deserialize<'a>> {
     #[serde(bound = "")]
     pub step: S,
     pub settings: StepSettings,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub struct StepSettings {
-    pub max_retry_count: u32,
+    pub max_retries: u32,
     // pub delay: Option<Duration>,
     // TODO
     // backoff: u32,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FullyQualifiedStep<S: Debug + Step + for<'a> Deserialize<'a>> {
     pub instance_id: WorkflowInstanceId,
     #[serde(bound = "")]
@@ -143,7 +149,7 @@ impl<W: Workflow> StepsAwaitingEventManager<W> {
             _phantom: PhantomData,
         }
     }
-    pub async fn put_step(&mut self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
+    pub async fn put_step(&self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
         let instance_id = step.instance_id;
         let payload = serde_json::to_vec(&step)?;
         self.tikv_client
@@ -153,7 +159,7 @@ impl<W: Workflow> StepsAwaitingEventManager<W> {
     }
 
     pub async fn get_step(
-        &mut self,
+        &self,
         instance_id: WorkflowInstanceId,
     ) -> anyhow::Result<FullyQualifiedStep<W::Step>> {
         let value = self
@@ -170,32 +176,40 @@ impl<W: Workflow> StepsAwaitingEventManager<W> {
 pub struct ActiveStepReceiver<W: Workflow>(Mutex<Receiver>, PhantomData<W>);
 
 impl<W: Workflow> ActiveStepReceiver<W> {
-    pub fn new(receiver: Receiver) -> Self {
-        Self(Mutex::new(receiver), PhantomData::default())
+    pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
+        let addr = format!("{}-active-steps", W::NAME);
+        let link_name = format!("{addr}-receiver-{}", Uuid::new_v4().as_hyphenated());
+        let receiver = Receiver::attach(session, link_name, addr).await?;
+        Ok(Self(Mutex::new(receiver), PhantomData::default()))
     }
     pub async fn recv(&self) -> anyhow::Result<FullyQualifiedStep<W::Step>> {
         let mut receiver = self.0.lock().await;
 
         // TODO: using string while developing, change to Vec<u8> in production
-        let event = receiver.recv::<String>().await?;
-        let event = serde_json::from_str(event.body())?;
+        let msg = receiver.recv::<String>().await?;
+
+        let event = match serde_json::from_str(msg.body()) {
+            Ok(event) => event,
+            Err(e) => {
+                let err = anyhow::anyhow!("Failed to deserialize step: {}", e);
+                tracing::error!("{}", err);
+                receiver.reject(msg, None).await?;
+                return Err(err);
+            }
+        };
+        receiver.accept(msg).await?;
 
         Ok(event)
     }
 }
 
-
-/// There can only ever be one ActiveStepSender instance per workflow type.
-/// The link name is derived from the workflow name. This is intentional, as having multiple senders
-/// for the same workflow type is not ever expected. This won't fail or panic, but it will cause the 
-/// earlier sender to be replaced by the new one.
 #[derive(Debug)]
 pub struct ActiveStepSender<W: Workflow>(Mutex<Sender>, PhantomData<W>);
 
 impl<W: Workflow> ActiveStepSender<W> {
     pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
         let addr = format!("{}-active-steps", W::NAME);
-        let link_name = format!("{}-active-steps-sender", W::NAME);
+        let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
         let sender = Sender::attach(session, link_name, addr).await?;
         Ok(Self(Mutex::new(sender), PhantomData::default()))
     }

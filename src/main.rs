@@ -1,15 +1,17 @@
-use std::{marker::PhantomData, sync::Arc, time::Duration};
+use std::{any::TypeId, sync::Arc, time::Duration};
 
 use axum_thiserror::ErrorStatus;
-use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
+use fe2o3_amqp::{Receiver, Sender, Session};
 use futures::lock::Mutex;
 use lapin::{Connection, ConnectionProperties, options::QueueDeclareOptions, types::FieldTable};
 use rust_workflow_2::{
     ActiveStepQueue, Ctx, WaitingForEventStepQueue, Workflow, Workflow0, WorkflowExt, WorkflowId,
     WorkflowInstanceId, WorkflowName,
-    event::{Event, EventSender, InstanceEvent, WorkflowEvent, event_0::Event0},
+    event::{EventSender, Immediate, InstanceEvent, WorkflowEvent, event_0::Event0},
     runner::{handle_event, handle_step},
-    step::{FullyQualifiedStep, StepSettings, StepWithSettings, WorkflowStep, step_0::Step0},
+    step::{
+        ActiveStepReceiver, ActiveStepSender, FullyQualifiedStep, Step, StepsAwaitingEventManager,
+    },
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -27,12 +29,10 @@ use axum::{
     Extension, ServiceExt,
     extract::{Json, Request, State},
     http::StatusCode,
-    response::ErrorResponse,
 };
 use axum_typed_routing::{TypedApiRouter, api_route};
 
 use tower_layer::Layer;
-use typemap_rev::TypeMap;
 
 #[derive(Debug)]
 struct WorkflowInstanceManager {
@@ -167,7 +167,7 @@ async fn workspace_instance_worker() -> anyhow::Result<()> {
             .await?;
 
     let mut session = Session::begin(&mut connection).await?;
-    
+
     let mut instance_receiver = Receiver::attach(
         &mut session,
         "workflow-0-instances-receiver-1",
@@ -175,21 +175,17 @@ async fn workspace_instance_worker() -> anyhow::Result<()> {
     )
     .await?;
 
-    let mut step_sender = Sender::attach(
-        &mut session,
-        "workflow-0-steps-sender-1",
-        "workflow-0-steps",
-    )
-    .await?;
+    let active_step_sender = ActiveStepSender::<Workflow0>::new(&mut session).await?;
 
     loop {
         let Ok(msg) = instance_receiver.recv::<String>().await else {
             continue;
         };
+        tracing::info!("Received instance message");
         let Ok(instance) = serde_json::from_str::<WorkflowInstance>(msg.body()) else {
             continue;
         };
-        tracing::info!("{:?}", instance);
+        // tracing::info!("{:?}", instance);
         instance_receiver.accept(msg).await?;
 
         let entrypoint = FullyQualifiedStep {
@@ -198,11 +194,64 @@ async fn workspace_instance_worker() -> anyhow::Result<()> {
             event: None,
             retry_count: 0,
         };
-        let Ok(fully_qualified_step) = serde_json::to_string(&entrypoint) else {
+
+        if let Err(_) = active_step_sender.send(entrypoint).await {
+            continue;
+        }
+    }
+}
+
+async fn active_step_worker(wf: Workflow0) -> anyhow::Result<()> {
+    let mut connection =
+        fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
+            .await?;
+    let mut session = Session::begin(&mut connection).await?;
+    let active_step_receiver = ActiveStepReceiver::<Workflow0>::new(&mut session).await?;
+    let active_step_sender = ActiveStepSender::<Workflow0>::new(&mut session).await?;
+    let steps_awaiting_event =
+        StepsAwaitingEventManager::<Workflow0>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
+
+    loop {
+        let Ok(mut step) = active_step_receiver.recv().await else {
             continue;
         };
-        if let Err(_) = step_sender.send(fully_qualified_step).await {
-            continue;
+        tracing::info!("Received new step");
+        let next_step = step.step.step.clone().run_raw(wf.clone(), None).await;
+        step.retry_count += 1;
+        if let Ok(next_step) = next_step {
+            if let Some(next_step) = next_step {
+                if next_step.step.variant_event_type_id() == TypeId::of::<Immediate<Workflow0>>() {
+                    active_step_sender
+                        .send(FullyQualifiedStep {
+                            instance_id: step.instance_id,
+                            step: next_step,
+                            event: None,
+                            retry_count: 0,
+                        })
+                        .await?;
+                } else {
+                    steps_awaiting_event
+                        .put_step(FullyQualifiedStep {
+                            instance_id: step.instance_id,
+                            step: next_step,
+                            event: None,
+                            retry_count: 0,
+                        })
+                        .await?;
+                }
+            } else {
+                tracing::info!("Workflow completed");
+            }
+        } else {
+            tracing::info!("Failed to run step: {:?}", step.step);
+
+            if step.retry_count <= step.step.settings.max_retries {
+                tracing::info!("Retrying step. Retry count: {}", step.retry_count);
+                active_step_sender.send(step).await?;
+            } else {
+                tracing::info!("Max retries reached for step: {:?}", step.step);
+                // TODO: push into end of life queue
+            }
         }
     }
 }
@@ -220,6 +269,8 @@ async fn main() -> anyhow::Result<()> {
     let mut session = Session::begin(&mut connection).await?;
 
     let instance_worker = tokio::spawn(workspace_instance_worker());
+
+    let active_step_worker = tokio::spawn(active_step_worker(Workflow0 {}));
 
     let event_sender = Sender::attach(
         &mut session,
@@ -266,6 +317,7 @@ async fn main() -> anyhow::Result<()> {
 
     axum::serve(listener, router).await?;
     instance_worker.await??;
+    active_step_worker.await??;
     Ok(())
 }
 
@@ -348,7 +400,7 @@ async fn poc_main() -> anyhow::Result<()> {
             step: rust_workflow_2::step::StepWithSettings {
                 step: rust_workflow_2::step::WorkflowStep::Step0(step_0),
                 settings: rust_workflow_2::step::StepSettings {
-                    max_retry_count: 1,
+                    max_retries: 1,
                     // delay: None,
                 },
             },

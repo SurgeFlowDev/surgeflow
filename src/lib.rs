@@ -175,7 +175,7 @@ pub mod runner {
                     step,
                     settings:
                         StepSettings {
-                            max_retry_count,
+                            max_retries: max_retry_count,
                             // delay,
                         },
                 },
@@ -193,7 +193,7 @@ pub mod runner {
                     step: StepWithSettings {
                         step,
                         settings: StepSettings {
-                            max_retry_count,
+                            max_retries: max_retry_count,
                             // delay,
                         },
                     },
@@ -259,6 +259,7 @@ pub mod runner {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Workflow0 {}
 
 impl Workflow for Workflow0 {
@@ -269,12 +270,12 @@ impl Workflow for Workflow0 {
     fn entrypoint() -> StepWithSettings<Self::Step> {
         StepWithSettings {
             step: Step0 {}.into(),
-            settings: StepSettings { max_retry_count: 1 },
+            settings: StepSettings { max_retries: 1 },
         }
     }
 }
 
-pub trait Workflow {
+pub trait Workflow: Clone {
     type Event: Event<Workflow = Self> + JsonSchema;
     type Step: Step<Workflow = Self, Event = Self::Event>;
     const NAME: &'static str;
