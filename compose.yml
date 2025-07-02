@@ -1,8 +1,8 @@
 services:
   rabbitmq:
     image: rabbitmq:4-management
-    environment:
-      RABBITMQ_FEATURE_FLAGS: "feature_flags_v2"
+    # environment:
+    #   RABBITMQ_FEATURE_FLAGS: "feature_flags_v2"
     ports:
       - "5672:5672"
       - "15672:15672"

@@ -25,7 +25,7 @@ pub mod step;
 use step::{StepError, WorkflowStep};
 
 use crate::{
-    event::{Event, WorkflowEvent},
+    event::{Event, Workflow0Event},
     step::{FullyQualifiedStep, Step, StepSettings, StepWithSettings, step_0::Step0},
 };
 
@@ -154,7 +154,7 @@ pub mod runner {
     use tokio::time::{Duration, sleep};
 
     use crate::{
-        event::{Immediate, WorkflowEvent},
+        event::{Immediate, Workflow0Event},
         step::{Step, StepSettings},
     };
 
@@ -240,7 +240,7 @@ pub mod runner {
 
     pub async fn handle_event(
         instance_id: WorkflowInstanceId,
-        event: WorkflowEvent,
+        event: Workflow0Event,
         ctx: &mut Ctx,
     ) -> anyhow::Result<()> {
         tracing::info!("started handle_event");
@@ -263,7 +263,7 @@ pub mod runner {
 pub struct Workflow0 {}
 
 impl Workflow for Workflow0 {
-    type Event = WorkflowEvent;
+    type Event = Workflow0Event;
     type Step = WorkflowStep;
     const NAME: &'static str = "workflow_0";
 
@@ -276,6 +276,7 @@ impl Workflow for Workflow0 {
 }
 
 pub trait Workflow: Clone {
+    // + WorkflowEvent<Self>
     type Event: Event<Workflow = Self> + JsonSchema;
     type Step: Step<Workflow = Self, Event = Self::Event>;
     const NAME: &'static str;

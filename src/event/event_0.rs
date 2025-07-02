@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{event::{Event, WorkflowEvent}, Workflow0};
+use crate::{event::{Event, Workflow0Event}, Workflow0};
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
 pub struct Event0 {}
@@ -12,6 +12,6 @@ impl Event for Event0 {
 
 impl Into<Option<<Workflow0 as crate::Workflow>::Event>> for Event0 {
     fn into(self) -> Option<<Workflow0 as crate::Workflow>::Event> {
-        Some(WorkflowEvent::Event0(self))
+        Some(Workflow0Event::Event0(self))
     }
 }

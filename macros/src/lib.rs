@@ -105,7 +105,7 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
                 } else {
                     return Err(StepError::Unknown);
                 };
-                let event = #ty::try_from(event).map_err(|_| StepError::Unknown)?;
+                let event = #ty::try_from(event).map_err(|_| StepError::WrongEventType)?;
             }),
             ty.clone(),
         )
@@ -136,7 +136,7 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
         async fn run_raw(
             &self,
             wf: Self::Workflow,
-            event: Option<WorkflowEvent>,
+            event: Option<Workflow0Event>,
         ) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
             #event_extraction
 
