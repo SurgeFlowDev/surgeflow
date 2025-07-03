@@ -19,7 +19,7 @@ impl Step1 {
     async fn run(
         &self,
         wf: Workflow0,
-        event: Event0,
+        // event: Event0,
     ) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
         tracing::info!("Running Step1");
         // let dev_count = DEV_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);

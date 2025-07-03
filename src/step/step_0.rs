@@ -3,7 +3,6 @@ use crate::{
     event::{Workflow0Event, event_0::Event0},
     step::{Step, Step1, StepSettings},
 };
-use crate::event::Immediate;
 use macros::step;
 
 use serde::{Deserialize, Serialize, de};
@@ -17,6 +16,7 @@ impl Step0 {
     async fn run(
         &self,
         wf: Workflow0,
+        event: Event0,
     ) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
         // println!("Running Step0 with event: {:?}", event);
         tracing::info!("Running Step0");

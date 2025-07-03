@@ -276,31 +276,34 @@ async fn active_step_worker(wf: Workflow0) -> anyhow::Result<()> {
             });
         step.retry_count += 1;
         if let Ok(next_step) = next_step {
+            // TODO: maybe use `succeeded-step-sender` and push the old step into it? and handle workflow completion there
             if let Some(next_step) = next_step {
-                // TODO?: maybe use `succeeded_step_sender` and handle this logic in the consumer
-
-                if next_step.step.variant_event_type_id() == TypeId::of::<Immediate<Workflow0>>() {
-                    active_step_sender
-                        .send(FullyQualifiedStep {
-                            instance_id: step.instance_id,
-                            step: next_step,
-                            event: None,
-                            retry_count: 0,
-                        })
-                        .await?;
-                } else {
-                    steps_awaiting_event
-                        .put_step(FullyQualifiedStep {
-                            instance_id: step.instance_id,
-                            step: next_step,
-                            event: None,
-                            retry_count: 0,
-                        })
-                        .await?;
+                {
+                    // TODO: push to a `next-step` queue and have a worker that consumes it and handles this block of code
+                    if next_step.step.variant_event_type_id()
+                        == TypeId::of::<Immediate<Workflow0>>()
+                    {
+                        active_step_sender
+                            .send(FullyQualifiedStep {
+                                instance_id: step.instance_id,
+                                step: next_step,
+                                event: None,
+                                retry_count: 0,
+                            })
+                            .await?;
+                    } else {
+                        steps_awaiting_event
+                            .put_step(FullyQualifiedStep {
+                                instance_id: step.instance_id,
+                                step: next_step,
+                                event: None,
+                                retry_count: 0,
+                            })
+                            .await?;
+                    }
                 }
             } else {
-                // TODO: push workflow instance into "completed" queue
-                tracing::info!("Workflow completed");
+                tracing::info!("Instance {} completed", step.instance_id);
             }
         } else {
             tracing::info!("Failed to run step: {:?}", step.step);
