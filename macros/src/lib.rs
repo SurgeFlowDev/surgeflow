@@ -124,10 +124,6 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
         None
     };
 
-    /////////////////////////////////////////////////
-    // remove wait_for_event. Every step should have an Event associated type, which can be "Immediate". from the outside
-    // I can check the type's TypeId and see if it is "Immediate" or not. this way I can avoid the need for a wait_for_event method.
-    /////////////////////////////////////////////////
     quote! {
     #input
     impl Step for #step_type {
