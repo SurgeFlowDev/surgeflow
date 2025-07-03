@@ -59,7 +59,7 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-     let wf_arg = run_fn.sig.inputs.iter().find(|arg| {
+    let wf_arg = run_fn.sig.inputs.iter().find(|arg| {
         if let FnArg::Typed(pat_type) = arg {
             if let Pat::Ident(pat_ident) = &*pat_type.pat {
                 pat_ident.ident == "wf"

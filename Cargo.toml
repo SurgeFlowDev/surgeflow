@@ -40,3 +40,11 @@ uuid = { version = "1.17.0", features = ["serde", "v4"] }
 [workspace]
 members = ["macros"]
 resolver = "2"
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
+incremental = false
+debug = false
+panic = "abort"

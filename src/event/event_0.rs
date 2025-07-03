@@ -1,7 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{event::{Event, Workflow0Event}, Workflow0};
+use crate::{
+    Workflow0,
+    event::{Event, Workflow0Event},
+};
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
 pub struct Event0 {}

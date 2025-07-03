@@ -334,3 +334,54 @@ impl<W: Workflow> SucceededStepSender<W> {
         Ok(())
     }
 }
+
+#[derive(Debug)]
+pub struct NextStepReceiver<W: Workflow>(Mutex<Receiver>, PhantomData<W>);
+
+impl<W: Workflow> NextStepReceiver<W> {
+    pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
+        let addr = format!("{}-next-steps", W::NAME);
+        let link_name = format!("{addr}-receiver-{}", Uuid::new_v4().as_hyphenated());
+        let receiver = Receiver::attach(session, link_name, addr).await?;
+        Ok(Self(Mutex::new(receiver), PhantomData::default()))
+    }
+    pub async fn recv(&self) -> anyhow::Result<FullyQualifiedStep<W::Step>> {
+        let mut receiver = self.0.lock().await;
+
+        // TODO: using string while developing, change to Vec<u8> in production
+        let msg = receiver.recv::<String>().await?;
+
+        let event = match serde_json::from_str(msg.body()) {
+            Ok(event) => event,
+            Err(e) => {
+                let err = anyhow::anyhow!("Failed to deserialize step: {}", e);
+                tracing::error!("{}", err);
+                receiver.reject(msg, None).await?;
+                return Err(err);
+            }
+        };
+        receiver.accept(msg).await?;
+
+        Ok(event)
+    }
+}
+
+#[derive(Debug)]
+pub struct NextStepSender<W: Workflow>(Mutex<Sender>, PhantomData<W>);
+
+impl<W: Workflow> NextStepSender<W> {
+    pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
+        let addr = format!("{}-next-steps", W::NAME);
+        let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
+        let sender = Sender::attach(session, link_name, addr).await?;
+        Ok(Self(Mutex::new(sender), PhantomData::default()))
+    }
+    pub async fn send(&self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
+        let mut sender = self.0.lock().await;
+
+        // TODO: using string while developing, change to Vec<u8> in production
+        let event = serde_json::to_string(&step)?;
+        sender.send(event).await?;
+        Ok(())
+    }
+}

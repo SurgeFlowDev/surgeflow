@@ -12,8 +12,8 @@ use rust_workflow_2::{
     },
     runner::{handle_event, handle_step},
     step::{
-        ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep, Step,
-        StepsAwaitingEventManager, SucceededStepSender,
+        ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
+        NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, SucceededStepSender,
     },
 };
 use schemars::JsonSchema;
@@ -178,7 +178,7 @@ async fn workspace_instance_worker() -> anyhow::Result<()> {
     )
     .await?;
 
-    let active_step_sender = ActiveStepSender::<Workflow0>::new(&mut session).await?;
+    let next_step_sender = NextStepSender::<Workflow0>::new(&mut session).await?;
 
     loop {
         let Ok(msg) = instance_receiver.recv::<String>().await else {
@@ -198,7 +198,7 @@ async fn workspace_instance_worker() -> anyhow::Result<()> {
             retry_count: 0,
         };
 
-        if let Err(_) = active_step_sender.send(entrypoint).await {
+        if let Err(_) = next_step_sender.send(entrypoint).await {
             continue;
         }
     }
@@ -246,6 +246,45 @@ async fn handle_event_new() -> anyhow::Result<()> {
     }
 }
 
+async fn next_step_worker() -> anyhow::Result<()> {
+    let mut connection =
+        fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
+            .await?;
+    let mut session = Session::begin(&mut connection).await?;
+
+    let next_step_receiver = NextStepReceiver::<Workflow0>::new(&mut session).await?;
+    let active_step_sender = ActiveStepSender::<Workflow0>::new(&mut session).await?;
+
+    let steps_awaiting_event =
+        StepsAwaitingEventManager::<Workflow0>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
+
+    loop {
+        let Ok(step) = next_step_receiver.recv().await else {
+            continue;
+        };
+
+        if step.step.step.variant_event_type_id() == TypeId::of::<Immediate<Workflow0>>() {
+            active_step_sender
+                .send(FullyQualifiedStep {
+                    instance_id: step.instance_id,
+                    step: step.step,
+                    event: None,
+                    retry_count: 0,
+                })
+                .await?;
+        } else {
+            steps_awaiting_event
+                .put_step(FullyQualifiedStep {
+                    instance_id: step.instance_id,
+                    step: step.step,
+                    event: None,
+                    retry_count: 0,
+                })
+                .await?;
+        }
+    }
+}
+
 async fn active_step_worker(wf: Workflow0) -> anyhow::Result<()> {
     let mut connection =
         fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
@@ -253,13 +292,11 @@ async fn active_step_worker(wf: Workflow0) -> anyhow::Result<()> {
     let mut session = Session::begin(&mut connection).await?;
     let active_step_receiver = ActiveStepReceiver::<Workflow0>::new(&mut session).await?;
     let active_step_sender = ActiveStepSender::<Workflow0>::new(&mut session).await?;
+    let next_step_sender = NextStepSender::<Workflow0>::new(&mut session).await?;
 
     let failed_step_sender = FailedStepSender::<Workflow0>::new(&mut session).await?;
 
     let succeeded_step_sender = SucceededStepSender::<Workflow0>::new(&mut session).await?;
-
-    let steps_awaiting_event =
-        StepsAwaitingEventManager::<Workflow0>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
 
     loop {
         let Ok(mut step) = active_step_receiver.recv().await else {
@@ -278,30 +315,14 @@ async fn active_step_worker(wf: Workflow0) -> anyhow::Result<()> {
         if let Ok(next_step) = next_step {
             // TODO: maybe use `succeeded-step-sender` and push the old step into it? and handle workflow completion there
             if let Some(next_step) = next_step {
-                {
-                    // TODO: push to a `next-step` queue and have a worker that consumes it and handles this block of code
-                    if next_step.step.variant_event_type_id()
-                        == TypeId::of::<Immediate<Workflow0>>()
-                    {
-                        active_step_sender
-                            .send(FullyQualifiedStep {
-                                instance_id: step.instance_id,
-                                step: next_step,
-                                event: None,
-                                retry_count: 0,
-                            })
-                            .await?;
-                    } else {
-                        steps_awaiting_event
-                            .put_step(FullyQualifiedStep {
-                                instance_id: step.instance_id,
-                                step: next_step,
-                                event: None,
-                                retry_count: 0,
-                            })
-                            .await?;
-                    }
-                }
+                next_step_sender
+                    .send(FullyQualifiedStep {
+                        instance_id: step.instance_id,
+                        step: next_step,
+                        event: None,
+                        retry_count: 0,
+                    })
+                    .await?;
             } else {
                 tracing::info!("Instance {} completed", step.instance_id);
             }
@@ -336,6 +357,8 @@ async fn main() -> anyhow::Result<()> {
     let instance_worker = tokio::spawn(workspace_instance_worker());
 
     let active_step_worker = tokio::spawn(active_step_worker(Workflow0 {}));
+
+    let nest_step_worker = tokio::spawn(next_step_worker());
 
     let handle_event_worker = tokio::spawn(handle_event_new());
 
@@ -379,6 +402,7 @@ async fn main() -> anyhow::Result<()> {
     instance_worker.await??;
     active_step_worker.await??;
     handle_event_worker.await??;
+    nest_step_worker.await??;
     Ok(())
 }
 

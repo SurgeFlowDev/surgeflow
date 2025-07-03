@@ -1,10 +1,10 @@
 use derive_more::{From, TryInto};
-use fe2o3_amqp::{session::SessionHandle, Receiver, Sender};
+use fe2o3_amqp::{Receiver, Sender, session::SessionHandle};
 use futures::lock::Mutex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use std::{any::TypeId, fmt::Debug, marker::PhantomData};
+use uuid::Uuid;
 
 use event_0::Event0;
 
