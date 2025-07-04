@@ -18,6 +18,8 @@ use crate::{
     event::{Event, Immediate, Workflow0Event},
 };
 
+pub type StepResult<W> = Result<Option<StepWithSettings<<W as Workflow>::Step>>, StepError>;
+
 pub trait Step:
     Serialize
     + for<'a> Deserialize<'a>

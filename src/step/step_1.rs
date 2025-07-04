@@ -1,15 +1,22 @@
-use std::sync::atomic::AtomicUsize;
-
 use crate::{
-    StepError, StepWithSettings, Workflow0,
-    event::{Immediate, Workflow0Event, event_0::Event0},
-    step::{Step, WorkflowStep},
+    event::{event_0::Event0, Immediate, Workflow0Event}, step::{Step, StepResult, StepSettings, WorkflowStep}, StepError, StepWithSettings, Workflow, Workflow0
 };
 use macros::step;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Step1 {}
+
+impl From<Step1>
+    for Result<Option<StepWithSettings<<<Step1 as Step>::Workflow as Workflow>::Step>>, StepError>
+{
+    fn from(step: Step1) -> Self {
+        Ok(Some(StepWithSettings {
+            step: step.into(),
+            settings: StepSettings { max_retries: 0 },
+        }))
+    }
+}
 
 // static DEV_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -20,7 +27,7 @@ impl Step1 {
         &self,
         wf: Workflow0,
         // event: Event0,
-    ) -> Result<Option<StepWithSettings<WorkflowStep>>, StepError> {
+    ) -> StepResult<Workflow0> {
         tracing::info!("Running Step1");
         // let dev_count = DEV_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         // if dev_count == 3 {
