@@ -6,7 +6,7 @@ use rust_workflow_2::{
     event::{EventReceiver, EventSender, Immediate, InstanceEvent, Workflow0Event},
     step::{
         ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
-        NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, SucceededStepSender,
+        NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager,
     },
 };
 use schemars::JsonSchema;
@@ -192,7 +192,8 @@ async fn workspace_instance_worker() -> anyhow::Result<()> {
             retry_count: 0,
         };
 
-        if let Err(_) = next_step_sender.send(entrypoint).await {
+        if let Err(err) = next_step_sender.send(entrypoint).await {
+            tracing::error!("Failed to send next step: {:?}", err);
             continue;
         }
     }
@@ -290,7 +291,7 @@ async fn active_step_worker(wf: Workflow0) -> anyhow::Result<()> {
 
     let failed_step_sender = FailedStepSender::<Workflow0>::new(&mut session).await?;
 
-    let succeeded_step_sender = SucceededStepSender::<Workflow0>::new(&mut session).await?;
+    // let succeeded_step_sender = SucceededStepSender::<Workflow0>::new(&mut session).await?;
 
     loop {
         let Ok(mut step) = active_step_receiver.recv().await else {

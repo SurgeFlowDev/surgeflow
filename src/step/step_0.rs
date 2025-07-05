@@ -16,6 +16,7 @@ impl Step0 {
     #[run]
     async fn run(
         &self,
+        #[expect(unused_variables)]
         wf: Workflow0,
         // event: Event0,
     ) -> StepResult<Workflow0> {

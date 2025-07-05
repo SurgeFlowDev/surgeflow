@@ -1,9 +1,9 @@
 use darling::ast::NestedMeta;
-use darling::{Error, FromDeriveInput, FromMeta};
+use darling::{Error, FromMeta};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
-use syn::{Attribute, FnArg, ImplItem, ItemFn, ItemImpl, Pat, PatType, parse_quote};
+use syn::{FnArg, ImplItem, ItemImpl, Pat, PatType, parse_quote};
 
 #[derive(FromMeta)]
 // #[darling(attributes(my_crate), forward_attrs(allow, doc, cfg))]
@@ -31,16 +31,14 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
                 .attrs
                 .extract_if(.., |attr| attr.path().is_ident("run"))
                 .next();
-            if let Some(attr) = attr {
-                Some((attr, item_fn))
-            } else {
-                None
-            }
+
+            attr.map(|attr| (attr, item_fn))
         } else {
             None
         }
     });
 
+    #[expect(unused_variables)]
     let (attr, run_fn) = match run_fn {
         Some((attr, run_fn)) => (attr, run_fn),
         None => {
@@ -79,6 +77,7 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
     //     }
     // });
 
+    #[expect(unused_variables)]
     let args = match StepOpts::from_list(&attr_args) {
         Ok(v) => v,
         Err(e) => {

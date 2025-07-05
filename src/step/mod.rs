@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::{
-    ActiveStepQueue, WaitingForEventStepQueue, Workflow, Workflow0, WorkflowInstanceId,
+    Workflow, Workflow0, WorkflowInstanceId,
     event::{Event, Immediate, Workflow0Event},
 };
 
@@ -29,54 +29,13 @@ pub trait Step:
     type Event: Event<Workflow = Self::Workflow>;
     type Workflow: Workflow;
 
-    async fn run_raw(
+    fn run_raw(
         &self,
         wf: Self::Workflow,
         event: Option<Workflow0Event>,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Step>>, StepError>;
-    async fn enqueue(
-        step: FullyQualifiedStep<Self>,
-        active_step_queue: &mut ActiveStepQueue,
-        waiting_for_step_queue: &mut WaitingForEventStepQueue,
-        // delayed_step_queue: &DelayedStepQueue,
-    ) -> anyhow::Result<()>
-    where
-        Self::Event: 'static,
-        <Self as Step>::Workflow: 'static,
-    {
-        if TypeId::of::<Self::Event>() != TypeId::of::<Immediate<Self::Workflow>>()
-            && step.event.is_none()
-        {
-            // If the next step requires an event, enqueue it in the waiting for event queue
-            waiting_for_step_queue
-                .enqueue(FullyQualifiedStep::<<Self::Workflow as Workflow>::Step> {
-                    event: step.event,
-                    instance_id: step.instance_id,
-                    step: StepWithSettings::<<Self::Workflow as Workflow>::Step> {
-                        step: step.step.step.into(),
-                        settings: step.step.settings,
-                    },
-                    retry_count: step.retry_count,
-                })
-                .await?;
-            return Ok(());
-        } else {
-            active_step_queue
-                .enqueue(FullyQualifiedStep::<<Self::Workflow as Workflow>::Step> {
-                    event: step.event,
-                    instance_id: step.instance_id,
-                    step: StepWithSettings::<<Self::Workflow as Workflow>::Step> {
-                        step: step.step.step.into(),
-                        settings: step.step.settings,
-                    },
-                    retry_count: step.retry_count,
-                })
-                .await?;
-        }
-        Ok(())
-    }
+    ) -> impl std::future::Future<Output = Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Step>>, StepError>> + Send;
 }
 
 #[derive(Debug, Serialize, Deserialize, From, TryInto, Clone)]
