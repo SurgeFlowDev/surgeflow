@@ -12,6 +12,7 @@ use rust_workflow_2::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool, query_as};
+use tokio::try_join;
 use std::{any::TypeId, sync::Arc};
 use tikv_client::RawClient;
 use tower_http::normalize_path::NormalizePathLayer;
@@ -341,21 +342,14 @@ async fn active_step_worker(wf: Workflow0) -> anyhow::Result<()> {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let instance_worker = tokio::spawn(workspace_instance_worker::<Workflow0>());
+    try_join!(
+        workspace_instance_worker::<Workflow0>(),
+        active_step_worker(Workflow0 {}),
+        next_step_worker(),
+        handle_event_new(),
+        control_server(),
+    )?;
 
-    let active_step_worker = tokio::spawn(active_step_worker(Workflow0 {}));
-
-    let nest_step_worker = tokio::spawn(next_step_worker());
-
-    let handle_event_worker = tokio::spawn(handle_event_new());
-
-    let control_server = tokio::spawn(control_server());
-
-    control_server.await??;
-    instance_worker.await??;
-    active_step_worker.await??;
-    handle_event_worker.await??;
-    nest_step_worker.await??;
     Ok(())
 }
 
