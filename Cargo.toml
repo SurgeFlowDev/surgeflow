@@ -32,6 +32,7 @@ sqlx = { version = "0.8.6", default-features = false, features = ["postgres", "m
 surrealdb-tikv-client = "0.3.0-surreal.3"
 thiserror = "2.0.12"
 tokio = { version = "1.46.1", features = ["full"] }
+tower = "0.5.2"
 tower-http = { version = "0.6.6", features = ["normalize-path"] }
 tower-layer = "0.3.3"
 tracing = "0.1.41"

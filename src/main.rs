@@ -5,9 +5,10 @@ use aide::{
     scalar::Scalar,
 };
 use axum::{
-    Extension, ServiceExt,
+    Extension, Router, ServiceExt,
     extract::{Json, Request, State},
     http::StatusCode,
+    routing::IntoMakeService,
 };
 use axum_thiserror::ErrorStatus;
 use axum_typed_routing::{TypedApiRouter, api_route};
@@ -26,8 +27,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool, query_as};
 use std::{any::TypeId, sync::Arc};
 use tikv_client::RawClient;
-use tokio::try_join;
-use tower_http::normalize_path::NormalizePathLayer;
+use tokio::{net::TcpListener, try_join};
+use tower_http::normalize_path::{NormalizePath, NormalizePathLayer};
 use tower_layer::Layer;
 
 #[derive(Debug)]
@@ -323,14 +324,32 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    // TODO: refactor this into a function
-    let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
+    // now just one call…
+    let (listener, make_service) = build_server::<Workflow0>().await?;
+
+    try_join!(
+        workspace_instance_worker::<Workflow0>(),
+        active_step_worker(Workflow0 {}),
+        next_step_worker::<Workflow0>(),
+        handle_event_new::<Workflow0>(),
+        async {
+            axum::serve(listener, make_service).await?;
+            Ok(())
+        }
+    )?;
+
+    Ok(())
+}
+
+/// Pulls out all of the setup between your TODO markers.
+async fn build_server<W: Workflow>()
+-> anyhow::Result<(TcpListener, IntoMakeService<NormalizePath<Router>>)> {
+    let listener = TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
     let sqlx_pool = PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?;
 
     let mut connection =
         fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
-
     let mut session = Session::begin(&mut connection).await?;
 
     let instance_sender = Sender::attach(
@@ -339,28 +358,22 @@ async fn main() -> anyhow::Result<()> {
         "workflow-0-instances",
     )
     .await?;
-
-    let event_sender = EventSender::<Workflow0>::new(&mut session).await?;
+    let event_sender = EventSender::<W>::new(&mut session).await?;
 
     let app_state = Arc::new(AppState {
         event_sender,
         workflow_instance_manager: WorkflowInstanceManager {
-            workflow_name: Workflow0::name(),
+            workflow_name: W::name(),
             sender: instance_sender.into(),
         },
         sqlx_pool,
     });
 
     let mut api = base_open_api();
-
-    let router0 = control_server::<Workflow0>().await?;
-
-    // // test that we can use the same control server for multiple workflows
-    // let router1 = control_server::<Workflow0>().await?;
+    let router0 = control_server::<W>().await?;
 
     let router = ApiRouter::new()
         .merge(router0)
-        // .merge(router1)
         .with_state(app_state.clone());
 
     let router = if cfg!(debug_assertions) {
@@ -371,23 +384,11 @@ async fn main() -> anyhow::Result<()> {
     } else {
         router.into()
     };
+
     let router = NormalizePathLayer::trim_trailing_slash().layer(router);
-    let router = ServiceExt::<Request>::into_make_service(router);
-    // TODO: end here
+    let make_service = ServiceExt::<Request>::into_make_service(router);
 
-
-    try_join!(
-        workspace_instance_worker::<Workflow0>(),
-        active_step_worker(Workflow0 {}),
-        next_step_worker::<Workflow0>(),
-        handle_event_new::<Workflow0>(),
-        async {
-            axum::serve(listener, router).await?;
-            Ok(())
-        }
-    )?;
-
-    Ok(())
+    Ok((listener, make_service))
 }
 
 async fn control_server<W: Workflow>() -> anyhow::Result<ApiRouter<Arc<AppState<W>>>> {

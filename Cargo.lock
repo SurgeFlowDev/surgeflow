@@ -2821,6 +2821,7 @@ dependencies = [
  "surrealdb-tikv-client",
  "thiserror 2.0.12",
  "tokio",
+ "tower 0.5.2",
  "tower-http",
  "tower-layer",
  "tracing",
