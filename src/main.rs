@@ -6,15 +6,15 @@ use rust_workflow_2::{
     event::{EventReceiver, EventSender, Immediate, InstanceEvent, Workflow0Event},
     step::{
         ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
-        NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager,
+        NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStepExt,
     },
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool, query_as};
-use tokio::try_join;
 use std::{any::TypeId, sync::Arc};
 use tikv_client::RawClient;
+use tokio::try_join;
 use tower_http::normalize_path::NormalizePathLayer;
 
 use aide::{
@@ -242,24 +242,24 @@ async fn handle_event_new() -> anyhow::Result<()> {
     }
 }
 
-async fn next_step_worker() -> anyhow::Result<()> {
+async fn next_step_worker<W: Workflow + 'static>() -> anyhow::Result<()> {
     let mut connection =
         fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
     let mut session = Session::begin(&mut connection).await?;
 
-    let next_step_receiver = NextStepReceiver::<Workflow0>::new(&mut session).await?;
-    let active_step_sender = ActiveStepSender::<Workflow0>::new(&mut session).await?;
+    let next_step_receiver = NextStepReceiver::<W>::new(&mut session).await?;
+    let active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
 
     let steps_awaiting_event =
-        StepsAwaitingEventManager::<Workflow0>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
+        StepsAwaitingEventManager::<W>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
 
     loop {
         let Ok(step) = next_step_receiver.recv().await else {
             continue;
         };
 
-        if step.step.step.variant_event_type_id() == TypeId::of::<Immediate<Workflow0>>() {
+        if step.step.step.variant_event_type_id() == TypeId::of::<Immediate<W>>() {
             active_step_sender
                 .send(FullyQualifiedStep {
                     instance_id: step.instance_id,
@@ -345,7 +345,7 @@ async fn main() -> anyhow::Result<()> {
     try_join!(
         workspace_instance_worker::<Workflow0>(),
         active_step_worker(Workflow0 {}),
-        next_step_worker(),
+        next_step_worker::<Workflow0>(),
         handle_event_new(),
         control_server(),
     )?;

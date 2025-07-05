@@ -11,7 +11,7 @@ use step::{StepError, WorkflowStep};
 
 use crate::{
     event::{Event, Workflow0Event},
-    step::{Step, StepSettings, StepWithSettings, step_0::Step0},
+    step::{step_0::Step0, Step, StepSettings, StepWithSettings, WorkflowStepExt},
 };
 
 #[derive(
@@ -53,7 +53,7 @@ impl Workflow for Workflow0 {
 pub trait Workflow: Clone {
     // + WorkflowEvent<Self>
     type Event: Event<Workflow = Self> + JsonSchema;
-    type Step: Step<Workflow = Self, Event = Self::Event>;
+    type Step: Step<Workflow = Self, Event = Self::Event> + WorkflowStepExt;
     const NAME: &'static str;
 
     fn entrypoint() -> StepWithSettings<Self::Step>;

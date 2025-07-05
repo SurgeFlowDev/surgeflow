@@ -43,14 +43,18 @@ pub enum WorkflowStep {
     Step0(Step0),
     Step1(Step1),
 }
-impl WorkflowStep {
-    /// Returns the TypeId of the event type associated with this step.
-    pub fn variant_event_type_id(&self) -> TypeId {
+impl WorkflowStepExt for WorkflowStep {
+    fn variant_event_type_id(&self) -> TypeId {
         match self {
             WorkflowStep::Step0(_) => TypeId::of::<<Step0 as Step>::Event>(),
             WorkflowStep::Step1(_) => TypeId::of::<<Step1 as Step>::Event>(),
         }
     }
+}
+
+pub trait WorkflowStepExt: Step {
+    /// Returns the TypeId of the event type associated with this step.
+    fn variant_event_type_id(&self) -> TypeId;
 }
 
 impl Step for WorkflowStep {
