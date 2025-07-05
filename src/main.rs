@@ -149,8 +149,8 @@ async fn workspace_instance_worker<W: Workflow>() -> anyhow::Result<()> {
 
     let mut instance_receiver = Receiver::attach(
         &mut session,
-        "workflow-0-instances-receiver-1",
-        "workflow-0-instances",
+        format!("{}-instances-receiver-1", W::NAME),
+        format!("{}-instances", W::NAME),
     )
     .await?;
 
@@ -330,8 +330,8 @@ async fn init_app_state<W: Workflow>() -> anyhow::Result<Arc<AppState<W>>> {
 
     let instance_sender = Sender::attach(
         &mut session,
-        "workflow-0-instances-sender-1",
-        "workflow-0-instances",
+        format!("{}-instances-receiver-1", W::NAME),
+        format!("{}-instances", W::NAME),
     )
     .await?;
 
