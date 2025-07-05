@@ -324,8 +324,8 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    // now just one call…
-    let (listener, make_service) = build_server::<Workflow0>().await?;
+    let listener = TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
+    let make_service = build_server::<Workflow0>().await?;
 
     try_join!(
         workspace_instance_worker::<Workflow0>(),
@@ -342,9 +342,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 /// Pulls out all of the setup between your TODO markers.
-async fn build_server<W: Workflow>()
--> anyhow::Result<(TcpListener, IntoMakeService<NormalizePath<Router>>)> {
-    let listener = TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
+async fn build_server<W: Workflow>() -> anyhow::Result<IntoMakeService<NormalizePath<Router>>> {
     let sqlx_pool = PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?;
 
     let mut connection =
@@ -388,7 +386,7 @@ async fn build_server<W: Workflow>()
     let router = NormalizePathLayer::trim_trailing_slash().layer(router);
     let make_service = ServiceExt::<Request>::into_make_service(router);
 
-    Ok((listener, make_service))
+    Ok(make_service)
 }
 
 async fn control_server<W: Workflow>() -> anyhow::Result<ApiRouter<Arc<AppState<W>>>> {
