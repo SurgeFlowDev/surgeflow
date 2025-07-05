@@ -1,9 +1,21 @@
+use aide::{
+    OperationIo,
+    axum::{ApiRouter, IntoApiResponse},
+    openapi::{Info, OpenApi},
+    scalar::Scalar,
+};
+use axum::{
+    Extension, ServiceExt,
+    extract::{Json, Request, State},
+    http::StatusCode,
+};
 use axum_thiserror::ErrorStatus;
+use axum_typed_routing::{TypedApiRouter, api_route};
 use fe2o3_amqp::{Receiver, Sender, Session};
 use futures::lock::Mutex;
 use rust_workflow_2::{
     Workflow, Workflow0, WorkflowExt, WorkflowId, WorkflowInstanceId, WorkflowName,
-    event::{EventReceiver, EventSender, Immediate, InstanceEvent, Workflow0Event},
+    event::{EventReceiver, EventSender, Immediate, InstanceEvent, WorkflowEvent},
     step::{
         ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
         NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStep,
@@ -16,20 +28,6 @@ use std::{any::TypeId, sync::Arc};
 use tikv_client::RawClient;
 use tokio::try_join;
 use tower_http::normalize_path::NormalizePathLayer;
-
-use aide::{
-    OperationIo,
-    axum::{ApiRouter, IntoApiResponse},
-    openapi::{Info, OpenApi},
-    scalar::Scalar,
-};
-use axum::{
-    Extension, ServiceExt,
-    extract::{Json, Request, State},
-    http::StatusCode,
-};
-use axum_typed_routing::{TypedApiRouter, api_route};
-
 use tower_layer::Layer;
 
 #[derive(Debug)]
@@ -61,23 +59,6 @@ impl WorkflowInstanceManager {
         Ok(res)
     }
 }
-
-// #[derive(Debug)]
-// struct WorkflowReceiver(Mutex<Receiver>);
-
-// impl WorkflowReceiver {
-//     fn new(receiver: Receiver) -> Self {
-//         Self(Mutex::new(receiver))
-//     }
-//     async fn recv(&self) -> anyhow::Result<WorkflowName> {
-//         let mut receiver = self.0.lock().await;
-
-//         let event = receiver.recv::<String>().await?;
-//         let event = serde_json::from_str(event.body())?;
-
-//         Ok(event)
-//     }
-// }
 
 struct WorkflowInstanceRecord {
     pub id: i32,
@@ -120,8 +101,8 @@ enum MyError {
     tags: ["workflow-instance"],
     hidden: false
 })]
-async fn post_workflow_instance(
-    State(state): State<Arc<AppState>>,
+async fn post_workflow_instance<W: Workflow>(
+    State(state): State<Arc<AppState<W>>>,
 ) -> Result<Json<WorkflowInstance>, MyError> {
     tracing::info!("creating instance...");
     let mut tx = state.sqlx_pool.begin().await.unwrap();
@@ -141,10 +122,10 @@ async fn post_workflow_instance(
     tags: ["workflow-event"],
     hidden: false
 })]
-async fn post_workflow_event(
+async fn post_workflow_event<W: Workflow>(
     instance_id: WorkflowInstanceId,
-    State(state): State<Arc<AppState>>,
-    Json(event): Json<Workflow0Event>,
+    State(state): State<Arc<AppState<W>>>,
+    Json(event): Json<W::Event>,
 ) {
     state
         .event_sender
@@ -153,8 +134,8 @@ async fn post_workflow_event(
         .unwrap();
 }
 
-struct AppState {
-    event_sender: EventSender<Workflow0>,
+struct AppState<W: Workflow> {
+    event_sender: EventSender<W>,
     workflow_instance_manager: WorkflowInstanceManager,
     sqlx_pool: PgPool,
 }
@@ -347,13 +328,13 @@ async fn main() -> anyhow::Result<()> {
         active_step_worker(Workflow0 {}),
         next_step_worker::<Workflow0>(),
         handle_event_new::<Workflow0>(),
-        control_server(),
+        control_server::<Workflow0>(),
     )?;
 
     Ok(())
 }
 
-async fn control_server() -> anyhow::Result<()> {
+async fn control_server<W: Workflow>() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
     let sqlx_pool = PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?;
 
@@ -370,17 +351,17 @@ async fn control_server() -> anyhow::Result<()> {
     )
     .await?;
 
-    let event_sender = EventSender::<Workflow0>::new(&mut session).await?;
+    let event_sender = EventSender::<W>::new(&mut session).await?;
 
     let app_state = Arc::new(AppState {
         event_sender,
         workflow_instance_manager: WorkflowInstanceManager {
-            workflow_name: Workflow0::name(),
+            workflow_name: W::name(),
             sender: instance_sender.into(),
         },
         sqlx_pool,
     });
-    let router: ApiRouter = ApiRouter::new()
+    let router = ApiRouter::new()
         .typed_api_route(post_workflow_instance)
         .typed_api_route(post_workflow_event)
         .with_state(app_state);

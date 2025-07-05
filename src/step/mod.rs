@@ -32,7 +32,7 @@ pub trait Step:
     fn run_raw(
         &self,
         wf: Self::Workflow,
-        event: Option<Workflow0Event>,
+        event: Option<<Self::Workflow as Workflow>::Event>,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
     ) -> impl std::future::Future<Output = Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Step>>, StepError>> + Send;
@@ -100,7 +100,7 @@ pub struct FullyQualifiedStep<S: Debug + Step + for<'a> Deserialize<'a>> {
     pub instance_id: WorkflowInstanceId,
     #[serde(bound = "")]
     pub step: StepWithSettings<S>,
-    pub event: Option<Workflow0Event>,
+    pub event: Option<<S::Workflow as Workflow>::Event>,
     pub retry_count: u32,
 }
 

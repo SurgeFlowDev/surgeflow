@@ -11,7 +11,7 @@ use step::{StepError, Workflow0Step};
 
 use crate::{
     event::{Event, Workflow0Event, WorkflowEvent},
-    step::{step_0::Step0, Step, StepSettings, StepWithSettings, WorkflowStep},
+    step::{Step, StepSettings, StepWithSettings, WorkflowStep, step_0::Step0},
 };
 
 #[derive(
@@ -34,7 +34,7 @@ impl AsRef<str> for WorkflowName {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, JsonSchema)]
 pub struct Workflow0 {}
 
 impl Workflow for Workflow0 {
@@ -50,8 +50,7 @@ impl Workflow for Workflow0 {
     }
 }
 
-pub trait Workflow: Clone {
-    // + WorkflowEvent<Self>
+pub trait Workflow: Clone + Send + Sync + 'static {
     type Event: Event<Workflow = Self> + JsonSchema + WorkflowEvent;
     type Step: Step<Workflow = Self, Event = Self::Event> + WorkflowStep;
     const NAME: &'static str;

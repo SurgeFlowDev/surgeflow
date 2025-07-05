@@ -25,7 +25,7 @@ impl WorkflowEvent for Workflow0Event {
     }
 }
 
-pub trait WorkflowEvent: Event {
+pub trait WorkflowEvent: Event + Debug + JsonSchema + Send {
     fn variant_type_id(&self) -> TypeId;
 }
 
