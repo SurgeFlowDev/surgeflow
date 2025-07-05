@@ -11,7 +11,7 @@ use axum::{
 };
 use axum_thiserror::ErrorStatus;
 use axum_typed_routing::{TypedApiRouter, api_route};
-use fe2o3_amqp::{Receiver, Sender, Session};
+use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
 use futures::lock::Mutex;
 use rust_workflow_2::{
     Workflow, Workflow0, WorkflowExt, WorkflowId, WorkflowInstanceId, WorkflowName,
@@ -24,7 +24,7 @@ use rust_workflow_2::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool, query_as};
-use std::{any::TypeId, sync::Arc};
+use std::{any::TypeId, mem::forget, sync::Arc};
 use tikv_client::RawClient;
 use tokio::{net::TcpListener, try_join};
 use tower_http::normalize_path::NormalizePathLayer;
@@ -140,9 +140,9 @@ struct AppState<W: Workflow> {
     sqlx_pool: PgPool,
 }
 
-async fn workspace_instance_worker<W: Workflow>() -> anyhow::Result<()> {
+async fn workspace_instance_worker<W: Workflow>() -> anyhow::Result<SessionHandle<()>> {
     let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
+        fe2o3_amqp::Connection::open("control-connection-3", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
 
     let mut session = Session::begin(&mut connection).await?;
@@ -183,7 +183,7 @@ async fn workspace_instance_worker<W: Workflow>() -> anyhow::Result<()> {
 
 async fn handle_event_new<W: Workflow>() -> anyhow::Result<()> {
     let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
+        fe2o3_amqp::Connection::open("control-connection-2", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
 
     let mut session = Session::begin(&mut connection).await?;
@@ -225,7 +225,7 @@ async fn handle_event_new<W: Workflow>() -> anyhow::Result<()> {
 
 async fn next_step_worker<W: Workflow + 'static>() -> anyhow::Result<()> {
     let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
+        fe2o3_amqp::Connection::open("control-connection-4", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
     let mut session = Session::begin(&mut connection).await?;
 
@@ -264,7 +264,7 @@ async fn next_step_worker<W: Workflow + 'static>() -> anyhow::Result<()> {
 
 async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
     let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
+        fe2o3_amqp::Connection::open("control-connection-5", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
     let mut session = Session::begin(&mut connection).await?;
     let active_step_receiver = ActiveStepReceiver::<W>::new(&mut session).await?;
@@ -323,10 +323,11 @@ async fn init_app_state<W: Workflow>() -> anyhow::Result<Arc<AppState<W>>> {
     let sqlx_pool = PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?;
 
     let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
+        fe2o3_amqp::Connection::open("control-connection-6", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
 
     let mut session = Session::begin(&mut connection).await?;
+    
 
     let instance_sender = Sender::attach(
         &mut session,
@@ -336,6 +337,11 @@ async fn init_app_state<W: Workflow>() -> anyhow::Result<Arc<AppState<W>>> {
     .await?;
 
     let event_sender = EventSender::<W>::new(&mut session).await?;
+
+
+    // TODO: TEMP
+    forget(connection);
+    forget(session);
 
     Ok(Arc::new(AppState {
         event_sender,

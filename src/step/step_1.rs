@@ -1,7 +1,5 @@
 use crate::{
-    StepError, StepWithSettings, Workflow, Workflow0,
-    event::{Immediate, Workflow0Event},
-    step::{Step, StepResult, StepSettings, Workflow0Step},
+    event::{event_0::Event0, Immediate, Workflow0Event}, step::{Step, StepResult, StepSettings, Workflow0Step}, StepError, StepWithSettings, Workflow, Workflow0
 };
 use macros::step;
 use serde::{Deserialize, Serialize};
@@ -27,7 +25,7 @@ impl Step1 {
         &self,
         #[expect(unused_variables)]
         wf: Workflow0,
-        // event: Event0,
+        event: Event0,
     ) -> StepResult<Workflow0> {
         tracing::info!("Running Step1");
         // let dev_count = DEV_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -38,35 +36,3 @@ impl Step1 {
         Ok(None)
     }
 }
-
-// impl Step for Step1 {
-//     async fn run_raw(&self, event: Option<WorkflowEvent>) -> Result<Option<StepWithSettings>, StepError> {
-//         self.run().await
-//     }
-
-//     // each step can implement its own enqueue method, so we have to take both the active and waiting for step queues as parameters,
-//     // and the step will decide which queue to enqueue itself into
-//     async fn enqueue(
-//         self,
-//         instance_id: InstanceId,
-//         settings: StepSettings,
-//         active_step_queue: &ActiveStepQueue,
-//         waiting_for_step_queue: &WaitingForEventStepQueue,
-//         delayed_step_queue: &DelayedStepQueue,
-//     ) -> anyhow::Result<()> {
-//         active_step_queue
-//             .enqueue(
-//                 instance_id,
-//                 FullyQualifiedStep {
-//                     step: StepWithSettings {
-//                         step: self.into(),
-//                         settings,
-//                     },
-//                     event: None,
-//                     retry_count: 0,
-//                 },
-//             )
-//             .await?;
-//         Ok(())
-//     }
-// }
