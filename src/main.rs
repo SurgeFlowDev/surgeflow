@@ -281,16 +281,16 @@ async fn next_step_worker() -> anyhow::Result<()> {
     }
 }
 
-async fn active_step_worker(wf: Workflow0) -> anyhow::Result<()> {
+async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
     let mut connection =
         fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
     let mut session = Session::begin(&mut connection).await?;
-    let active_step_receiver = ActiveStepReceiver::<Workflow0>::new(&mut session).await?;
-    let active_step_sender = ActiveStepSender::<Workflow0>::new(&mut session).await?;
-    let next_step_sender = NextStepSender::<Workflow0>::new(&mut session).await?;
+    let active_step_receiver = ActiveStepReceiver::<W>::new(&mut session).await?;
+    let active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
+    let next_step_sender = NextStepSender::<W>::new(&mut session).await?;
 
-    let failed_step_sender = FailedStepSender::<Workflow0>::new(&mut session).await?;
+    let failed_step_sender = FailedStepSender::<W>::new(&mut session).await?;
 
     // let succeeded_step_sender = SucceededStepSender::<Workflow0>::new(&mut session).await?;
 
