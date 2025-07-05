@@ -323,18 +323,7 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    try_join!(
-        workspace_instance_worker::<Workflow0>(),
-        active_step_worker(Workflow0 {}),
-        next_step_worker::<Workflow0>(),
-        handle_event_new::<Workflow0>(),
-        control_server::<Workflow0>(),
-    )?;
-
-    Ok(())
-}
-
-async fn control_server<W: Workflow>() -> anyhow::Result<()> {
+    // TODO: refactor this into a function
     let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
     let sqlx_pool = PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?;
 
@@ -351,37 +340,62 @@ async fn control_server<W: Workflow>() -> anyhow::Result<()> {
     )
     .await?;
 
-    let event_sender = EventSender::<W>::new(&mut session).await?;
+    let event_sender = EventSender::<Workflow0>::new(&mut session).await?;
 
     let app_state = Arc::new(AppState {
         event_sender,
         workflow_instance_manager: WorkflowInstanceManager {
-            workflow_name: W::name(),
+            workflow_name: Workflow0::name(),
             sender: instance_sender.into(),
         },
         sqlx_pool,
     });
+
+    let mut api = base_open_api();
+
+    let router0 = control_server::<Workflow0>().await?;
+
+    // // test that we can use the same control server for multiple workflows
+    // let router1 = control_server::<Workflow0>().await?;
+
     let router = ApiRouter::new()
-        .typed_api_route(post_workflow_instance)
-        .typed_api_route(post_workflow_event)
-        .with_state(app_state);
+        .merge(router0)
+        // .merge(router1)
+        .with_state(app_state.clone());
 
     let router = if cfg!(debug_assertions) {
         let router = router
             .typed_api_route(serve_api)
             .route("/docs", Scalar::new("/openapi.json").axum_route());
-
-        let mut api = base_open_api();
         router.finish_api(&mut api).layer(Extension(api))
     } else {
         router.into()
     };
-
     let router = NormalizePathLayer::trim_trailing_slash().layer(router);
     let router = ServiceExt::<Request>::into_make_service(router);
+    // TODO: end here
 
-    axum::serve(listener, router).await?;
+
+    try_join!(
+        workspace_instance_worker::<Workflow0>(),
+        active_step_worker(Workflow0 {}),
+        next_step_worker::<Workflow0>(),
+        handle_event_new::<Workflow0>(),
+        async {
+            axum::serve(listener, router).await?;
+            Ok(())
+        }
+    )?;
+
     Ok(())
+}
+
+async fn control_server<W: Workflow>() -> anyhow::Result<ApiRouter<Arc<AppState<W>>>> {
+    let router = ApiRouter::new()
+        .typed_api_route(post_workflow_instance)
+        .typed_api_route(post_workflow_event);
+
+    Ok(router)
 }
 
 pub fn base_open_api() -> OpenApi {
