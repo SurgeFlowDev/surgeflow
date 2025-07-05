@@ -32,7 +32,7 @@ use tower_layer::Layer;
 
 #[derive(Debug)]
 struct WorkflowInstanceManager {
-    // TODO: could probably be a const param if they allowed &str
+    // TODO: could probably be a const generic if they allowed &str
     workflow_name: WorkflowName,
     sender: Mutex<Sender>,
 }
