@@ -1,7 +1,7 @@
 use crate::{
     StepError, StepWithSettings, Workflow, Workflow0,
     event::{Immediate, Workflow0Event},
-    step::{Step, StepResult, StepSettings, WorkflowStep},
+    step::{Step, StepResult, StepSettings, Workflow0Step},
 };
 use macros::step;
 use serde::{Deserialize, Serialize};

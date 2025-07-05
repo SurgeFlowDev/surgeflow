@@ -17,12 +17,16 @@ pub enum Workflow0Event {
     Event0(Event0),
 }
 
-impl Workflow0Event {
-    pub fn variant_type_id(&self) -> TypeId {
+impl WorkflowEvent for Workflow0Event {
+    fn variant_type_id(&self) -> TypeId {
         match self {
             Self::Event0(_) => TypeId::of::<Event0>(),
         }
     }
+}
+
+pub trait WorkflowEvent: Event {
+    fn variant_type_id(&self) -> TypeId;
 }
 
 impl Event for Workflow0Event {

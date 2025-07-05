@@ -1,6 +1,6 @@
 use crate::step::{Immediate, StepResult};
 use crate::{
-    StepError, StepWithSettings, Workflow0, WorkflowStep,
+    StepError, StepWithSettings, Workflow0, Workflow0Step,
     event::Workflow0Event,
     step::{Step, Step1},
 };

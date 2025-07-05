@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 pub mod event;
 pub mod step;
 
-use step::{StepError, WorkflowStep};
+use step::{StepError, Workflow0Step};
 
 use crate::{
-    event::{Event, Workflow0Event},
-    step::{step_0::Step0, Step, StepSettings, StepWithSettings, WorkflowStepExt},
+    event::{Event, Workflow0Event, WorkflowEvent},
+    step::{step_0::Step0, Step, StepSettings, StepWithSettings, WorkflowStep},
 };
 
 #[derive(
@@ -39,7 +39,7 @@ pub struct Workflow0 {}
 
 impl Workflow for Workflow0 {
     type Event = Workflow0Event;
-    type Step = WorkflowStep;
+    type Step = Workflow0Step;
     const NAME: &'static str = "workflow_0";
 
     fn entrypoint() -> StepWithSettings<Self::Step> {
@@ -52,8 +52,8 @@ impl Workflow for Workflow0 {
 
 pub trait Workflow: Clone {
     // + WorkflowEvent<Self>
-    type Event: Event<Workflow = Self> + JsonSchema;
-    type Step: Step<Workflow = Self, Event = Self::Event> + WorkflowStepExt;
+    type Event: Event<Workflow = Self> + JsonSchema + WorkflowEvent;
+    type Step: Step<Workflow = Self, Event = Self::Event> + WorkflowStep;
     const NAME: &'static str;
 
     fn entrypoint() -> StepWithSettings<Self::Step>;

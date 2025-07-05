@@ -39,25 +39,25 @@ pub trait Step:
 }
 
 #[derive(Debug, Serialize, Deserialize, From, TryInto, Clone)]
-pub enum WorkflowStep {
+pub enum Workflow0Step {
     Step0(Step0),
     Step1(Step1),
 }
-impl WorkflowStepExt for WorkflowStep {
+impl WorkflowStep for Workflow0Step {
     fn variant_event_type_id(&self) -> TypeId {
         match self {
-            WorkflowStep::Step0(_) => TypeId::of::<<Step0 as Step>::Event>(),
-            WorkflowStep::Step1(_) => TypeId::of::<<Step1 as Step>::Event>(),
+            Workflow0Step::Step0(_) => TypeId::of::<<Step0 as Step>::Event>(),
+            Workflow0Step::Step1(_) => TypeId::of::<<Step1 as Step>::Event>(),
         }
     }
 }
 
-pub trait WorkflowStepExt: Step {
+pub trait WorkflowStep: Step {
     /// Returns the TypeId of the event type associated with this step.
     fn variant_event_type_id(&self) -> TypeId;
 }
 
-impl Step for WorkflowStep {
+impl Step for Workflow0Step {
     type Event = Workflow0Event;
     type Workflow = Workflow0;
     async fn run_raw(
@@ -66,8 +66,8 @@ impl Step for WorkflowStep {
         event: Option<Workflow0Event>,
     ) -> Result<Option<StepWithSettings<Self>>, StepError> {
         match self {
-            WorkflowStep::Step0(step) => Step::run_raw(step, wf, event).await,
-            WorkflowStep::Step1(step) => Step::run_raw(step, wf, event).await,
+            Workflow0Step::Step0(step) => Step::run_raw(step, wf, event).await,
+            Workflow0Step::Step1(step) => Step::run_raw(step, wf, event).await,
         }
     }
 }

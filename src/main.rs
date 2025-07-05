@@ -6,7 +6,7 @@ use rust_workflow_2::{
     event::{EventReceiver, EventSender, Immediate, InstanceEvent, Workflow0Event},
     step::{
         ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
-        NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStepExt,
+        NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStep,
     },
 };
 use schemars::JsonSchema;
@@ -200,17 +200,17 @@ async fn workspace_instance_worker<W: Workflow>() -> anyhow::Result<()> {
     }
 }
 
-async fn handle_event_new() -> anyhow::Result<()> {
+async fn handle_event_new<W: Workflow>() -> anyhow::Result<()> {
     let mut connection =
         fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
 
     let mut session = Session::begin(&mut connection).await?;
 
-    let active_step_sender = ActiveStepSender::<Workflow0>::new(&mut session).await?;
+    let active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
     let steps_awaiting_event =
-        StepsAwaitingEventManager::<Workflow0>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
-    let event_receiver = EventReceiver::<Workflow0>::new(&mut session).await?;
+        StepsAwaitingEventManager::<W>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
+    let event_receiver = EventReceiver::<W>::new(&mut session).await?;
 
     loop {
         let Ok(InstanceEvent { event, instance_id }) = event_receiver.recv().await else {
@@ -346,7 +346,7 @@ async fn main() -> anyhow::Result<()> {
         workspace_instance_worker::<Workflow0>(),
         active_step_worker(Workflow0 {}),
         next_step_worker::<Workflow0>(),
-        handle_event_new(),
+        handle_event_new::<Workflow0>(),
         control_server(),
     )?;
 
