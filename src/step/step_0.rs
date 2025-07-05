@@ -12,8 +12,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Step0 {}
 
-
-
 #[step]
 impl Step0 {
     #[run]
@@ -25,6 +23,6 @@ impl Step0 {
         tracing::info!("Running Step0");
 
         // return the next step to run
-        Step1 {}.into()
+        Ok(Step1 {}.into())
     }
 }

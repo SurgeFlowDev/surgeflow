@@ -1,5 +1,7 @@
 use crate::{
-    event::{event_0::Event0, Immediate, Workflow0Event}, step::{Step, StepResult, StepSettings, WorkflowStep}, StepError, StepWithSettings, Workflow, Workflow0
+    StepError, StepWithSettings, Workflow, Workflow0,
+    event::{Immediate, Workflow0Event, event_0::Event0},
+    step::{Step, StepResult, StepSettings, WorkflowStep},
 };
 use macros::step;
 use serde::{Deserialize, Serialize};
@@ -7,14 +9,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Step1 {}
 
-impl From<Step1>
-    for Result<Option<StepWithSettings<<<Step1 as Step>::Workflow as Workflow>::Step>>, StepError>
-{
+impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workflow>::Step>> {
     fn from(step: Step1) -> Self {
-        Ok(Some(StepWithSettings {
+        Some(StepWithSettings {
             step: step.into(),
             settings: StepSettings { max_retries: 0 },
-        }))
+        })
     }
 }
 
