@@ -62,7 +62,7 @@ impl<W: Workflow> EventReceiver<W> {
         let addr = format!("{}-events", W::NAME);
         let link_name = format!("{addr}-receiver-{}", Uuid::new_v4().as_hyphenated());
         let receiver = Receiver::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(receiver), PhantomData::default()))
+        Ok(Self(Mutex::new(receiver), PhantomData))
     }
     pub async fn recv(&self) -> anyhow::Result<InstanceEvent<W>> {
         let mut receiver = self.0.lock().await;
@@ -93,7 +93,7 @@ impl<W: Workflow> EventSender<W> {
         let addr = format!("{}-events", W::NAME);
         let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
         let sender = Sender::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(sender), PhantomData::default()))
+        Ok(Self(Mutex::new(sender), PhantomData))
     }
     pub async fn send(&self, step: InstanceEvent<W>) -> anyhow::Result<()> {
         let mut sender = self.0.lock().await;

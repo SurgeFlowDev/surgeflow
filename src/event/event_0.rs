@@ -13,8 +13,8 @@ impl Event for Event0 {
     type Workflow = Workflow0;
 }
 
-impl Into<Option<<Workflow0 as crate::Workflow>::Event>> for Event0 {
-    fn into(self) -> Option<<Workflow0 as crate::Workflow>::Event> {
-        Some(Workflow0Event::Event0(self))
+impl From<Event0> for Option<<Workflow0 as crate::Workflow>::Event> {
+    fn from(val: Event0) -> Self {
+        Some(Workflow0Event::Event0(val))
     }
 }

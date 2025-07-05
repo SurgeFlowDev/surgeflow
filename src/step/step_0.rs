@@ -1,4 +1,3 @@
-use crate::Workflow;
 use crate::step::{Immediate, StepResult};
 use crate::{
     StepError, StepWithSettings, Workflow0, WorkflowStep,

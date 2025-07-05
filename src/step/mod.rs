@@ -1,16 +1,14 @@
 pub mod step_0;
 pub mod step_1;
 
-use anyhow::Context;
 use derive_more::{From, TryInto};
-use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
+use fe2o3_amqp::{Receiver, Sender, session::SessionHandle};
 use serde::{Deserialize, Serialize};
 use std::{any::TypeId, fmt::Debug, marker::PhantomData};
 use step_0::Step0;
 use step_1::Step1;
 use tikv_client::RawClient;
 use tokio::sync::Mutex;
-use tracing::event;
 use uuid::Uuid;
 
 use crate::{
@@ -192,7 +190,7 @@ impl<W: Workflow> ActiveStepReceiver<W> {
         let addr = format!("{}-active-steps", W::NAME);
         let link_name = format!("{addr}-receiver-{}", Uuid::new_v4().as_hyphenated());
         let receiver = Receiver::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(receiver), PhantomData::default()))
+        Ok(Self(Mutex::new(receiver), PhantomData))
     }
     pub async fn recv(&self) -> anyhow::Result<FullyQualifiedStep<W::Step>> {
         let mut receiver = self.0.lock().await;
@@ -223,7 +221,7 @@ impl<W: Workflow> ActiveStepSender<W> {
         let addr = format!("{}-active-steps", W::NAME);
         let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
         let sender = Sender::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(sender), PhantomData::default()))
+        Ok(Self(Mutex::new(sender), PhantomData))
     }
     pub async fn send(&self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
         let mut sender = self.0.lock().await;
@@ -243,7 +241,7 @@ impl<W: Workflow> FailedStepReceiver<W> {
         let addr = format!("{}-failed-steps", W::NAME);
         let link_name = format!("{addr}-receiver-{}", Uuid::new_v4().as_hyphenated());
         let receiver = Receiver::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(receiver), PhantomData::default()))
+        Ok(Self(Mutex::new(receiver), PhantomData))
     }
     pub async fn recv(&self) -> anyhow::Result<FullyQualifiedStep<W::Step>> {
         let mut receiver = self.0.lock().await;
@@ -274,7 +272,7 @@ impl<W: Workflow> FailedStepSender<W> {
         let addr = format!("{}-failed-steps", W::NAME);
         let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
         let sender = Sender::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(sender), PhantomData::default()))
+        Ok(Self(Mutex::new(sender), PhantomData))
     }
     pub async fn send(&self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
         let mut sender = self.0.lock().await;
@@ -294,7 +292,7 @@ impl<W: Workflow> SucceededStepReceiver<W> {
         let addr = format!("{}-succeeded-steps", W::NAME);
         let link_name = format!("{addr}-receiver-{}", Uuid::new_v4().as_hyphenated());
         let receiver = Receiver::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(receiver), PhantomData::default()))
+        Ok(Self(Mutex::new(receiver), PhantomData))
     }
     pub async fn recv(&self) -> anyhow::Result<FullyQualifiedStep<W::Step>> {
         let mut receiver = self.0.lock().await;
@@ -325,7 +323,7 @@ impl<W: Workflow> SucceededStepSender<W> {
         let addr = format!("{}-succeeded-steps", W::NAME);
         let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
         let sender = Sender::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(sender), PhantomData::default()))
+        Ok(Self(Mutex::new(sender), PhantomData))
     }
     pub async fn send(&self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
         let mut sender = self.0.lock().await;
@@ -345,7 +343,7 @@ impl<W: Workflow> NextStepReceiver<W> {
         let addr = format!("{}-next-steps", W::NAME);
         let link_name = format!("{addr}-receiver-{}", Uuid::new_v4().as_hyphenated());
         let receiver = Receiver::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(receiver), PhantomData::default()))
+        Ok(Self(Mutex::new(receiver), PhantomData))
     }
     pub async fn recv(&self) -> anyhow::Result<FullyQualifiedStep<W::Step>> {
         let mut receiver = self.0.lock().await;
@@ -376,7 +374,7 @@ impl<W: Workflow> NextStepSender<W> {
         let addr = format!("{}-next-steps", W::NAME);
         let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
         let sender = Sender::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(sender), PhantomData::default()))
+        Ok(Self(Mutex::new(sender), PhantomData))
     }
     pub async fn send(&self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
         let mut sender = self.0.lock().await;

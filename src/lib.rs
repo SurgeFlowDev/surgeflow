@@ -1,23 +1,14 @@
 use anyhow::Context;
 use fe2o3_amqp::{Receiver, Sender};
-use futures::{TryStreamExt, stream::StreamExt};
 use schemars::JsonSchema;
 use std::{
-    borrow::Cow,
     collections::{HashMap, VecDeque},
     hash::Hash,
-    sync::Arc,
-    time::Duration,
 };
 use tikv_client::RawClient;
 
-use derive_more::{Display, From, Into, TryInto};
-use lapin::{
-    BasicProperties, Channel, Consumer,
-    options::{BasicAckOptions, BasicConsumeOptions, BasicPublishOptions},
-    types::FieldTable,
-};
-use serde::{Deserialize, Serialize, Serializer};
+use derive_more::{Display, From, Into};
+use serde::{Deserialize, Serialize};
 
 pub mod event;
 pub mod step;

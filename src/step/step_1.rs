@@ -1,6 +1,6 @@
 use crate::{
     StepError, StepWithSettings, Workflow, Workflow0,
-    event::{Immediate, Workflow0Event, event_0::Event0},
+    event::{Immediate, Workflow0Event},
     step::{Step, StepResult, StepSettings, WorkflowStep},
 };
 use macros::step;
