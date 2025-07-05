@@ -158,7 +158,7 @@ struct AppState {
     sqlx_pool: PgPool,
 }
 
-async fn workspace_instance_worker() -> anyhow::Result<()> {
+async fn workspace_instance_worker<W: Workflow>() -> anyhow::Result<()> {
     let mut connection =
         fe2o3_amqp::Connection::open("control-connection-1", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
@@ -172,7 +172,7 @@ async fn workspace_instance_worker() -> anyhow::Result<()> {
     )
     .await?;
 
-    let next_step_sender = NextStepSender::<Workflow0>::new(&mut session).await?;
+    let next_step_sender = NextStepSender::<W>::new(&mut session).await?;
 
     loop {
         let Ok(msg) = instance_receiver.recv::<String>().await else {
@@ -182,12 +182,12 @@ async fn workspace_instance_worker() -> anyhow::Result<()> {
         let Ok(instance) = serde_json::from_str::<WorkflowInstance>(msg.body()) else {
             continue;
         };
-        // tracing::info!("{:?}", instance);
+
         instance_receiver.accept(msg).await?;
 
         let entrypoint = FullyQualifiedStep {
             instance_id: instance.id,
-            step: Workflow0::entrypoint(),
+            step: W::entrypoint(),
             event: None,
             retry_count: 0,
         };
@@ -340,6 +340,26 @@ async fn active_step_worker(wf: Workflow0) -> anyhow::Result<()> {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
+
+    let instance_worker = tokio::spawn(workspace_instance_worker::<Workflow0>());
+
+    let active_step_worker = tokio::spawn(active_step_worker(Workflow0 {}));
+
+    let nest_step_worker = tokio::spawn(next_step_worker());
+
+    let handle_event_worker = tokio::spawn(handle_event_new());
+
+    let control_server = tokio::spawn(control_server());
+
+    control_server.await??;
+    instance_worker.await??;
+    active_step_worker.await??;
+    handle_event_worker.await??;
+    nest_step_worker.await??;
+    Ok(())
+}
+
+async fn control_server() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
     let sqlx_pool = PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?;
 
@@ -348,14 +368,6 @@ async fn main() -> anyhow::Result<()> {
             .await?;
 
     let mut session = Session::begin(&mut connection).await?;
-
-    let instance_worker = tokio::spawn(workspace_instance_worker());
-
-    let active_step_worker = tokio::spawn(active_step_worker(Workflow0 {}));
-
-    let nest_step_worker = tokio::spawn(next_step_worker());
-
-    let handle_event_worker = tokio::spawn(handle_event_new());
 
     let instance_sender = Sender::attach(
         &mut session,
@@ -394,10 +406,6 @@ async fn main() -> anyhow::Result<()> {
     let router = ServiceExt::<Request>::into_make_service(router);
 
     axum::serve(listener, router).await?;
-    instance_worker.await??;
-    active_step_worker.await??;
-    handle_event_worker.await??;
-    nest_step_worker.await??;
     Ok(())
 }
 
