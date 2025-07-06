@@ -24,7 +24,7 @@ use rust_workflow_2::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool, query_as};
-use std::{any::TypeId, mem::forget, sync::Arc};
+use std::{any::TypeId, sync::Arc};
 use tikv_client::RawClient;
 use tokio::{net::TcpListener, try_join};
 use tower_http::normalize_path::NormalizePathLayer;
@@ -319,34 +319,23 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
     }
 }
 
-async fn init_app_state<W: Workflow>() -> anyhow::Result<Arc<AppState<W>>> {
-    let sqlx_pool = PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?;
-
-    let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-6", "amqp://guest:guest@127.0.0.1:5672")
-            .await?;
-
-    let mut session = Session::begin(&mut connection).await?;
-    
-
+async fn init_app_state<W: Workflow>(
+    sqlx_pool: PgPool,
+    session: &mut SessionHandle<()>,
+) -> anyhow::Result<Arc<AppState<W>>> {
     let instance_sender = Sender::attach(
-        &mut session,
+        session,
         format!("{}-instances-receiver-1", W::NAME),
         format!("{}-instances", W::NAME),
     )
     .await?;
 
-    let event_sender = EventSender::<W>::new(&mut session).await?;
-
-
-    // TODO: TEMP
-    forget(connection);
-    forget(session);
+    let event_sender = EventSender::<W>::new(session).await?;
 
     Ok(Arc::new(AppState {
         event_sender,
         workflow_instance_manager: WorkflowInstanceManager {
-            workflow_name: Workflow0::name(),
+            workflow_name: W::name(),
             sender: instance_sender.into(),
         },
         sqlx_pool,
@@ -359,13 +348,21 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
 
-    let mut api = base_open_api();
+    let sqlx_pool = PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?;
 
-    let app_state = init_app_state::<Workflow0>().await?;
+    let mut connection =
+        fe2o3_amqp::Connection::open("control-connection-6", "amqp://guest:guest@127.0.0.1:5672")
+            .await?;
 
-    let router0 = control_server::<Workflow0>().await?;
+    let mut session = Session::begin(&mut connection).await?;
+
+    let app_state = init_app_state::<Workflow0>(sqlx_pool, &mut session).await?;
+
+    let router0 = control_router::<Workflow0>().await?;
 
     let router = ApiRouter::new().merge(router0).with_state(app_state);
+
+    let mut api = base_open_api();
 
     let router = if cfg!(debug_assertions) {
         let router = router
@@ -392,7 +389,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn control_server<W: Workflow>() -> anyhow::Result<ApiRouter<Arc<AppState<W>>>> {
+async fn control_router<W: Workflow>() -> anyhow::Result<ApiRouter<Arc<AppState<W>>>> {
     let router = ApiRouter::new()
         .typed_api_route(post_workflow_instance)
         .typed_api_route(post_workflow_event);
