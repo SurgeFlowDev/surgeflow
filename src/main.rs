@@ -1,143 +1,34 @@
 use aide::{
-    OperationIo,
     axum::{ApiRouter, IntoApiResponse},
     openapi::{Info, OpenApi},
     scalar::Scalar,
 };
 use axum::{
     Extension, ServiceExt,
-    extract::{Json, Request, State},
-    http::StatusCode,
+    extract::{Json, Request},
 };
-use axum_thiserror::ErrorStatus;
 use axum_typed_routing::{TypedApiRouter, api_route};
 use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
-use futures::lock::Mutex;
 use rust_workflow_2::{
+    AppState, WorkflowInstance, WorkflowInstanceManager,
     event::{EventReceiver, EventSender, Immediate, InstanceEvent},
     step::{
         ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
         NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStep,
     },
-    workflows::{workflow_0::Workflow0, workflow_1::Workflow1, Workflow, WorkflowEvent, WorkflowId, WorkflowInstanceId},
+    workflows::{
+        Workflow, WorkflowEvent,
+        workflow_0::{self, Workflow0},
+        workflow_1::{self, Workflow1},
+    },
 };
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use sqlx::{PgConnection, PgPool, query_as};
+
+use sqlx::PgPool;
 use std::{any::TypeId, marker::PhantomData, sync::Arc};
 use tikv_client::RawClient;
 use tokio::{net::TcpListener, try_join};
 use tower_http::normalize_path::NormalizePathLayer;
 use tower_layer::Layer;
-
-#[derive(Debug)]
-struct WorkflowInstanceManager<W: Workflow> {
-    sender: Mutex<Sender>,
-    _marker: PhantomData<W>,
-}
-
-impl<W: Workflow> WorkflowInstanceManager<W> {
-    async fn create_instance(&self, conn: &mut PgConnection) -> anyhow::Result<WorkflowInstance> {
-        let res = query_as!(
-            WorkflowInstanceRecord,
-            r#"
-            INSERT INTO workflow_instances ("workflow_id")
-            SELECT "id"
-            FROM workflows
-            WHERE "name" = $1
-            RETURNING "id", "workflow_id";
-        "#,
-            W::NAME
-        )
-        .fetch_one(conn)
-        .await?;
-
-        let res = res.try_into()?;
-        let msg = serde_json::to_string(&res)?;
-        self.sender.lock().await.send(msg).await?;
-        Ok(res)
-    }
-}
-
-struct WorkflowInstanceRecord {
-    pub id: i32,
-    pub workflow_id: i32,
-}
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
-struct WorkflowInstance {
-    pub id: WorkflowInstanceId,
-    pub workflow_id: WorkflowId,
-}
-
-#[derive(Debug, thiserror::Error)]
-enum WorkflowInstanceError {
-    #[error("Database error")]
-    Database(#[from] sqlx::Error),
-}
-
-impl TryFrom<WorkflowInstanceRecord> for WorkflowInstance {
-    type Error = WorkflowInstanceError;
-
-    fn try_from(value: WorkflowInstanceRecord) -> Result<Self, Self::Error> {
-        Ok(WorkflowInstance {
-            id: value.id.into(),
-            workflow_id: value.workflow_id.into(),
-        })
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, JsonSchema, thiserror::Error, ErrorStatus, OperationIo)]
-enum MyError {
-    #[error("unkown")]
-    #[status(StatusCode::CONFLICT)]
-    Unkown,
-}
-
-#[api_route(POST "/workflow/workflow_0" {
-    summary: "Create workflow Instance",
-    description: "Create workflow Instance",
-    id: "post-workflow-instance",
-    tags: ["workflow-instance"],
-    hidden: false
-})]
-async fn post_workflow_instance<W: Workflow>(
-    State(state): State<Arc<AppState<W>>>,
-) -> Result<Json<WorkflowInstance>, MyError> {
-    tracing::info!("creating instance...");
-    let mut tx = state.sqlx_pool.begin().await.unwrap();
-    let res = state
-        .workflow_instance_manager
-        .create_instance(&mut tx)
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
-    Ok(Json(res))
-}
-
-#[api_route(POST "/workflow/workflow_0/{instance_id}/event" {
-    summary: "Send event",
-    description: "Send event",
-    id: "post-event",
-    tags: ["workflow-event"],
-    hidden: false
-})]
-async fn post_workflow_event<W: Workflow>(
-    instance_id: WorkflowInstanceId,
-    State(state): State<Arc<AppState<W>>>,
-    Json(event): Json<W::Event>,
-) {
-    state
-        .event_sender
-        .send(InstanceEvent { event, instance_id })
-        .await
-        .unwrap();
-}
-
-struct AppState<W: Workflow> {
-    event_sender: EventSender<W>,
-    workflow_instance_manager: WorkflowInstanceManager<W>,
-    sqlx_pool: PgPool,
-}
 
 async fn workspace_instance_worker<W: Workflow>() -> anyhow::Result<SessionHandle<()>> {
     let mut connection =
@@ -358,7 +249,7 @@ async fn main() -> anyhow::Result<()> {
     // ISOLATED WORKFLOW 0
     let app_state_0 = init_app_state::<Workflow0>(sqlx_pool.clone(), &mut session).await?;
 
-    let router_0 = control_router::<Workflow0>().await?.with_state(app_state_0);
+    let router_0 = workflow_0::control_router().await?.with_state(app_state_0);
 
     let handlers_0 = async {
         try_join!(
@@ -373,7 +264,7 @@ async fn main() -> anyhow::Result<()> {
     // ISOLATED WORKFLOW 1
     let app_state_1 = init_app_state::<Workflow1>(sqlx_pool, &mut session).await?;
 
-    let router_1 = control_router::<Workflow1>().await?.with_state(app_state_1);
+    let router_1 = workflow_1::control_router().await?.with_state(app_state_1);
 
     let handlers_1 = async {
         try_join!(
@@ -411,14 +302,6 @@ async fn main() -> anyhow::Result<()> {
     try_join!(all_handlers, server)?;
 
     Ok(())
-}
-
-async fn control_router<W: Workflow>() -> anyhow::Result<ApiRouter<Arc<AppState<W>>>> {
-    let router = ApiRouter::new()
-        .typed_api_route(post_workflow_instance)
-        .typed_api_route(post_workflow_event);
-
-    Ok(router)
 }
 
 pub fn base_open_api() -> OpenApi {

@@ -1,14 +1,68 @@
-use std::any::TypeId;
-
-use crate::workflows::{Workflow, WorkflowEvent};
-use crate::event::{Event, Immediate};
+use crate::event::{Event, Immediate, InstanceEvent};
+use crate::step::StepError;
+use crate::step::{Step, StepWithSettings};
 use crate::step::{StepResult, StepSettings, WorkflowStep};
-use crate::{StepError, StepWithSettings, step::Step};
+use crate::workflows::{Workflow, WorkflowEvent, WorkflowInstanceId};
+use crate::{AppState, MyError, WorkflowInstance};
+use aide::axum::ApiRouter;
+use axum::Json;
+use axum::extract::State;
+use axum_typed_routing::{TypedApiRouter, api_route};
 use derive_more::{From, TryInto};
 use macros::step;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::any::TypeId;
 use std::fmt::Debug;
+use std::sync::Arc;
+
+pub async fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Workflow1>>>> {
+    let router = ApiRouter::new()
+        .typed_api_route(post_workflow_instance)
+        .typed_api_route(post_workflow_event);
+
+    Ok(router)
+}
+
+#[api_route(POST "/workflow/workflow_1" {
+    summary: "Create workflow Instance",
+    description: "Create workflow Instance",
+    id: "post-workflow-instance",
+    tags: ["workflow-instance"],
+    hidden: false
+})]
+pub async fn post_workflow_instance(
+    State(state): State<Arc<AppState<Workflow1>>>,
+) -> Result<Json<WorkflowInstance>, MyError> {
+    tracing::info!("creating instance...");
+    let mut tx = state.sqlx_pool.begin().await.unwrap();
+    let res = state
+        .workflow_instance_manager
+        .create_instance(&mut tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    Ok(Json(res))
+}
+
+#[api_route(POST "/workflow/workflow_1/{instance_id}/event" {
+    summary: "Send event",
+    description: "Send event",
+    id: "post-event",
+    tags: ["workflow-event"],
+    hidden: false
+})]
+pub async fn post_workflow_event<W: Workflow>(
+    instance_id: WorkflowInstanceId,
+    State(state): State<Arc<AppState<W>>>,
+    Json(event): Json<W::Event>,
+) {
+    state
+        .event_sender
+        .send(InstanceEvent { event, instance_id })
+        .await
+        .unwrap();
+}
 
 #[derive(Debug, Clone, JsonSchema)]
 pub struct Workflow1 {}
