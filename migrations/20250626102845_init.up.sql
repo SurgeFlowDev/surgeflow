@@ -13,4 +13,5 @@ CREATE TABLE
 INSERT INTO
     workflows ("name")
 VALUES
-    ('workflow_0');
+    ('workflow_0'),
+    ('workflow_1');

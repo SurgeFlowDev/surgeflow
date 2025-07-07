@@ -16,7 +16,7 @@ pub struct Workflow1 {}
 impl Workflow for Workflow1 {
     type Event = Workflow1Event;
     type Step = Workflow1Step;
-    const NAME: &'static str = "workflow_0";
+    const NAME: &'static str = "workflow_1";
 
     fn entrypoint() -> StepWithSettings<Self::Step> {
         StepWithSettings {
@@ -96,7 +96,7 @@ impl Step0 {
         #[expect(unused_variables)] wf: Workflow1,
         // event: Event0,
     ) -> StepResult<Workflow1> {
-        tracing::info!("Running Step0");
+        tracing::info!("Running Step0, Workflow1");
 
         // return the next step to run
         Ok(Step1 {}.into())
@@ -122,7 +122,7 @@ impl Step1 {
     #[expect(unused_variables)]
     #[run]
     async fn run(&self, wf: Workflow1, event: Event0) -> StepResult<Workflow1> {
-        tracing::info!("Running Step1");
+        tracing::info!("Running Step1, Workflow1");
         // let dev_count = DEV_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         // if dev_count == 3 {
         //     return Ok(None);

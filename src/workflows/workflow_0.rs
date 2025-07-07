@@ -96,7 +96,7 @@ impl Step0 {
         #[expect(unused_variables)] wf: Workflow0,
         // event: Event0,
     ) -> StepResult<Workflow0> {
-        tracing::info!("Running Step0");
+        tracing::info!("Running Step0, Workflow0");
 
         // return the next step to run
         Ok(Step1 {}.into())
@@ -122,7 +122,7 @@ impl Step1 {
     #[expect(unused_variables)]
     #[run]
     async fn run(&self, wf: Workflow0, event: Event0) -> StepResult<Workflow0> {
-        tracing::info!("Running Step1");
+        tracing::info!("Running Step1, Workflow0");
         // let dev_count = DEV_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         // if dev_count == 3 {
         //     return Ok(None);
