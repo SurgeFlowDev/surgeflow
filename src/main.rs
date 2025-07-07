@@ -14,12 +14,13 @@ use axum_typed_routing::{TypedApiRouter, api_route};
 use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
 use futures::lock::Mutex;
 use rust_workflow_2::{
-    Workflow, Workflow0, WorkflowExt, WorkflowId, WorkflowInstanceId, WorkflowName,
-    event::{EventReceiver, EventSender, Immediate, InstanceEvent, WorkflowEvent},
+    Workflow, Workflow0, WorkflowId, WorkflowInstanceId,
+    event::{EventReceiver, EventSender, Immediate, InstanceEvent},
     step::{
         ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
         NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStep,
     },
+    workflows::workflow_0::WorkflowEvent,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -384,7 +385,6 @@ async fn main() -> anyhow::Result<()> {
         )
     };
     // ISOLATED END
-
 
     // MERGE
     let all_handlers = async { try_join!(handlers_0, handlers_1) };

@@ -1,17 +1,19 @@
 use schemars::JsonSchema;
-use std::hash::Hash;
+use std::{any::TypeId, hash::Hash};
 
-use derive_more::{Display, From, Into};
+use derive_more::{Display, From, Into, TryInto};
 use serde::{Deserialize, Serialize};
 
 pub mod event;
 pub mod step;
+pub mod workflows;
 
-use step::{StepError, Workflow0Step};
+use step::StepError;
 
 use crate::{
-    event::{Event, Workflow0Event, WorkflowEvent},
-    step::{Step, StepSettings, StepWithSettings, WorkflowStep, step_0::Step0},
+    event::Event,
+    step::{Step, StepSettings, StepWithSettings, WorkflowStep},
+    workflows::workflow_0::{Step0, Step1, Workflow0Event, WorkflowEvent},
 };
 
 #[derive(
@@ -65,3 +67,34 @@ pub trait WorkflowExt: Workflow {
 }
 
 impl<T: Workflow> WorkflowExt for T {}
+
+// step
+
+#[derive(Debug, Serialize, Deserialize, From, TryInto, Clone)]
+pub enum Workflow0Step {
+    Step0(Step0),
+    Step1(Step1),
+}
+impl WorkflowStep for Workflow0Step {
+    fn variant_event_type_id(&self) -> TypeId {
+        match self {
+            Workflow0Step::Step0(_) => TypeId::of::<<Step0 as Step>::Event>(),
+            Workflow0Step::Step1(_) => TypeId::of::<<Step1 as Step>::Event>(),
+        }
+    }
+}
+
+impl Step for Workflow0Step {
+    type Event = Workflow0Event;
+    type Workflow = Workflow0;
+    async fn run_raw(
+        &self,
+        wf: Self::Workflow,
+        event: Option<Workflow0Event>,
+    ) -> Result<Option<StepWithSettings<Self>>, StepError> {
+        match self {
+            Workflow0Step::Step0(step) => Step::run_raw(step, wf, event).await,
+            Workflow0Step::Step1(step) => Step::run_raw(step, wf, event).await,
+        }
+    }
+}

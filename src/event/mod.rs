@@ -1,48 +1,15 @@
-use derive_more::{From, TryInto};
 use fe2o3_amqp::{Receiver, Sender, session::SessionHandle};
 use futures::lock::Mutex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{any::TypeId, fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData};
 use uuid::Uuid;
 
-use event_0::Event0;
-
-use crate::{Workflow, Workflow0, WorkflowInstanceId};
-
-pub mod event_0;
-
-#[derive(Debug, Serialize, Deserialize, From, TryInto, JsonSchema, Clone)]
-pub enum Workflow0Event {
-    Event0(Event0),
-}
-
-impl WorkflowEvent for Workflow0Event {
-    fn variant_type_id(&self) -> TypeId {
-        match self {
-            Self::Event0(_) => TypeId::of::<Event0>(),
-        }
-    }
-}
-
-pub trait WorkflowEvent: Event + Debug + JsonSchema + Send {
-    fn variant_type_id(&self) -> TypeId;
-}
-
-impl Event for Workflow0Event {
-    type Workflow = Workflow0;
-}
+use crate::{Workflow, WorkflowInstanceId};
 
 pub trait Event: Serialize + for<'a> Deserialize<'a> + Clone {
     type Workflow: Workflow;
 }
-
-// pub trait WorkflowEvent<W: Workflow>: Event<Workflow = W> {
-//     const NAME: &'static str;
-// }
-// impl WorkflowEvent<Workflow0> for Workflow0Event {
-//     const NAME: &'static str = "Workflow0Event";
-// }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Immediate<W: Workflow>(PhantomData<W>);

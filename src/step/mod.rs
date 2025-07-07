@@ -1,20 +1,12 @@
-pub mod step_0;
-pub mod step_1;
-
-use derive_more::{From, TryInto};
 use fe2o3_amqp::{Receiver, Sender, session::SessionHandle};
 use serde::{Deserialize, Serialize};
 use std::{any::TypeId, fmt::Debug, marker::PhantomData};
-use step_0::Step0;
-use step_1::Step1;
+
 use tikv_client::RawClient;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{
-    Workflow, Workflow0, WorkflowInstanceId,
-    event::{Event, Immediate, Workflow0Event},
-};
+use crate::{Workflow, WorkflowInstanceId, event::Event};
 
 pub type StepResult<W> = Result<Option<StepWithSettings<<W as Workflow>::Step>>, StepError>;
 
@@ -35,41 +27,14 @@ pub trait Step:
         event: Option<<Self::Workflow as Workflow>::Event>,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> impl std::future::Future<Output = Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Step>>, StepError>> + Send;
-}
-
-#[derive(Debug, Serialize, Deserialize, From, TryInto, Clone)]
-pub enum Workflow0Step {
-    Step0(Step0),
-    Step1(Step1),
-}
-impl WorkflowStep for Workflow0Step {
-    fn variant_event_type_id(&self) -> TypeId {
-        match self {
-            Workflow0Step::Step0(_) => TypeId::of::<<Step0 as Step>::Event>(),
-            Workflow0Step::Step1(_) => TypeId::of::<<Step1 as Step>::Event>(),
-        }
-    }
+    ) -> impl std::future::Future<
+        Output = Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Step>>, StepError>,
+    > + Send;
 }
 
 pub trait WorkflowStep: Step {
     /// Returns the TypeId of the event type associated with this step.
     fn variant_event_type_id(&self) -> TypeId;
-}
-
-impl Step for Workflow0Step {
-    type Event = Workflow0Event;
-    type Workflow = Workflow0;
-    async fn run_raw(
-        &self,
-        wf: Self::Workflow,
-        event: Option<Workflow0Event>,
-    ) -> Result<Option<StepWithSettings<Self>>, StepError> {
-        match self {
-            Workflow0Step::Step0(step) => Step::run_raw(step, wf, event).await,
-            Workflow0Step::Step1(step) => Step::run_raw(step, wf, event).await,
-        }
-    }
 }
 
 #[derive(Debug, thiserror::Error)]
