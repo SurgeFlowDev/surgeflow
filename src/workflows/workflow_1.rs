@@ -139,6 +139,15 @@ impl From<Event0> for Option<<Workflow1 as Workflow>::Event> {
     }
 }
 
+impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workflow>::Step>> {
+    fn from(step: Step1) -> Self {
+        Some(StepWithSettings {
+            step: step.into(),
+            settings: StepSettings { max_retries: 3 },
+        })
+    }
+}
+
 // boilerplate ended
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
@@ -169,15 +178,6 @@ impl Step0 {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Step1 {}
-
-impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workflow>::Step>> {
-    fn from(step: Step1) -> Self {
-        Some(StepWithSettings {
-            step: step.into(),
-            settings: StepSettings { max_retries: 3 },
-        })
-    }
-}
 
 static DEV_COUNT: AtomicUsize = AtomicUsize::new(0);
 
