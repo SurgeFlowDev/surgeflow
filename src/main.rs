@@ -24,20 +24,19 @@ use rust_workflow_2::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool, query_as};
-use std::{any::TypeId, sync::Arc};
+use std::{any::TypeId, marker::PhantomData, sync::Arc};
 use tikv_client::RawClient;
 use tokio::{net::TcpListener, try_join};
 use tower_http::normalize_path::NormalizePathLayer;
 use tower_layer::Layer;
 
 #[derive(Debug)]
-struct WorkflowInstanceManager {
-    // TODO: could probably be a const generic if they allowed &str
-    workflow_name: WorkflowName,
+struct WorkflowInstanceManager<W: Workflow> {
     sender: Mutex<Sender>,
+    _marker: PhantomData<W>,
 }
 
-impl WorkflowInstanceManager {
+impl<W: Workflow> WorkflowInstanceManager<W> {
     async fn create_instance(&self, conn: &mut PgConnection) -> anyhow::Result<WorkflowInstance> {
         let res = query_as!(
             WorkflowInstanceRecord,
@@ -48,7 +47,7 @@ impl WorkflowInstanceManager {
             WHERE "name" = $1
             RETURNING "id", "workflow_id";
         "#,
-            self.workflow_name.as_ref()
+            W::NAME
         )
         .fetch_one(conn)
         .await?;
@@ -136,7 +135,7 @@ async fn post_workflow_event<W: Workflow>(
 
 struct AppState<W: Workflow> {
     event_sender: EventSender<W>,
-    workflow_instance_manager: WorkflowInstanceManager,
+    workflow_instance_manager: WorkflowInstanceManager<W>,
     sqlx_pool: PgPool,
 }
 
@@ -335,8 +334,8 @@ async fn init_app_state<W: Workflow>(
     Ok(Arc::new(AppState {
         event_sender,
         workflow_instance_manager: WorkflowInstanceManager {
-            workflow_name: W::name(),
             sender: instance_sender.into(),
+            _marker: PhantomData,
         },
         sqlx_pool,
     }))
