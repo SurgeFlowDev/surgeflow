@@ -126,8 +126,7 @@ impl Event for Workflow0Event {
     type Workflow = Workflow0;
 }
 
-#[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
-pub struct Event0 {}
+
 
 impl Event for Event0 {
     type Workflow = Workflow0;
@@ -138,6 +137,11 @@ impl From<Event0> for Option<<Workflow0 as Workflow>::Event> {
         Some(Workflow0Event::Event0(val))
     }
 }
+
+// boilerplate ended
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
+pub struct Event0 {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Step0 {}
