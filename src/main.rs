@@ -170,14 +170,7 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
             continue;
         };
         tracing::info!("Received new step");
-        let next_step = step
-            .step
-            .step
-            .run_raw(wf.clone(), step.event.clone())
-            .await
-            .inspect_err(|e| {
-                tracing::error!("Failed to run step: {:?}", e);
-            });
+        let next_step = step.step.step.run_raw(wf.clone(), step.event.clone()).await;
         step.retry_count += 1;
         if let Ok(next_step) = next_step {
             // TODO: maybe use `succeeded-step-sender` and push the old step into it? and handle workflow completion there

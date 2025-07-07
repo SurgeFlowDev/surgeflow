@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 
 pub async fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Workflow1>>>> {
     let router = ApiRouter::new()
@@ -112,12 +113,14 @@ impl Step for Workflow1Step {
 #[derive(Debug, Serialize, Deserialize, From, TryInto, JsonSchema, Clone)]
 pub enum Workflow1Event {
     Event0(Event0),
+    Event1(Event1),
 }
 
 impl WorkflowEvent for Workflow1Event {
     fn variant_type_id(&self) -> TypeId {
         match self {
             Self::Event0(_) => TypeId::of::<Event0>(),
+            Self::Event1(_) => TypeId::of::<Event1>(),
         }
     }
 }
@@ -139,7 +142,12 @@ impl From<Event0> for Option<<Workflow1 as Workflow>::Event> {
 // boilerplate ended
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
-pub struct Event0 {}
+pub struct Event0 {
+    test_string: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
+pub struct Event1 {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Step0 {}
@@ -166,24 +174,26 @@ impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workf
     fn from(step: Step1) -> Self {
         Some(StepWithSettings {
             step: step.into(),
-            settings: StepSettings { max_retries: 0 },
+            settings: StepSettings { max_retries: 3 },
         })
     }
 }
 
-// static DEV_COUNT: AtomicUsize = AtomicUsize::new(0);
+static DEV_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 #[step]
 impl Step1 {
     #[expect(unused_variables)]
     #[run]
     async fn run(&self, wf: Workflow1, event: Event0) -> StepResult<Workflow1> {
-        tracing::info!("Running Step1, Workflow1");
-        // let dev_count = DEV_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        // if dev_count == 3 {
-        //     return Ok(None);
-        // }
-        // Err(StepError::Unknown)
-        Ok(None)
+        tracing::info!(
+            "Running Step1, Workflow1, event.test_string: {}",
+            event.test_string
+        );
+        let dev_count = DEV_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if dev_count == 3 {
+            return Ok(None);
+        }
+        Err(StepError::Unknown)
     }
 }
