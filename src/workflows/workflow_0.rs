@@ -25,10 +25,10 @@ pub async fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Workflow0
 }
 
 #[api_route(POST "/workflow/workflow_0" {
-    summary: "Create workflow Instance",
-    description: "Create workflow Instance",
+    summary: "Create instance",
+    description: "Create instance",
     id: "post-workflow-instance",
-    tags: ["workflow-instance"],
+    tags: ["workflow-0"],
     hidden: false
 })]
 pub async fn post_workflow_instance(
@@ -49,7 +49,7 @@ pub async fn post_workflow_instance(
     summary: "Send event",
     description: "Send event",
     id: "post-event",
-    tags: ["workflow-event"],
+    tags: ["workflow-0"],
     hidden: false
 })]
 pub async fn post_workflow_event<W: Workflow>(
