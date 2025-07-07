@@ -64,22 +64,6 @@ pub async fn post_workflow_event<W: Workflow>(
         .unwrap();
 }
 
-#[derive(Debug, Clone, JsonSchema)]
-pub struct Workflow0 {}
-
-impl Workflow for Workflow0 {
-    type Event = Workflow0Event;
-    type Step = Workflow0Step;
-    const NAME: &'static str = "workflow_0";
-
-    fn entrypoint() -> StepWithSettings<Self::Step> {
-        StepWithSettings {
-            step: Step0 {}.into(),
-            settings: StepSettings { max_retries: 1 },
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, From, TryInto, Clone)]
 pub enum Workflow0Step {
     Step0(Step0),
@@ -126,8 +110,6 @@ impl Event for Workflow0Event {
     type Workflow = Workflow0;
 }
 
-
-
 impl Event for Event0 {
     type Workflow = Workflow0;
 }
@@ -137,7 +119,6 @@ impl From<Event0> for Option<<Workflow0 as Workflow>::Event> {
         Some(Workflow0Event::Event0(val))
     }
 }
-
 
 impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workflow>::Step>> {
     fn from(step: Step1) -> Self {
@@ -150,8 +131,21 @@ impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workf
 
 // boilerplate ended
 
-#[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
-pub struct Event0 {}
+#[derive(Debug, Clone, JsonSchema)]
+pub struct Workflow0 {}
+
+impl Workflow for Workflow0 {
+    type Event = Workflow0Event;
+    type Step = Workflow0Step;
+    const NAME: &'static str = "workflow_0";
+
+    fn entrypoint() -> StepWithSettings<Self::Step> {
+        StepWithSettings {
+            step: Step0 {}.into(),
+            settings: StepSettings { max_retries: 0 },
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Step0 {}
@@ -159,28 +153,29 @@ pub struct Step0 {}
 #[step]
 impl Step0 {
     #[run]
-    async fn run(
-        &self,
-        #[expect(unused_variables)] wf: Workflow0,
-        // event: Event0,
-    ) -> StepResult<Workflow0> {
-        tracing::info!("Running Step0, Workflow0");
+    async fn run(&self, #[expect(unused_variables)] wf: Workflow0) -> StepResult<Workflow0> {
+        tracing::error!("Running Step0, Workflow0");
 
         // return the next step to run
-        Ok(Step1 {}.into())
+        Ok(Some(StepWithSettings {
+            step: Workflow0Step::Step1(Step1 {}),
+            settings: StepSettings { max_retries: 0 },
+        }))
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Step1 {}
 
-
 #[step]
 impl Step1 {
     #[expect(unused_variables)]
     #[run]
     async fn run(&self, wf: Workflow0, event: Event0) -> StepResult<Workflow0> {
-        tracing::info!("Running Step1, Workflow0");
+        tracing::error!("Running Step1, Workflow0");
         Ok(None)
     }
 }
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
+pub struct Event0 {}

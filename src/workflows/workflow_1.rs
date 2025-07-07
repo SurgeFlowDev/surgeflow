@@ -143,7 +143,7 @@ impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workf
     fn from(step: Step1) -> Self {
         Some(StepWithSettings {
             step: step.into(),
-            settings: StepSettings { max_retries: 3 },
+            settings: StepSettings { max_retries: 0 },
         })
     }
 }
@@ -169,10 +169,13 @@ impl Step0 {
         #[expect(unused_variables)] wf: Workflow1,
         // event: Event0,
     ) -> StepResult<Workflow1> {
-        tracing::info!("Running Step0, Workflow1");
+        tracing::error!("Running Step0, Workflow1");
 
         // return the next step to run
-        Ok(Step1 {}.into())
+        Ok(Some(StepWithSettings {
+            step: Step1 {}.into(),
+            settings: StepSettings { max_retries: 3 },
+        }))
     }
 }
 
@@ -186,7 +189,7 @@ impl Step1 {
     #[expect(unused_variables)]
     #[run]
     async fn run(&self, wf: Workflow1, event: Event0) -> StepResult<Workflow1> {
-        tracing::info!(
+        tracing::error!(
             "Running Step1, Workflow1, event.test_string: {}",
             event.test_string
         );
