@@ -90,7 +90,7 @@ async fn handle_event_new<W: Workflow>() -> anyhow::Result<()> {
         let step = steps_awaiting_event.get_step(instance_id).await?;
         let Some(step) = step else {
             tracing::info!("No step awaiting event for instance {}", instance_id);
-            return Ok(());
+            continue;
         };
         if step.step.step.variant_event_type_id() == event.variant_type_id() {
             steps_awaiting_event.delete_step(instance_id).await?;
@@ -100,7 +100,7 @@ async fn handle_event_new<W: Workflow>() -> anyhow::Result<()> {
                 step.step,
                 event.variant_type_id()
             );
-            return Ok(());
+            continue;
         }
         active_step_sender
             .send(FullyQualifiedStep {
