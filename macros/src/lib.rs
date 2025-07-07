@@ -131,8 +131,8 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
         async fn run_raw(
             &self,
             wf: Self::Workflow,
-            event: Option<Workflow0Event>,
-        ) -> Result<Option<StepWithSettings<Workflow0Step>>, StepError> {
+            event: Option<<Self::Workflow as Workflow>::Event>,
+        ) -> Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Step>>, StepError> {
             #event_extraction
 
             self.run(wf, #run_args).await

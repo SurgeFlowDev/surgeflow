@@ -11,11 +11,11 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 #[derive(Debug, Clone, JsonSchema)]
-pub struct Workflow0 {}
+pub struct Workflow1 {}
 
-impl Workflow for Workflow0 {
-    type Event = Workflow0Event;
-    type Step = Workflow0Step;
+impl Workflow for Workflow1 {
+    type Event = Workflow1Event;
+    type Step = Workflow1Step;
     const NAME: &'static str = "workflow_0";
 
     fn entrypoint() -> StepWithSettings<Self::Step> {
@@ -27,40 +27,40 @@ impl Workflow for Workflow0 {
 }
 
 #[derive(Debug, Serialize, Deserialize, From, TryInto, Clone)]
-pub enum Workflow0Step {
+pub enum Workflow1Step {
     Step0(Step0),
     Step1(Step1),
 }
-impl WorkflowStep for Workflow0Step {
+impl WorkflowStep for Workflow1Step {
     fn variant_event_type_id(&self) -> TypeId {
         match self {
-            Workflow0Step::Step0(_) => TypeId::of::<<Step0 as Step>::Event>(),
-            Workflow0Step::Step1(_) => TypeId::of::<<Step1 as Step>::Event>(),
+            Workflow1Step::Step0(_) => TypeId::of::<<Step0 as Step>::Event>(),
+            Workflow1Step::Step1(_) => TypeId::of::<<Step1 as Step>::Event>(),
         }
     }
 }
 
-impl Step for Workflow0Step {
-    type Event = Workflow0Event;
-    type Workflow = Workflow0;
+impl Step for Workflow1Step {
+    type Event = Workflow1Event;
+    type Workflow = Workflow1;
     async fn run_raw(
         &self,
         wf: Self::Workflow,
-        event: Option<Workflow0Event>,
+        event: Option<Workflow1Event>,
     ) -> Result<Option<StepWithSettings<Self>>, StepError> {
         match self {
-            Workflow0Step::Step0(step) => Step::run_raw(step, wf, event).await,
-            Workflow0Step::Step1(step) => Step::run_raw(step, wf, event).await,
+            Workflow1Step::Step0(step) => Step::run_raw(step, wf, event).await,
+            Workflow1Step::Step1(step) => Step::run_raw(step, wf, event).await,
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, From, TryInto, JsonSchema, Clone)]
-pub enum Workflow0Event {
+pub enum Workflow1Event {
     Event0(Event0),
 }
 
-impl WorkflowEvent for Workflow0Event {
+impl WorkflowEvent for Workflow1Event {
     fn variant_type_id(&self) -> TypeId {
         match self {
             Self::Event0(_) => TypeId::of::<Event0>(),
@@ -68,20 +68,20 @@ impl WorkflowEvent for Workflow0Event {
     }
 }
 
-impl Event for Workflow0Event {
-    type Workflow = Workflow0;
+impl Event for Workflow1Event {
+    type Workflow = Workflow1;
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
 pub struct Event0 {}
 
 impl Event for Event0 {
-    type Workflow = Workflow0;
+    type Workflow = Workflow1;
 }
 
-impl From<Event0> for Option<<Workflow0 as Workflow>::Event> {
+impl From<Event0> for Option<<Workflow1 as Workflow>::Event> {
     fn from(val: Event0) -> Self {
-        Some(Workflow0Event::Event0(val))
+        Some(Workflow1Event::Event0(val))
     }
 }
 
@@ -93,9 +93,9 @@ impl Step0 {
     #[run]
     async fn run(
         &self,
-        #[expect(unused_variables)] wf: Workflow0,
+        #[expect(unused_variables)] wf: Workflow1,
         // event: Event0,
-    ) -> StepResult<Workflow0> {
+    ) -> StepResult<Workflow1> {
         tracing::info!("Running Step0");
 
         // return the next step to run
@@ -121,7 +121,7 @@ impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workf
 impl Step1 {
     #[expect(unused_variables)]
     #[run]
-    async fn run(&self, wf: Workflow0, event: Event0) -> StepResult<Workflow0> {
+    async fn run(&self, wf: Workflow1, event: Event0) -> StepResult<Workflow1> {
         tracing::info!("Running Step1");
         // let dev_count = DEV_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         // if dev_count == 3 {

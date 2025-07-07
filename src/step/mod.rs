@@ -6,7 +6,7 @@ use tikv_client::RawClient;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{Workflow, WorkflowInstanceId, event::Event};
+use crate::{event::Event, workflows::{Workflow, WorkflowInstanceId}};
 
 pub type StepResult<W> = Result<Option<StepWithSettings<<W as Workflow>::Step>>, StepError>;
 
@@ -82,7 +82,7 @@ impl<W: Workflow> StepsAwaitingEventManager<W> {
         }
     }
     fn make_key(instance_id: WorkflowInstanceId) -> String {
-        format!("instance_{}", instance_id.0)
+        format!("instance_{}", i32::from(instance_id))
     }
     pub async fn put_step(&self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
         let instance_id = step.instance_id;

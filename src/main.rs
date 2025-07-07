@@ -14,13 +14,12 @@ use axum_typed_routing::{TypedApiRouter, api_route};
 use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
 use futures::lock::Mutex;
 use rust_workflow_2::{
-    Workflow, Workflow0, WorkflowId, WorkflowInstanceId,
     event::{EventReceiver, EventSender, Immediate, InstanceEvent},
     step::{
         ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
         NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStep,
     },
-    workflows::workflow_0::WorkflowEvent,
+    workflows::{workflow_0::Workflow0, workflow_1::Workflow1, Workflow, WorkflowEvent, WorkflowId, WorkflowInstanceId},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -372,16 +371,16 @@ async fn main() -> anyhow::Result<()> {
     // ISOLATED END
 
     // ISOLATED WORKFLOW 1
-    let app_state_1 = init_app_state::<Workflow0>(sqlx_pool, &mut session).await?;
+    let app_state_1 = init_app_state::<Workflow1>(sqlx_pool, &mut session).await?;
 
-    let router_1 = control_router::<Workflow0>().await?.with_state(app_state_1);
+    let router_1 = control_router::<Workflow1>().await?.with_state(app_state_1);
 
     let handlers_1 = async {
         try_join!(
-            workspace_instance_worker::<Workflow0>(),
-            active_step_worker(Workflow0 {}),
-            next_step_worker::<Workflow0>(),
-            handle_event_new::<Workflow0>()
+            workspace_instance_worker::<Workflow1>(),
+            active_step_worker(Workflow1 {}),
+            next_step_worker::<Workflow1>(),
+            handle_event_new::<Workflow1>()
         )
     };
     // ISOLATED END

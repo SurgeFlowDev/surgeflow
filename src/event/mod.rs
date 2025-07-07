@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, marker::PhantomData};
 use uuid::Uuid;
 
-use crate::{Workflow, WorkflowInstanceId};
+use crate::workflows::{Workflow, WorkflowInstanceId};
+
+
 
 pub trait Event: Serialize + for<'a> Deserialize<'a> + Clone {
     type Workflow: Workflow;
