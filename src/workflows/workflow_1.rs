@@ -65,27 +65,6 @@ pub async fn post_workflow_event<W: Workflow>(
         .unwrap();
 }
 
-#[derive(Debug, Clone, JsonSchema)]
-pub struct Workflow1 {}
-
-impl Workflow for Workflow1 {
-    type Event = Workflow1Event;
-    type Step = Workflow1Step;
-    const NAME: &'static str = "workflow_1";
-
-    fn entrypoint() -> StepWithSettings<Self::Step> {
-        StepWithSettings {
-            step: Step0 {}.into(),
-            settings: StepSettings { max_retries: 1 },
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, From, TryInto, Clone)]
-pub enum Workflow1Step {
-    Step0(Step0),
-    Step1(Step1),
-}
 impl WorkflowStep for Workflow1Step {
     fn variant_event_type_id(&self) -> TypeId {
         match self {
@@ -108,12 +87,6 @@ impl Step for Workflow1Step {
             Workflow1Step::Step1(step) => Step::run_raw(step, wf, event).await,
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, From, TryInto, JsonSchema, Clone)]
-pub enum Workflow1Event {
-    Event0(Event0),
-    Event1(Event1),
 }
 
 impl WorkflowEvent for Workflow1Event {
@@ -148,7 +121,35 @@ impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workf
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, From, TryInto, Clone)]
+pub enum Workflow1Step {
+    Step0(Step0),
+    Step1(Step1),
+}
+
+#[derive(Debug, Serialize, Deserialize, From, TryInto, JsonSchema, Clone)]
+pub enum Workflow1Event {
+    Event0(Event0),
+    Event1(Event1),
+}
+
+impl Workflow for Workflow1 {
+    type Event = Workflow1Event;
+    type Step = Workflow1Step;
+    const NAME: &'static str = "workflow_1";
+
+    fn entrypoint() -> StepWithSettings<Self::Step> {
+        StepWithSettings {
+            step: Step0 {}.into(),
+            settings: StepSettings { max_retries: 1 },
+        }
+    }
+}
+
 // boilerplate ended
+
+#[derive(Debug, Clone, JsonSchema)]
+pub struct Workflow1 {}
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
 pub struct Event0 {
