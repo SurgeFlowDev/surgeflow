@@ -76,12 +76,12 @@ impl<W: Workflow> FromRef<ArcAppState<W>> for TxState {
 pub trait WorkflowControl: Workflow {
     fn control_router() -> anyhow::Result<ApiRouter<ArcAppState<Self>>>;
 
-    fn post_workflow_event_api_route() -> (&'static str, ApiMethodRouter<Arc<AppState<Self>>>) {
+    fn post_workflow_event_api_route() -> (&'static str, ApiMethodRouter<ArcAppState<Self>>) {
         (
             PostWorkflowEvent::PATH,
             post_with(
                 async |PostWorkflowEvent { instance_id }: PostWorkflowEvent,
-                       state: State<Arc<AppState<Self>>>,
+                       State(ArcAppState(state)): State<ArcAppState<Self>>,
                        Json(event): Json<<Self as Workflow>::Event>|
                        -> Result<(), PostWorkflowEventError> {
                     state
@@ -134,19 +134,17 @@ pub trait WorkflowControl: Workflow {
 
 impl WorkflowControl for Workflow1 {
     fn control_router() -> anyhow::Result<ApiRouter<ArcAppState<Workflow1>>> {
-        
-        // let post_workflow_event_api_route = Self::post_workflow_event_api_route();
+        let post_workflow_event_api_route = Self::post_workflow_event_api_route();
         let post_workflow_instance_api_route = Self::post_workflow_instance_api_route();
         let router = ApiRouter::new()
             .api_route(
                 post_workflow_instance_api_route.0,
                 post_workflow_instance_api_route.1,
             )
-            // .api_route(
-            //     post_workflow_event_api_route.0,
-            //     post_workflow_event_api_route.1,
-            // )
-            ;
+            .api_route(
+                post_workflow_event_api_route.0,
+                post_workflow_event_api_route.1,
+            );
 
         Ok(router)
     }
