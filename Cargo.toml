@@ -4,14 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-aide = { version = "0.15.0", features = [
+aide = { git = "https://github.com/Zizico2/aide.git", branch = "feat/typed-routing-with", features = [
     "macros",
     "scalar",
     "axum",
     "axum-json",
     "axum-query",
-    "axum-extra-typed-routing"
+    "axum-extra-typed-routing",
 ] }
+# TODO: wait for https://github.com/tamasfe/aide/pull/232 to be merged
 anyhow = "1.0.98"
 axum = { version = "0.8.4", features = ["http2", "macros", "multipart"] }
 axum-extra = { version = "0.10.1", features = ["typed-routing"] }
@@ -26,10 +27,14 @@ fe2o3-amqp-ext = "0.14.0"
 futures = "0.3.31"
 lapin = "3.0.0"
 macros = { version = "0.1.0", path = "macros" }
-schemars = "0.9.0"
+schemars = "1.0.4"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.140", features = ["raw_value"] }
-sqlx = { version = "0.8.6", default-features = false, features = ["postgres", "macros", "runtime-tokio"] }
+sqlx = { version = "0.8.6", default-features = false, features = [
+    "postgres",
+    "macros",
+    "runtime-tokio",
+] }
 surrealdb-tikv-client = "0.3.0-surreal.3"
 thiserror = "2.0.12"
 tokio = { version = "1.46.1", features = ["full"] }
