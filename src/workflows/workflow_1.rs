@@ -3,7 +3,7 @@ use crate::step::StepError;
 use crate::step::{Step, StepWithSettings};
 use crate::step::{StepResult, StepSettings, WorkflowStep};
 use crate::workflows::{Workflow, WorkflowEvent, WorkflowInstanceId};
-use crate::{AppState, MyError, WorkflowInstance};
+use crate::{AppState, WorkflowInstance};
 use aide::OperationIo;
 use aide::axum::ApiRouter;
 use aide::axum::routing::{ApiMethodRouter, post_with};
@@ -47,6 +47,22 @@ enum PostWorkflowEventError {
 #[typed_path("/workflow/workflow_1")]
 pub struct PostWorkflowInstance;
 
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    Clone,
+    thiserror::Error,
+    axum_thiserror::ErrorStatus,
+    OperationIo,
+)]
+enum PostWorkflowInstanceError {
+    #[error("could not create instance")]
+    #[status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)]
+    CouldntCreateInstance,
+}
+
 pub trait WorkflowControl: Workflow {
     fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Self>>>>;
 
@@ -82,15 +98,15 @@ pub trait WorkflowControl: Workflow {
             post_with(
                 async |_: PostWorkflowInstance,
                        state: State<Arc<AppState<Self>>>|
-                       -> Result<Json<WorkflowInstance>, MyError> {
+                       -> Result<Json<WorkflowInstance>, PostWorkflowInstanceError> {
                     tracing::info!("creating instance...");
-                    let mut tx = state.sqlx_pool.begin().await.unwrap();
+                    let mut tx = state.sqlx_pool.begin().await.map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
                     let res = state
                         .workflow_instance_manager
                         .create_instance(&mut tx)
                         .await
-                        .unwrap();
-                    tx.commit().await.unwrap();
+                        .map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
+                    tx.commit().await.map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
                     Ok(Json(res))
                 },
                 |op| {

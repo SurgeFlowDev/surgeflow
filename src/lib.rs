@@ -18,13 +18,6 @@ pub mod event;
 pub mod step;
 pub mod workflows;
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema, thiserror::Error, ErrorStatus, OperationIo)]
-pub enum MyError {
-    #[error("unkown")]
-    #[status(StatusCode::CONFLICT)]
-    Unkown,
-}
-
 pub struct AppState<W: Workflow> {
     pub event_sender: EventSender<W>,
     pub workflow_instance_manager: WorkflowInstanceManager<W>,
