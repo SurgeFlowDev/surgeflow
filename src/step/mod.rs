@@ -6,7 +6,10 @@ use tikv_client::RawClient;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{event::Event, workflows::{Workflow, WorkflowInstanceId}};
+use crate::{
+    event::Event,
+    workflows::{Workflow, WorkflowInstanceId},
+};
 
 pub type StepResult<W> = Result<Option<StepWithSettings<<W as Workflow>::Step>>, StepError>;
 

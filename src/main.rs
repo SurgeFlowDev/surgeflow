@@ -1,5 +1,5 @@
 use aide::{
-    axum::{ApiRouter, IntoApiResponse},
+    axum::{ApiRouter, IntoApiResponse, routing::get},
     openapi::{Info, OpenApi},
     scalar::Scalar,
 };
@@ -7,7 +7,7 @@ use axum::{
     Extension, ServiceExt,
     extract::{Json, Request},
 };
-use axum_typed_routing::{TypedApiRouter, api_route};
+
 use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
 use rust_workflow_2::{
     AppState, WorkflowInstance, WorkflowInstanceManager,
@@ -17,9 +17,10 @@ use rust_workflow_2::{
         NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStep,
     },
     workflows::{
-        Workflow, WorkflowEvent,
-        workflow_0::{self, Workflow0},
-        workflow_1::{self, Workflow1},
+        Workflow,
+        WorkflowEvent,
+        // workflow_0::{self, Workflow0},
+        workflow_1::{Workflow1, WorkflowControl},
     },
 };
 
@@ -240,24 +241,26 @@ async fn main() -> anyhow::Result<()> {
     let mut session = Session::begin(&mut connection).await?;
 
     // ISOLATED WORKFLOW 0
-    let app_state_0 = init_app_state::<Workflow0>(sqlx_pool.clone(), &mut session).await?;
 
-    let router_0 = workflow_0::control_router().await?.with_state(app_state_0);
+    // let app_state_0 = init_app_state::<Workflow0>(sqlx_pool.clone(), &mut session).await?;
 
-    let handlers_0 = async {
-        try_join!(
-            workspace_instance_worker::<Workflow0>(),
-            active_step_worker(Workflow0 {}),
-            next_step_worker::<Workflow0>(),
-            handle_event_new::<Workflow0>()
-        )
-    };
+    // let router_0 = workflow_0::control_router().await?.with_state(app_state_0);
+
+    // let handlers_0 = async {
+    //     try_join!(
+    //         workspace_instance_worker::<Workflow0>(),
+    //         active_step_worker(Workflow0 {}),
+    //         next_step_worker::<Workflow0>(),
+    //         handle_event_new::<Workflow0>()
+    //     )
+    // };
+
     // ISOLATED END
 
     // ISOLATED WORKFLOW 1
     let app_state_1 = init_app_state::<Workflow1>(sqlx_pool, &mut session).await?;
 
-    let router_1 = workflow_1::control_router().await?.with_state(app_state_1);
+    let router_1 = Workflow1::control_router()?.with_state(app_state_1);
 
     let handlers_1 = async {
         try_join!(
@@ -270,15 +273,19 @@ async fn main() -> anyhow::Result<()> {
     // ISOLATED END
 
     // MERGE
-    let all_handlers = async { try_join!(handlers_0, handlers_1) };
-    let router = ApiRouter::new().merge(router_0).merge(router_1);
+    let all_handlers = async {
+        try_join!(/*handlers_0,*/ handlers_1)
+    };
+    let router = ApiRouter::new()
+        // .merge(router_0)
+        .merge(router_1);
     // MERGE END
 
     let mut api = base_open_api();
 
     let router = if cfg!(debug_assertions) {
         let router = router
-            .typed_api_route(serve_api)
+            .api_route("/openapi.json", get(serve_api))
             .route("/docs", Scalar::new("/openapi.json").axum_route());
         router.finish_api(&mut api).layer(Extension(api))
     } else {
@@ -306,10 +313,10 @@ pub fn base_open_api() -> OpenApi {
         ..OpenApi::default()
     }
 }
-#[api_route(GET "/openapi.json" {
-    summary: "OpenAPI Spec",
-    hidden: false
-})]
+// #[api_route(GET "/openapi.json" {
+//     summary: "OpenAPI Spec",
+//     hidden: false
+// })]
 async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
     Json(api)
 }

@@ -4,10 +4,14 @@ use crate::step::{Step, StepWithSettings};
 use crate::step::{StepResult, StepSettings, WorkflowStep};
 use crate::workflows::{Workflow, WorkflowEvent, WorkflowInstanceId};
 use crate::{AppState, MyError, WorkflowInstance};
+use aide::OperationIo;
 use aide::axum::ApiRouter;
+use aide::axum::routing::post_with;
+use aide::transform::TransformOperation;
 use axum::Json;
 use axum::extract::State;
-use axum_typed_routing::{TypedApiRouter, api_route};
+use axum_extra::routing::TypedPath;
+
 use derive_more::{From, TryInto};
 use macros::step;
 use schemars::JsonSchema;
@@ -17,52 +21,77 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
-pub async fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Workflow1>>>> {
-    let router = ApiRouter::new()
-        .typed_api_route(post_workflow_instance)
-        .typed_api_route(post_workflow_event);
-
-    Ok(router)
-}
-
-#[api_route(POST "/workflow/workflow_1" {
-    summary: "Create instance",
-    description: "Create instance",
-    id: "post-workflow-instance",
-    tags: ["workflow-1"],
-    hidden: false
-})]
-pub async fn post_workflow_instance(
-    State(state): State<Arc<AppState<Workflow1>>>,
-) -> Result<Json<WorkflowInstance>, MyError> {
-    tracing::info!("creating instance...");
-    let mut tx = state.sqlx_pool.begin().await.unwrap();
-    let res = state
-        .workflow_instance_manager
-        .create_instance(&mut tx)
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
-    Ok(Json(res))
-}
-
-#[api_route(POST "/workflow/workflow_1/{instance_id}/event" {
-    summary: "Send event",
-    description: "Send event",
-    id: "post-event",
-    tags: ["workflow-1"],
-    hidden: false
-})]
-pub async fn post_workflow_event<W: Workflow>(
+#[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
+#[typed_path("/workflow/workflow_1/{instance_id}/event")]
+pub struct PostWorkflowEvent {
     instance_id: WorkflowInstanceId,
-    State(state): State<Arc<AppState<W>>>,
-    Json(event): Json<W::Event>,
-) {
-    state
-        .event_sender
-        .send(InstanceEvent { event, instance_id })
-        .await
-        .unwrap();
+}
+
+#[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
+#[typed_path("/workflow/workflow_1")]
+pub struct PostWorkflowInstance;
+
+pub trait WorkflowControl: Workflow {
+    fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Self>>>>;
+    async fn post_workflow_event(
+        PostWorkflowEvent { instance_id }: PostWorkflowEvent,
+        state: State<Arc<AppState<Self>>>,
+        Json(event): Json<<Self as Workflow>::Event>,
+    ) {
+        state
+            .event_sender
+            .send(InstanceEvent { event, instance_id })
+            .await
+            .unwrap();
+    }
+    fn post_workflow_event_docs(op: TransformOperation) -> TransformOperation {
+        op.description("Send event")
+            .summary("Send event")
+            .id("post-event")
+            .tag(Self::NAME)
+            .hidden(false)
+    }
+
+    async fn post_workflow_instance(
+        _: PostWorkflowInstance,
+        state: State<Arc<AppState<Self>>>,
+    ) -> Result<Json<WorkflowInstance>, MyError> {
+        tracing::info!("creating instance...");
+        let mut tx = state.sqlx_pool.begin().await.unwrap();
+        let res = state
+            .workflow_instance_manager
+            .create_instance(&mut tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        Ok(Json(res))
+    }
+    fn post_workflow_instance_docs(op: TransformOperation) -> TransformOperation {
+        op.description("Create instance")
+            .summary("Create instance")
+            .id("post-workflow-instance")
+            .tag(Self::NAME)
+            .hidden(false)
+    }
+}
+
+impl WorkflowControl for Workflow1 {
+    fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Workflow1>>>> {
+        let router = ApiRouter::new()
+            .api_route(
+                PostWorkflowEvent::PATH,
+                post_with(Self::post_workflow_event, Self::post_workflow_event_docs),
+            )
+            .api_route(
+                PostWorkflowInstance::PATH,
+                post_with(
+                    Self::post_workflow_instance,
+                    Self::post_workflow_instance_docs,
+                ),
+            );
+
+        Ok(router)
+    }
 }
 
 impl WorkflowStep for Workflow1Step {

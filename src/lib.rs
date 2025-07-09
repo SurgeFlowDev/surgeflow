@@ -6,7 +6,7 @@ use axum_thiserror::ErrorStatus;
 use fe2o3_amqp::Sender;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use sqlx::{query_as, PgConnection, PgPool};
+use sqlx::{PgConnection, PgPool, query_as};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -84,10 +84,8 @@ impl TryFrom<WorkflowInstanceRecord> for WorkflowInstance {
     }
 }
 
-
 #[derive(Debug, thiserror::Error)]
 pub enum WorkflowInstanceError {
     #[error("Database error")]
     Database(#[from] sqlx::Error),
 }
-
