@@ -3,19 +3,20 @@ use crate::step::StepError;
 use crate::step::{Step, StepWithSettings};
 use crate::step::{StepResult, StepSettings, WorkflowStep};
 use crate::workflows::{Workflow, WorkflowEvent, WorkflowInstanceId};
-use crate::{AppState, WorkflowInstance};
-use aide::OperationIo;
+use crate::{AppState, ArcAppState, WorkflowInstance};
 use aide::axum::ApiRouter;
 use aide::axum::routing::{ApiMethodRouter, post_with};
 use aide::transform::TransformOperation;
+use aide::{NoApi, OperationIo};
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{FromRef, State};
 use axum_extra::routing::TypedPath;
 
 use derive_more::{From, TryInto};
 use macros::step;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use sqlx::Postgres;
 use std::any::TypeId;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -63,6 +64,16 @@ enum PostWorkflowInstanceError {
     CouldntCreateInstance,
 }
 
+pub type Tx = axum_sqlx_tx::Tx<sqlx::Postgres>;
+pub type TxState = axum_sqlx_tx::State<Postgres>;
+pub type TxLayer = axum_sqlx_tx::Layer<Postgres, axum_sqlx_tx::Error>;
+
+impl<W: Workflow> FromRef<ArcAppState<W>> for TxState {
+    fn from_ref(input: &ArcAppState<W>) -> Self {
+        input.0.sqlx_tx_state.clone()
+    }
+}
+
 pub trait WorkflowControl: Workflow {
     fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Self>>>>;
 
@@ -92,22 +103,24 @@ pub trait WorkflowControl: Workflow {
         )
     }
 
-    fn post_workflow_instance_api_route() -> (&'static str, ApiMethodRouter<Arc<AppState<Self>>>) {
+    fn post_workflow_instance_api_route()
+    -> (&'static str, ApiMethodRouter<ArcAppState<Self>>) {
         (
             PostWorkflowInstance::PATH,
             post_with(
-                async |_: PostWorkflowInstance,
-                       state: State<Arc<AppState<Self>>>|
+                async |
+                        _: PostWorkflowInstance,
+                        NoApi(mut tx): NoApi<Tx>,
+                        State(ArcAppState(state)): State<ArcAppState<Self>>
+                        |
                        -> Result<Json<WorkflowInstance>, PostWorkflowInstanceError> {
-                    tracing::info!("creating instance...");
-                    let mut tx = state.sqlx_pool.begin().await.map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
-                    let res = state
-                        .workflow_instance_manager
-                        .create_instance(&mut tx)
-                        .await
-                        .map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
-                    tx.commit().await.map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
-                    Ok(Json(res))
+                            tracing::info!("creating instance...");
+                            let res = state
+                                .workflow_instance_manager
+                                .create_instance(&mut tx)
+                                .await
+                                .map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
+                            Ok(Json(res))
                 },
                 |op| {
                     op.description("Create instance")
@@ -123,19 +136,20 @@ pub trait WorkflowControl: Workflow {
 
 impl WorkflowControl for Workflow1 {
     fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Workflow1>>>> {
-        let post_workflow_event_api_route = Self::post_workflow_event_api_route();
-        let post_workflow_instance_api_route = Self::post_workflow_instance_api_route();
-        let router = ApiRouter::new()
-            .api_route(
-                post_workflow_instance_api_route.0,
-                post_workflow_instance_api_route.1,
-            )
-            .api_route(
-                post_workflow_event_api_route.0,
-                post_workflow_event_api_route.1,
-            );
+        todo!()
+        // let post_workflow_event_api_route = Self::post_workflow_event_api_route();
+        // let post_workflow_instance_api_route = Self::post_workflow_instance_api_route();
+        // let router = ApiRouter::new()
+        //     .api_route(
+        //         post_workflow_instance_api_route.0,
+        //         post_workflow_instance_api_route.1,
+        //     )
+        //     .api_route(
+        //         post_workflow_event_api_route.0,
+        //         post_workflow_event_api_route.1,
+        //     );
 
-        Ok(router)
+        // Ok(router)
     }
 }
 

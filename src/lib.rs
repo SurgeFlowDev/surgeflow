@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 
 use aide::OperationIo;
 use axum::http::StatusCode;
@@ -11,7 +11,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     event::EventSender,
-    workflows::{Workflow, WorkflowId, WorkflowInstanceId},
+    workflows::{workflow_1::TxState, Workflow, WorkflowId, WorkflowInstanceId},
 };
 
 pub mod event;
@@ -21,8 +21,12 @@ pub mod workflows;
 pub struct AppState<W: Workflow> {
     pub event_sender: EventSender<W>,
     pub workflow_instance_manager: WorkflowInstanceManager<W>,
-    pub sqlx_pool: PgPool,
+    // pub sqlx_pool: PgPool,
+    pub sqlx_tx_state: TxState,
 }
+
+#[derive(Clone)]
+pub struct ArcAppState<W: Workflow>(Arc<AppState<W>>);
 
 #[derive(Debug)]
 pub struct WorkflowInstanceManager<W: Workflow> {

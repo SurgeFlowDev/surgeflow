@@ -552,6 +552,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum-sqlx-tx"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a36c1aff9437192db13898fd768d31bf3f4a72cdf260fa16f098d48db493c112"
+dependencies = [
+ "axum-core 0.5.2",
+ "bytes",
+ "futures-core",
+ "http 1.3.1",
+ "http-body 1.0.1",
+ "parking_lot",
+ "sqlx",
+ "thiserror 1.0.69",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
 name = "axum_thiserror"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2801,6 +2819,7 @@ dependencies = [
  "anyhow",
  "axum 0.8.4",
  "axum-extra",
+ "axum-sqlx-tx",
  "axum_thiserror",
  "bytes",
  "derive_more",

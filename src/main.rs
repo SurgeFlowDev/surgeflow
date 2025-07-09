@@ -17,10 +17,8 @@ use rust_workflow_2::{
         NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStep,
     },
     workflows::{
-        Workflow,
-        WorkflowEvent,
-        // workflow_0::{self, Workflow0},
-        workflow_1::{Workflow1, WorkflowControl},
+        Workflow, WorkflowEvent,
+        workflow_1::{Tx, TxLayer, TxState, Workflow1, WorkflowControl},
     },
 };
 
@@ -204,7 +202,7 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
 }
 
 async fn init_app_state<W: Workflow>(
-    sqlx_pool: PgPool,
+    sqlx_tx_state: TxState,
     session: &mut SessionHandle<()>,
 ) -> anyhow::Result<Arc<AppState<W>>> {
     let instance_sender = Sender::attach(
@@ -222,7 +220,7 @@ async fn init_app_state<W: Workflow>(
             sender: instance_sender.into(),
             _marker: PhantomData,
         },
-        sqlx_pool,
+        sqlx_tx_state,
     }))
 }
 
@@ -232,7 +230,8 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
 
-    let sqlx_pool = PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?;
+    let (sqlx_tx_state, sqlx_tx_layer) =
+        Tx::setup(PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?);
 
     let mut connection =
         fe2o3_amqp::Connection::open("control-connection-6", "amqp://guest:guest@127.0.0.1:5672")
@@ -258,7 +257,7 @@ async fn main() -> anyhow::Result<()> {
     // ISOLATED END
 
     // ISOLATED WORKFLOW 1
-    let app_state_1 = init_app_state::<Workflow1>(sqlx_pool, &mut session).await?;
+    let app_state_1 = init_app_state::<Workflow1>(sqlx_tx_state, &mut session).await?;
 
     let router_1 = Workflow1::control_router()?.with_state(app_state_1);
 
@@ -278,7 +277,8 @@ async fn main() -> anyhow::Result<()> {
     };
     let router = ApiRouter::new()
         // .merge(router_0)
-        .merge(router_1);
+        .merge(router_1)
+        .layer(sqlx_tx_layer);
     // MERGE END
 
     let mut api = base_open_api();
