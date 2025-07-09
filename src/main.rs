@@ -10,7 +10,7 @@ use axum::{
 
 use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
 use rust_workflow_2::{
-    AppState, WorkflowInstance, WorkflowInstanceManager,
+    AppState, ArcAppState, WorkflowInstance, WorkflowInstanceManager,
     event::{EventReceiver, EventSender, Immediate, InstanceEvent},
     step::{
         ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
@@ -18,7 +18,7 @@ use rust_workflow_2::{
     },
     workflows::{
         Workflow, WorkflowEvent,
-        workflow_1::{Tx, TxLayer, TxState, Workflow1, WorkflowControl},
+        workflow_1::{Tx, TxState, Workflow1, WorkflowControl},
     },
 };
 
@@ -204,7 +204,7 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
 async fn init_app_state<W: Workflow>(
     sqlx_tx_state: TxState,
     session: &mut SessionHandle<()>,
-) -> anyhow::Result<Arc<AppState<W>>> {
+) -> anyhow::Result<ArcAppState<W>> {
     let instance_sender = Sender::attach(
         session,
         format!("{}-instances-receiver-1", W::NAME),
@@ -214,14 +214,14 @@ async fn init_app_state<W: Workflow>(
 
     let event_sender = EventSender::<W>::new(session).await?;
 
-    Ok(Arc::new(AppState {
+    Ok(ArcAppState(Arc::new(AppState {
         event_sender,
         workflow_instance_manager: WorkflowInstanceManager {
             sender: instance_sender.into(),
             _marker: PhantomData,
         },
         sqlx_tx_state,
-    }))
+    })))
 }
 
 #[tokio::main]

@@ -1,17 +1,13 @@
-use std::{marker::PhantomData, sync::Arc};
-
-use aide::OperationIo;
-use axum::http::StatusCode;
-use axum_thiserror::ErrorStatus;
 use fe2o3_amqp::Sender;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use sqlx::{PgConnection, PgPool, query_as};
+use sqlx::{PgConnection, query_as};
+use std::{marker::PhantomData, sync::Arc};
 use tokio::sync::Mutex;
 
 use crate::{
     event::EventSender,
-    workflows::{workflow_1::TxState, Workflow, WorkflowId, WorkflowInstanceId},
+    workflows::{Workflow, WorkflowId, WorkflowInstanceId, workflow_1::TxState},
 };
 
 pub mod event;
@@ -26,7 +22,7 @@ pub struct AppState<W: Workflow> {
 }
 
 #[derive(Clone)]
-pub struct ArcAppState<W: Workflow>(Arc<AppState<W>>);
+pub struct ArcAppState<W: Workflow>(pub Arc<AppState<W>>);
 
 #[derive(Debug)]
 pub struct WorkflowInstanceManager<W: Workflow> {

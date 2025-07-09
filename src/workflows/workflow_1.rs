@@ -6,7 +6,6 @@ use crate::workflows::{Workflow, WorkflowEvent, WorkflowInstanceId};
 use crate::{AppState, ArcAppState, WorkflowInstance};
 use aide::axum::ApiRouter;
 use aide::axum::routing::{ApiMethodRouter, post_with};
-use aide::transform::TransformOperation;
 use aide::{NoApi, OperationIo};
 use axum::Json;
 use axum::extract::{FromRef, State};
@@ -75,7 +74,7 @@ impl<W: Workflow> FromRef<ArcAppState<W>> for TxState {
 }
 
 pub trait WorkflowControl: Workflow {
-    fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Self>>>>;
+    fn control_router() -> anyhow::Result<ApiRouter<ArcAppState<Self>>>;
 
     fn post_workflow_event_api_route() -> (&'static str, ApiMethodRouter<Arc<AppState<Self>>>) {
         (
@@ -103,8 +102,7 @@ pub trait WorkflowControl: Workflow {
         )
     }
 
-    fn post_workflow_instance_api_route()
-    -> (&'static str, ApiMethodRouter<ArcAppState<Self>>) {
+    fn post_workflow_instance_api_route() -> (&'static str, ApiMethodRouter<ArcAppState<Self>>) {
         (
             PostWorkflowInstance::PATH,
             post_with(
@@ -135,21 +133,22 @@ pub trait WorkflowControl: Workflow {
 }
 
 impl WorkflowControl for Workflow1 {
-    fn control_router() -> anyhow::Result<ApiRouter<Arc<AppState<Workflow1>>>> {
-        todo!()
+    fn control_router() -> anyhow::Result<ApiRouter<ArcAppState<Workflow1>>> {
+        
         // let post_workflow_event_api_route = Self::post_workflow_event_api_route();
-        // let post_workflow_instance_api_route = Self::post_workflow_instance_api_route();
-        // let router = ApiRouter::new()
-        //     .api_route(
-        //         post_workflow_instance_api_route.0,
-        //         post_workflow_instance_api_route.1,
-        //     )
-        //     .api_route(
-        //         post_workflow_event_api_route.0,
-        //         post_workflow_event_api_route.1,
-        //     );
+        let post_workflow_instance_api_route = Self::post_workflow_instance_api_route();
+        let router = ApiRouter::new()
+            .api_route(
+                post_workflow_instance_api_route.0,
+                post_workflow_instance_api_route.1,
+            )
+            // .api_route(
+            //     post_workflow_event_api_route.0,
+            //     post_workflow_event_api_route.1,
+            // )
+            ;
 
-        // Ok(router)
+        Ok(router)
     }
 }
 
