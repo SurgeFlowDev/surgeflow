@@ -1,8 +1,5 @@
 use aide::{
-    axum::{
-        ApiRouter, IntoApiResponse,
-        routing::{get, get_with},
-    },
+    axum::{ApiRouter, IntoApiResponse, routing::get_with},
     openapi::{Info, OpenApi},
     scalar::Scalar,
 };
@@ -10,6 +7,7 @@ use axum::{
     Extension, ServiceExt,
     extract::{Json, Request},
 };
+use rust_workflow_2::workflows::workflow_0::Workflow0;
 
 use fe2o3_amqp::{Receiver, Session};
 use rust_workflow_2::{
@@ -253,7 +251,7 @@ async fn main() -> anyhow::Result<()> {
     let router =
         router.merge(Workflow1::control_router(sqlx_tx_state.clone(), &mut session).await?);
 
-    let main_handlers = async { try_join!(main_handlers, main_handler::<Workflow1>(Workflow1 {})) };
+    let main_handlers = async { try_join!(main_handlers, main_handler::<Workflow0>(Workflow0 {})) };
 
     /////////////////////////////
     /////////////////////////////

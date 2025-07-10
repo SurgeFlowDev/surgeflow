@@ -1,56 +1,41 @@
-use crate::event::{Event, EventSender, Immediate, InstanceEvent};
+use crate::event::{Event, Immediate};
 use crate::step::StepError;
 use crate::step::{Step, StepWithSettings};
 use crate::step::{StepResult, StepSettings, WorkflowStep};
-use crate::workflows::{Workflow, WorkflowEvent, WorkflowInstanceId};
-use crate::{AppState, ArcAppState, WorkflowInstance, WorkflowInstanceManager};
-use aide::axum::ApiRouter;
-use aide::{NoApi, OperationIo};
-use axum::Json;
-use axum::extract::{FromRef, State};
-use axum::http::StatusCode;
-use axum_extra::routing::TypedPath;
-
+use crate::workflows::{Workflow, WorkflowEvent};
 use derive_more::{From, TryInto};
-use fe2o3_amqp::Sender;
-use fe2o3_amqp::session::SessionHandle;
 use macros::step;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use sqlx::Postgres;
 use std::any::TypeId;
 use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
-
-
-impl WorkflowStep for Workflow1Step {
+impl WorkflowStep for Workflow0Step {
     fn variant_event_type_id(&self) -> TypeId {
         match self {
-            Workflow1Step::Step0(_) => TypeId::of::<<Step0 as Step>::Event>(),
-            Workflow1Step::Step1(_) => TypeId::of::<<Step1 as Step>::Event>(),
+            Workflow0Step::Step0(_) => TypeId::of::<<Step0 as Step>::Event>(),
+            Workflow0Step::Step1(_) => TypeId::of::<<Step1 as Step>::Event>(),
         }
     }
 }
 
-impl Step for Workflow1Step {
-    type Event = Workflow1Event;
-    type Workflow = Workflow1;
+impl Step for Workflow0Step {
+    type Event = Workflow0Event;
+    type Workflow = Workflow0;
     async fn run_raw(
         &self,
         wf: Self::Workflow,
-        event: Option<Workflow1Event>,
+        event: Option<Workflow0Event>,
     ) -> Result<Option<StepWithSettings<Self>>, StepError> {
         match self {
-            Workflow1Step::Step0(step) => Step::run_raw(step, wf, event).await,
-            Workflow1Step::Step1(step) => Step::run_raw(step, wf, event).await,
+            Workflow0Step::Step0(step) => Step::run_raw(step, wf, event).await,
+            Workflow0Step::Step1(step) => Step::run_raw(step, wf, event).await,
         }
     }
 }
 
-impl WorkflowEvent for Workflow1Event {
+impl WorkflowEvent for Workflow0Event {
     fn variant_type_id(&self) -> TypeId {
         match self {
             Self::Event0(_) => TypeId::of::<Event0>(),
@@ -59,17 +44,17 @@ impl WorkflowEvent for Workflow1Event {
     }
 }
 
-impl Event for Workflow1Event {
-    type Workflow = Workflow1;
+impl Event for Workflow0Event {
+    type Workflow = Workflow0;
 }
 
 impl Event for Event0 {
-    type Workflow = Workflow1;
+    type Workflow = Workflow0;
 }
 
-impl From<Event0> for Option<<Workflow1 as Workflow>::Event> {
+impl From<Event0> for Option<<Workflow0 as Workflow>::Event> {
     fn from(val: Event0) -> Self {
-        Some(Workflow1Event::Event0(val))
+        Some(Workflow0Event::Event0(val))
     }
 }
 
@@ -83,21 +68,21 @@ impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workf
 }
 
 #[derive(Debug, Serialize, Deserialize, From, TryInto, Clone)]
-pub enum Workflow1Step {
+pub enum Workflow0Step {
     Step0(Step0),
     Step1(Step1),
 }
 
 #[derive(Debug, Serialize, Deserialize, From, TryInto, JsonSchema, Clone)]
-pub enum Workflow1Event {
+pub enum Workflow0Event {
     Event0(Event0),
     Event1(Event1),
 }
 
-impl Workflow for Workflow1 {
-    type Event = Workflow1Event;
-    type Step = Workflow1Step;
-    const NAME: &'static str = "workflow_1";
+impl Workflow for Workflow0 {
+    type Event = Workflow0Event;
+    type Step = Workflow0Step;
+    const NAME: &'static str = "workflow_0";
 
     fn entrypoint() -> StepWithSettings<Self::Step> {
         StepWithSettings {
@@ -110,7 +95,7 @@ impl Workflow for Workflow1 {
 // boilerplate ended
 
 #[derive(Debug, Clone, JsonSchema)]
-pub struct Workflow1 {}
+pub struct Workflow0 {}
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
 pub struct Event0 {
@@ -128,10 +113,10 @@ impl Step0 {
     #[run]
     async fn run(
         &self,
-        #[expect(unused_variables)] wf: Workflow1,
+        #[expect(unused_variables)] wf: Workflow0,
         // event: Event0,
-    ) -> StepResult<Workflow1> {
-        tracing::error!("Running Step0, Workflow1");
+    ) -> StepResult<Workflow0> {
+        tracing::error!("Running Step0, Workflow0");
 
         // return the next step to run
         Ok(Some(StepWithSettings {
@@ -150,9 +135,9 @@ static DEV_COUNT: AtomicUsize = AtomicUsize::new(0);
 impl Step1 {
     #[expect(unused_variables)]
     #[run]
-    async fn run(&self, wf: Workflow1, event: Event0) -> StepResult<Workflow1> {
+    async fn run(&self, wf: Workflow0, event: Event0) -> StepResult<Workflow0> {
         tracing::error!(
-            "Running Step1, Workflow1, event.test_string: {}",
+            "Running Step1, Workflow0, event.test_string: {}",
             event.test_string
         );
         let dev_count = DEV_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);

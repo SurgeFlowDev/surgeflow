@@ -167,7 +167,7 @@ pub fn startup_workflow(input: TokenStream) -> TokenStream {
     };
 
     let handlers = idents.map(|ident| {
-        let fn_name = syn::Ident::new(&format!("{}", ident), ident.span());
+        let fn_name = syn::Ident::new(&format!("{ident}"), ident.span());
         quote! { #fn_name::<#workflow_ty>() }
     });
 
