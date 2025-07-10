@@ -7,7 +7,6 @@ use axum::{
     Extension, ServiceExt,
     extract::{Json, Request},
 };
-use futures::future::try_join;
 use rust_workflow_2::workflows::workflow_0::Workflow0;
 
 use fe2o3_amqp::{Receiver, Session};
@@ -200,10 +199,7 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
     }
 }
 
-async fn setup_server(
-    router: ApiRouter,
-    sqlx_tx_layer: TxLayer,
-) -> impl std::future::Future<Output = anyhow::Result<()>> {
+async fn setup_server(router: ApiRouter, sqlx_tx_layer: TxLayer) -> anyhow::Result<()> {
     let router = ApiRouter::new().merge(router).layer(sqlx_tx_layer);
 
     let mut api = base_open_api();
@@ -222,36 +218,58 @@ async fn setup_server(
     let router = NormalizePathLayer::trim_trailing_slash().layer(router);
     let router = ServiceExt::<Request>::into_make_service(router);
 
-    async move {
-        let listener = TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
-        axum::serve(listener, router).await?;
-        Ok(())
-    }
+    let listener = TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
+    axum::serve(listener, router).await?;
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let (sqlx_tx_state, sqlx_tx_layer) =
-        Tx::setup(PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?);
+    #[cfg(feature = "control_server")]
+    let ((sqlx_tx_state, sqlx_tx_layer), _connection, mut session, router) = {
+        let mut connection = fe2o3_amqp::Connection::open(
+            "control-connection-6",
+            "amqp://guest:guest@127.0.0.1:5672",
+        )
+        .await?;
 
-    let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-6", "amqp://guest:guest@127.0.0.1:5672")
-            .await?;
+        let session = Session::begin(&mut connection).await?;
 
-    let mut session = Session::begin(&mut connection).await?;
+        let router = ApiRouter::new();
 
-    let router = ApiRouter::new();
+        (
+            Tx::setup(
+                PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?,
+            ),
+            connection,
+            session,
+            router,
+        )
+    };
 
+    #[cfg(any(
+        feature = "active_step_worker",
+        feature = "new_instance_worker",
+        feature = "next_step_worker",
+        feature = "new_event_worker"
+    ))]
     let main_handlers = async { anyhow::Result::<()>::Ok(()) };
 
     /////////////////////////////
     /////////////////////////////
 
+    #[cfg(feature = "control_server")]
     let router =
-        router.merge(Workflow1::control_router(sqlx_tx_state.clone(), &mut session).await?);
+        router.merge(Workflow0::control_router(sqlx_tx_state.clone(), &mut session).await?);
 
+    #[cfg(any(
+        feature = "active_step_worker",
+        feature = "new_instance_worker",
+        feature = "next_step_worker",
+        feature = "new_event_worker"
+    ))]
     let main_handlers = async { try_join!(main_handlers, main_handler::<Workflow0>(Workflow0 {})) };
 
     /////////////////////////////
@@ -260,15 +278,24 @@ async fn main() -> anyhow::Result<()> {
     /////////////////////////////
     /////////////////////////////
 
-    let router =
-        router.merge(Workflow1::control_router(sqlx_tx_state.clone(), &mut session).await?);
+    // #[cfg(feature = "control_server")]
+    // let router =
+    //     router.merge(Workflow1::control_router(sqlx_tx_state.clone(), &mut session).await?);
 
-    let main_handlers = async { try_join!(main_handlers, main_handler::<Workflow1>(Workflow1 {})) };
+    // #[cfg(any(
+    //     feature = "active_step_worker",
+    //     feature = "new_instance_worker",
+    //     feature = "next_step_worker",
+    //     feature = "new_event_worker"
+    // ))]
+    // let main_handlers = async { try_join!(main_handlers, main_handler::<Workflow1>(Workflow1 {})) };
 
     /////////////////////////////
     /////////////////////////////
 
-    try_join!(main_handlers, setup_server(router, sqlx_tx_layer).await)?;
+    let main_handlers = async { try_join!(main_handlers, setup_server(router, sqlx_tx_layer)) };
+
+    main_handlers.await?;
 
     Ok(())
 }
@@ -287,6 +314,12 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
     Json(api)
 }
 
+#[cfg(any(
+    feature = "active_step_worker",
+    feature = "new_instance_worker",
+    feature = "next_step_worker",
+    feature = "new_event_worker"
+))]
 async fn main_handler<W: Workflow>(
     #[cfg(feature = "active_step_worker")] wf: W,
 ) -> anyhow::Result<()> {
