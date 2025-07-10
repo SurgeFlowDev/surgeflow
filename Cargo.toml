@@ -46,6 +46,20 @@ tracing-subscriber = "0.3.19"
 typemap_rev = "0.4.0"
 uuid = { version = "1.17.0", features = ["serde", "v4"] }
 
+[features]
+default = [
+    "new_instance_worker",
+    "active_step_worker",
+    "next_step_worker",
+    "new_event_worker",
+    "control_server",
+]
+new_instance_worker = []
+active_step_worker = []
+next_step_worker = []
+new_event_worker = []
+control_server = []
+
 [workspace]
 members = ["macros"]
 resolver = "2"

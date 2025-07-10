@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     event::EventSender,
-    workflows::{Workflow, WorkflowId, WorkflowInstanceId, workflow_1::TxState},
+    workflows::{TxState, Workflow, WorkflowId, WorkflowInstanceId},
 };
 
 pub mod event;
@@ -17,7 +17,6 @@ pub mod workflows;
 pub struct AppState<W: Workflow> {
     pub event_sender: EventSender<W>,
     pub workflow_instance_manager: WorkflowInstanceManager<W>,
-    // pub sqlx_pool: PgPool,
     pub sqlx_tx_state: TxState,
 }
 

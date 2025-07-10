@@ -3,7 +3,7 @@ use darling::{Error, FromMeta};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
-use syn::{FnArg, ImplItem, ItemImpl, Pat, PatType, parse_quote};
+use syn::{FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Token, parse_macro_input, parse_quote};
 
 #[derive(FromMeta)]
 // #[darling(attributes(my_crate), forward_attrs(allow, doc, cfg))]
@@ -141,3 +141,57 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
     }
     .into()
 }
+
+/// Expands to code that spawns the selected handlers for the given workflow type.
+/// Usage: my_macro!(Workflow1, workspace_instance, active_step, next_step, handle_event_new);
+#[proc_macro]
+pub fn startup_workflow(input: TokenStream) -> TokenStream {
+    struct Idents(Punctuated<Ident, Token![,]>);
+
+    impl syn::parse::Parse for Idents {
+        fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+            Ok(Idents(Punctuated::parse_terminated(input)?))
+        }
+    }
+
+    let Idents(input) = parse_macro_input!(input as Idents);
+
+    let mut idents = input.into_iter();
+    let workflow_ty = match idents.next() {
+        Some(ty) => ty,
+        None => {
+            return Error::custom("Expected workflow type as first argument")
+                .write_errors()
+                .into();
+        }
+    };
+
+    let handlers = idents.map(|ident| {
+        let fn_name = syn::Ident::new(&format!("{}", ident), ident.span());
+        quote! { #fn_name::<#workflow_ty>() }
+    });
+
+    let expanded = quote! {
+        ( 
+            #workflow_ty::control_router(sqlx_tx_state, &mut session).await?, 
+            async {
+                try_join!(
+                    #(#handlers),*
+                )
+            }
+        )
+    };
+
+    expanded.into()
+}
+
+// let router_1 = Workflow1::control_router(sqlx_tx_state, &mut session).await?;
+
+//     let handlers_1 = async {
+//         try_join!(
+//             workspace_instance_worker::<Workflow1>(),
+//             active_step_worker(Workflow1 {}),
+//             next_step_worker::<Workflow1>(),
+//             handle_event_new::<Workflow1>()
+//         )
+//     };

@@ -1,142 +1,30 @@
-use crate::event::{Event, Immediate, InstanceEvent};
+use crate::event::{Event, EventSender, Immediate, InstanceEvent};
 use crate::step::StepError;
 use crate::step::{Step, StepWithSettings};
 use crate::step::{StepResult, StepSettings, WorkflowStep};
 use crate::workflows::{Workflow, WorkflowEvent, WorkflowInstanceId};
-use crate::{AppState, ArcAppState, WorkflowInstance};
+use crate::{AppState, ArcAppState, WorkflowInstance, WorkflowInstanceManager};
 use aide::axum::ApiRouter;
-use aide::axum::routing::{ApiMethodRouter, post_with};
 use aide::{NoApi, OperationIo};
 use axum::Json;
 use axum::extract::{FromRef, State};
+use axum::http::StatusCode;
 use axum_extra::routing::TypedPath;
 
 use derive_more::{From, TryInto};
+use fe2o3_amqp::Sender;
+use fe2o3_amqp::session::SessionHandle;
 use macros::step;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::Postgres;
 use std::any::TypeId;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
-#[derive(
-    Debug,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    Clone,
-    thiserror::Error,
-    axum_thiserror::ErrorStatus,
-    OperationIo,
-)]
-enum PostWorkflowEventError {
-    #[error("could not queue event message")]
-    #[status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)]
-    CouldntQueueEventMessage,
-}
 
-#[derive(
-    Debug,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    Clone,
-    thiserror::Error,
-    axum_thiserror::ErrorStatus,
-    OperationIo,
-)]
-enum PostWorkflowInstanceError {
-    #[error("could not create instance")]
-    #[status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)]
-    CouldntCreateInstance,
-}
-
-pub type Tx = axum_sqlx_tx::Tx<sqlx::Postgres>;
-pub type TxState = axum_sqlx_tx::State<Postgres>;
-pub type TxLayer = axum_sqlx_tx::Layer<Postgres, axum_sqlx_tx::Error>;
-
-impl<W: Workflow> FromRef<ArcAppState<W>> for TxState {
-    fn from_ref(input: &ArcAppState<W>) -> Self {
-        input.0.sqlx_tx_state.clone()
-    }
-}
-
-pub trait WorkflowControl: Workflow {
-    fn control_router() -> anyhow::Result<ApiRouter<ArcAppState<Self>>> {
-        let post_workflow_event_api_route = Self::post_workflow_event_api_route();
-        let post_workflow_instance_api_route = Self::post_workflow_instance_api_route();
-
-        let router = ApiRouter::new().nest(
-            &format!("/workflow/{}", Self::NAME),
-            ApiRouter::new()
-                .merge(post_workflow_instance_api_route)
-                .merge(post_workflow_event_api_route),
-        );
-        Ok(router)
-    }
-
-    fn post_workflow_event_api_route() -> ApiRouter<ArcAppState<Self>> {
-        #[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
-        #[typed_path("/{instance_id}/event")]
-        pub struct PostWorkflowEvent {
-            instance_id: WorkflowInstanceId,
-        }
-
-        // more readable than a closure
-        async fn handler<T: Workflow>(
-            PostWorkflowEvent { instance_id }: PostWorkflowEvent,
-            State(ArcAppState(state)): State<ArcAppState<T>>,
-            Json(event): Json<<T as Workflow>::Event>,
-        ) -> Result<(), PostWorkflowEventError> {
-            state
-                .event_sender
-                .send(InstanceEvent { event, instance_id })
-                .await
-                .map_err(|_| PostWorkflowEventError::CouldntQueueEventMessage)?;
-            Ok(())
-        }
-
-        ApiRouter::new().typed_post_with(handler, |op| {
-            op.description("Send event")
-                .summary("Send event")
-                .id("post-event")
-                .tag(Self::NAME)
-                .hidden(false)
-        })
-    }
-
-    fn post_workflow_instance_api_route() -> ApiRouter<ArcAppState<Self>> {
-        #[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
-        #[typed_path("/")]
-        pub struct PostWorkflowInstance;
-
-        // more readable than a closure
-        async fn handler<T: Workflow>(
-            _: PostWorkflowInstance,
-            NoApi(mut tx): NoApi<Tx>,
-            State(ArcAppState(state)): State<ArcAppState<T>>,
-        ) -> Result<Json<WorkflowInstance>, PostWorkflowInstanceError> {
-            tracing::info!("creating instance...");
-            let res = state
-                .workflow_instance_manager
-                .create_instance(&mut tx)
-                .await
-                .map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
-            Ok(Json(res))
-        }
-        ApiRouter::new().typed_post_with(handler, |op| {
-            op.description("Create instance")
-                .summary("Create instance")
-                .id("post-workflow-instance")
-                .tag(Self::NAME)
-                .hidden(false)
-        })
-    }
-}
-
-impl<T: Workflow> WorkflowControl for T {}
 
 impl WorkflowStep for Workflow1Step {
     fn variant_event_type_id(&self) -> TypeId {

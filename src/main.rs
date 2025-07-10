@@ -1,5 +1,8 @@
 use aide::{
-    axum::{ApiRouter, IntoApiResponse, routing::get},
+    axum::{
+        ApiRouter, IntoApiResponse,
+        routing::{get, get_with},
+    },
     openapi::{Info, OpenApi},
     scalar::Scalar,
 };
@@ -8,28 +11,25 @@ use axum::{
     extract::{Json, Request},
 };
 
-use fe2o3_amqp::{Receiver, Sender, Session, session::SessionHandle};
+use fe2o3_amqp::{Receiver, Session};
 use rust_workflow_2::{
-    AppState, ArcAppState, WorkflowInstance, WorkflowInstanceManager,
-    event::{EventReceiver, EventSender, Immediate, InstanceEvent},
+    WorkflowInstance,
+    event::{EventReceiver, Immediate, InstanceEvent},
     step::{
         ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
         NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStep,
     },
-    workflows::{
-        Workflow, WorkflowEvent,
-        workflow_1::{Tx, TxState, Workflow1, WorkflowControl},
-    },
+    workflows::{Tx, TxLayer, Workflow, WorkflowControl, WorkflowEvent, workflow_1::Workflow1},
 };
 
 use sqlx::PgPool;
-use std::{any::TypeId, marker::PhantomData, sync::Arc};
+use std::any::TypeId;
 use tikv_client::RawClient;
 use tokio::{net::TcpListener, try_join};
 use tower_http::normalize_path::NormalizePathLayer;
 use tower_layer::Layer;
 
-async fn workspace_instance_worker<W: Workflow>() -> anyhow::Result<SessionHandle<()>> {
+async fn workspace_instance_worker<W: Workflow>() -> anyhow::Result<()> {
     let mut connection =
         fe2o3_amqp::Connection::open("control-connection-3", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
@@ -201,34 +201,38 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
     }
 }
 
-async fn init_app_state<W: Workflow>(
-    sqlx_tx_state: TxState,
-    session: &mut SessionHandle<()>,
-) -> anyhow::Result<ArcAppState<W>> {
-    let instance_sender = Sender::attach(
-        session,
-        format!("{}-instances-receiver-1", W::NAME),
-        format!("{}-instances", W::NAME),
-    )
-    .await?;
+async fn setup_server(
+    router: ApiRouter,
+    sqlx_tx_layer: TxLayer,
+) -> impl std::future::Future<Output = anyhow::Result<()>> {
+    let router = ApiRouter::new().merge(router).layer(sqlx_tx_layer);
 
-    let event_sender = EventSender::<W>::new(session).await?;
+    let mut api = base_open_api();
 
-    Ok(ArcAppState(Arc::new(AppState {
-        event_sender,
-        workflow_instance_manager: WorkflowInstanceManager {
-            sender: instance_sender.into(),
-            _marker: PhantomData,
-        },
-        sqlx_tx_state,
-    })))
+    let router = if cfg!(debug_assertions) {
+        let router = router
+            .api_route(
+                "/openapi.json",
+                get_with(serve_api, |op| op.summary("OpenAPI Spec").hidden(false)),
+            )
+            .route("/docs", Scalar::new("/openapi.json").axum_route());
+        router.finish_api(&mut api).layer(Extension(api))
+    } else {
+        router.into()
+    };
+    let router = NormalizePathLayer::trim_trailing_slash().layer(router);
+    let router = ServiceExt::<Request>::into_make_service(router);
+
+    async move {
+        let listener = TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
+        axum::serve(listener, router).await?;
+        Ok(())
+    }
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-
-    let listener = TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
 
     let (sqlx_tx_state, sqlx_tx_layer) =
         Tx::setup(PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?);
@@ -239,67 +243,33 @@ async fn main() -> anyhow::Result<()> {
 
     let mut session = Session::begin(&mut connection).await?;
 
-    // ISOLATED WORKFLOW 0
+    let router = ApiRouter::new();
 
-    // let app_state_0 = init_app_state::<Workflow0>(sqlx_pool.clone(), &mut session).await?;
+    let main_handlers = async { anyhow::Result::<()>::Ok(()) };
 
-    // let router_0 = workflow_0::control_router().await?.with_state(app_state_0);
+    /////////////////////////////
+    /////////////////////////////
 
-    // let handlers_0 = async {
-    //     try_join!(
-    //         workspace_instance_worker::<Workflow0>(),
-    //         active_step_worker(Workflow0 {}),
-    //         next_step_worker::<Workflow0>(),
-    //         handle_event_new::<Workflow0>()
-    //     )
-    // };
+    let router =
+        router.merge(Workflow1::control_router(sqlx_tx_state.clone(), &mut session).await?);
 
-    // ISOLATED END
+    let main_handlers = async { try_join!(main_handlers, main_handler::<Workflow1>(Workflow1 {})) };
 
-    // ISOLATED WORKFLOW 1
-    let app_state_1 = init_app_state::<Workflow1>(sqlx_tx_state, &mut session).await?;
+    /////////////////////////////
+    /////////////////////////////
 
-    let router_1 = Workflow1::control_router()?.with_state(app_state_1);
+    /////////////////////////////
+    /////////////////////////////
 
-    let handlers_1 = async {
-        try_join!(
-            workspace_instance_worker::<Workflow1>(),
-            active_step_worker(Workflow1 {}),
-            next_step_worker::<Workflow1>(),
-            handle_event_new::<Workflow1>()
-        )
-    };
-    // ISOLATED END
+    let router =
+        router.merge(Workflow1::control_router(sqlx_tx_state.clone(), &mut session).await?);
 
-    // MERGE
-    let all_handlers = async {
-        try_join!(/*handlers_0,*/ handlers_1)
-    };
-    let router = ApiRouter::new()
-        // .merge(router_0)
-        .merge(router_1)
-        .layer(sqlx_tx_layer);
-    // MERGE END
+    let main_handlers = async { try_join!(main_handlers, main_handler::<Workflow1>(Workflow1 {})) };
 
-    let mut api = base_open_api();
+    /////////////////////////////
+    /////////////////////////////
 
-    let router = if cfg!(debug_assertions) {
-        let router = router
-            .api_route("/openapi.json", get(serve_api))
-            .route("/docs", Scalar::new("/openapi.json").axum_route());
-        router.finish_api(&mut api).layer(Extension(api))
-    } else {
-        router.into()
-    };
-    let router = NormalizePathLayer::trim_trailing_slash().layer(router);
-    let router = ServiceExt::<Request>::into_make_service(router);
-
-    let server = async {
-        axum::serve(listener, router).await?;
-        Ok(())
-    };
-
-    try_join!(all_handlers, server)?;
+    try_join!(main_handlers, setup_server(router, sqlx_tx_layer).await)?;
 
     Ok(())
 }
@@ -313,10 +283,61 @@ pub fn base_open_api() -> OpenApi {
         ..OpenApi::default()
     }
 }
-// #[api_route(GET "/openapi.json" {
-//     summary: "OpenAPI Spec",
-//     hidden: false
-// })]
+
 async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
     Json(api)
+}
+
+async fn main_handler<W: Workflow>(
+    #[cfg(feature = "active_step_worker")] wf: W,
+) -> anyhow::Result<()> {
+    let workspace_instance_worker = async {
+        #[cfg(feature = "new_instance_worker")]
+        {
+            workspace_instance_worker::<W>().await
+        }
+        #[cfg(not(feature = "new_instance_worker"))]
+        {
+            Ok(())
+        }
+    };
+    let active_step_worker = async {
+        #[cfg(feature = "active_step_worker")]
+        {
+            active_step_worker(wf).await
+        }
+        #[cfg(not(feature = "active_step_worker"))]
+        {
+            Ok(())
+        }
+    };
+    let next_step_worker = async {
+        #[cfg(feature = "next_step_worker")]
+        {
+            next_step_worker::<W>().await
+        }
+        #[cfg(not(feature = "next_step_worker"))]
+        {
+            Ok(())
+        }
+    };
+    let handle_event_new = async {
+        #[cfg(feature = "new_event_worker")]
+        {
+            handle_event_new::<W>().await
+        }
+        #[cfg(not(feature = "new_event_worker"))]
+        {
+            Ok(())
+        }
+    };
+    if let Err(err) = try_join! {
+        workspace_instance_worker,
+        next_step_worker,
+        handle_event_new,
+        active_step_worker
+    } {
+        return Err(err);
+    }
+    Ok(())
 }

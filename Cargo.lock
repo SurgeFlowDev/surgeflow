@@ -40,7 +40,7 @@ dependencies = [
 [[package]]
 name = "aide"
 version = "0.15.0"
-source = "git+https://github.com/Zizico2/aide.git?branch=feat%2Ftyped-routing-with#2f8186b7fb54ec0881de0711418134c3e94119a5"
+source = "git+https://github.com/Zizico2/aide.git?branch=feat%2Ftyped-routing-with#56a8e6804672117d3fdd66603f17152bfb617f1b"
 dependencies = [
  "aide-macros",
  "axum 0.8.4",
@@ -62,7 +62,7 @@ dependencies = [
 [[package]]
 name = "aide-macros"
 version = "0.15.0"
-source = "git+https://github.com/Zizico2/aide.git?branch=feat%2Ftyped-routing-with#2f8186b7fb54ec0881de0711418134c3e94119a5"
+source = "git+https://github.com/Zizico2/aide.git?branch=feat%2Ftyped-routing-with#56a8e6804672117d3fdd66603f17152bfb617f1b"
 dependencies = [
  "darling",
  "proc-macro2",
