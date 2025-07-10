@@ -67,16 +67,19 @@ pub trait WorkflowControl: Workflow {
     fn control_router() -> anyhow::Result<ApiRouter<ArcAppState<Self>>> {
         let post_workflow_event_api_route = Self::post_workflow_event_api_route();
         let post_workflow_instance_api_route = Self::post_workflow_instance_api_route();
-        let router = ApiRouter::new()
-            .merge(post_workflow_instance_api_route)
-            .merge(post_workflow_event_api_route);
 
+        let router = ApiRouter::new().nest(
+            &format!("/workflow/{}", Self::NAME),
+            ApiRouter::new()
+                .merge(post_workflow_instance_api_route)
+                .merge(post_workflow_event_api_route),
+        );
         Ok(router)
     }
 
     fn post_workflow_event_api_route() -> ApiRouter<ArcAppState<Self>> {
         #[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
-        #[typed_path("/workflow/workflow_1/{instance_id}/event")]
+        #[typed_path("/{instance_id}/event")]
         pub struct PostWorkflowEvent {
             instance_id: WorkflowInstanceId,
         }
@@ -106,7 +109,7 @@ pub trait WorkflowControl: Workflow {
 
     fn post_workflow_instance_api_route() -> ApiRouter<ArcAppState<Self>> {
         #[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
-        #[typed_path("/workflow/workflow_1")]
+        #[typed_path("/")]
         pub struct PostWorkflowInstance;
 
         // more readable than a closure
