@@ -2,7 +2,9 @@ use darling::ast::NestedMeta;
 use darling::{Error, FromMeta};
 use proc_macro::TokenStream;
 use quote::quote;
+use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
+use syn::token::Comma;
 use syn::{FnArg, Ident, ImplItem, ItemImpl, Pat, PatType, Token, parse_macro_input, parse_quote};
 
 #[derive(FromMeta)]
@@ -172,8 +174,8 @@ pub fn startup_workflow(input: TokenStream) -> TokenStream {
     });
 
     let expanded = quote! {
-        ( 
-            #workflow_ty::control_router(sqlx_tx_state, &mut session).await?, 
+        (
+            #workflow_ty::control_router(sqlx_tx_state, &mut session).await?,
             async {
                 try_join!(
                     #(#handlers),*
@@ -185,13 +187,77 @@ pub fn startup_workflow(input: TokenStream) -> TokenStream {
     expanded.into()
 }
 
-// let router_1 = Workflow1::control_router(sqlx_tx_state, &mut session).await?;
+/// Parse a comma-separated list of Idents: `Workflow0, Workflow1, …`
+struct Workflows {
+    tys: Punctuated<Ident, Comma>,
+}
 
-//     let handlers_1 = async {
-//         try_join!(
-//             workspace_instance_worker::<Workflow1>(),
-//             active_step_worker(Workflow1 {}),
-//             next_step_worker::<Workflow1>(),
-//             handle_event_new::<Workflow1>()
-//         )
-//     };
+impl Parse for Workflows {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let tys = Punctuated::parse_terminated(input)?;
+        Ok(Workflows { tys })
+    }
+}
+
+#[proc_macro]
+pub fn my_main(item: TokenStream) -> TokenStream {
+    let Workflows { tys } = parse_macro_input!(item as Workflows);
+    let types: Vec<_> = tys.iter().collect();
+
+    // 1) control_server_setup block
+    let control_setup = quote! {
+        #[cfg(feature = "control_server")]
+        let ((sqlx_tx_state, sqlx_tx_layer), _connection, mut session) =
+            control_server_setup().await?;
+    };
+
+    // 2) build `router = A::control_router(…).await? .merge(B::control_router(…).await?) …;`
+    let router_build = if types.is_empty() {
+        quote! {}
+    } else {
+        let first = types[0];
+        let merges = types.iter().skip(1).map(|ty| {
+            quote! {
+                .merge(#ty::control_router(sqlx_tx_state.clone(), &mut session).await?)
+            }
+        });
+        quote! {
+            #[cfg(feature = "control_server")]
+            let router = #first::control_router(sqlx_tx_state.clone(), &mut session)
+                .await?
+                #(#merges)*;
+        }
+    };
+
+    // 3) try_join! arguments
+    let mut join_args = Vec::new();
+    join_args.push(quote! {
+        #[cfg(feature = "control_server")]
+        setup_server(router, sqlx_tx_layer)
+    });
+    for ty in &types {
+        join_args.push(quote! {
+            #[cfg(any(
+                feature = "active_step_worker",
+                feature = "new_instance_worker",
+                feature = "next_step_worker",
+                feature = "new_event_worker"
+            ))]
+            main_handler::<#ty>(#ty {})
+        });
+    }
+    let try_join_block = quote! {
+        try_join!(
+            #(#join_args),*
+        )?;
+    };
+
+    // 4) wrap it all in #[tokio::main]
+    let expanded = quote! {
+            #control_setup
+            #router_build
+            #try_join_block
+    };
+
+    TokenStream::from(expanded)
+}

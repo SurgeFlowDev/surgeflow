@@ -7,9 +7,10 @@ use axum::{
     Extension, ServiceExt,
     extract::{Json, Request},
 };
-use rust_workflow_2::workflows::workflow_0::Workflow0;
+use macros::my_main;
+use rust_workflow_2::workflows::{TxState, workflow_0::Workflow0};
 
-use fe2o3_amqp::{Receiver, Session};
+use fe2o3_amqp::{Receiver, Session, connection::ConnectionHandle, session::SessionHandle};
 use rust_workflow_2::{
     WorkflowInstance,
     event::{EventReceiver, Immediate, InstanceEvent},
@@ -222,80 +223,27 @@ async fn setup_server(router: ApiRouter, sqlx_tx_layer: TxLayer) -> anyhow::Resu
     axum::serve(listener, router).await?;
     Ok(())
 }
+#[cfg(feature = "control_server")]
+async fn control_server_setup()
+-> anyhow::Result<((TxState, TxLayer), ConnectionHandle<()>, SessionHandle<()>)> {
+    let mut connection =
+        fe2o3_amqp::Connection::open("control-connection-6", "amqp://guest:guest@127.0.0.1:5672")
+            .await?;
+
+    let session = Session::begin(&mut connection).await?;
+
+    Ok((
+        Tx::setup(PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?),
+        connection,
+        session,
+    ))
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    #[cfg(feature = "control_server")]
-    let ((sqlx_tx_state, sqlx_tx_layer), _connection, mut session, router) = {
-        let mut connection = fe2o3_amqp::Connection::open(
-            "control-connection-6",
-            "amqp://guest:guest@127.0.0.1:5672",
-        )
-        .await?;
-
-        let session = Session::begin(&mut connection).await?;
-
-        let router = ApiRouter::new();
-
-        (
-            Tx::setup(
-                PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?,
-            ),
-            connection,
-            session,
-            router,
-        )
-    };
-
-    #[cfg(any(
-        feature = "active_step_worker",
-        feature = "new_instance_worker",
-        feature = "next_step_worker",
-        feature = "new_event_worker"
-    ))]
-    let main_handlers = async { anyhow::Result::<()>::Ok(()) };
-
-    /////////////////////////////
-    /////////////////////////////
-
-    #[cfg(feature = "control_server")]
-    let router =
-        router.merge(Workflow0::control_router(sqlx_tx_state.clone(), &mut session).await?);
-
-    #[cfg(any(
-        feature = "active_step_worker",
-        feature = "new_instance_worker",
-        feature = "next_step_worker",
-        feature = "new_event_worker"
-    ))]
-    let main_handlers = async { try_join!(main_handlers, main_handler::<Workflow0>(Workflow0 {})) };
-
-    /////////////////////////////
-    /////////////////////////////
-
-    /////////////////////////////
-    /////////////////////////////
-
-    // #[cfg(feature = "control_server")]
-    // let router =
-    //     router.merge(Workflow1::control_router(sqlx_tx_state.clone(), &mut session).await?);
-
-    // #[cfg(any(
-    //     feature = "active_step_worker",
-    //     feature = "new_instance_worker",
-    //     feature = "next_step_worker",
-    //     feature = "new_event_worker"
-    // ))]
-    // let main_handlers = async { try_join!(main_handlers, main_handler::<Workflow1>(Workflow1 {})) };
-
-    /////////////////////////////
-    /////////////////////////////
-
-    let main_handlers = async { try_join!(main_handlers, setup_server(router, sqlx_tx_layer)) };
-
-    main_handlers.await?;
+    my_main!(Workflow0, Workflow1);
 
     Ok(())
 }
