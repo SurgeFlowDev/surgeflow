@@ -7,6 +7,7 @@ use axum::{
     Extension, ServiceExt,
     extract::{Json, Request},
 };
+use futures::future::try_join;
 use rust_workflow_2::workflows::workflow_0::Workflow0;
 
 use fe2o3_amqp::{Receiver, Session};
@@ -289,51 +290,16 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
 async fn main_handler<W: Workflow>(
     #[cfg(feature = "active_step_worker")] wf: W,
 ) -> anyhow::Result<()> {
-    let workspace_instance_worker = async {
-        #[cfg(feature = "new_instance_worker")]
-        {
-            workspace_instance_worker::<W>().await
-        }
-        #[cfg(not(feature = "new_instance_worker"))]
-        {
-            Ok(())
-        }
-    };
-    let active_step_worker = async {
+    try_join!(
         #[cfg(feature = "active_step_worker")]
-        {
-            active_step_worker(wf).await
-        }
-        #[cfg(not(feature = "active_step_worker"))]
-        {
-            Ok(())
-        }
-    };
-    let next_step_worker = async {
+        active_step_worker::<W>(wf),
+        #[cfg(feature = "new_instance_worker")]
+        workspace_instance_worker::<W>(),
         #[cfg(feature = "next_step_worker")]
-        {
-            next_step_worker::<W>().await
-        }
-        #[cfg(not(feature = "next_step_worker"))]
-        {
-            Ok(())
-        }
-    };
-    let handle_event_new = async {
+        next_step_worker::<W>(),
         #[cfg(feature = "new_event_worker")]
-        {
-            handle_event_new::<W>().await
-        }
-        #[cfg(not(feature = "new_event_worker"))]
-        {
-            Ok(())
-        }
-    };
-     try_join! {
-        workspace_instance_worker,
-        next_step_worker,
-        handle_event_new,
-        active_step_worker
-    }?;
+        handle_event_new::<W>(),
+    )?;
+
     Ok(())
 }
