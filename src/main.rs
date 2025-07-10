@@ -329,13 +329,11 @@ async fn main_handler<W: Workflow>(
             Ok(())
         }
     };
-    if let Err(err) = try_join! {
+     try_join! {
         workspace_instance_worker,
         next_step_worker,
         handle_event_new,
         active_step_worker
-    } {
-        return Err(err);
-    }
+    }?;
     Ok(())
 }
