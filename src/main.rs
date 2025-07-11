@@ -200,7 +200,7 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
     }
 }
 
-async fn setup_server(router: ApiRouter, sqlx_tx_layer: TxLayer) -> anyhow::Result<()> {
+async fn serve(router: ApiRouter, sqlx_tx_layer: TxLayer) -> anyhow::Result<()> {
     let router = ApiRouter::new().merge(router).layer(sqlx_tx_layer);
 
     let mut api = base_open_api();

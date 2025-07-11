@@ -232,7 +232,7 @@ pub fn my_main(item: TokenStream) -> TokenStream {
     let mut join_args = Vec::new();
     join_args.push(quote! {
         #[cfg(feature = "control_server")]
-        setup_server(router, sqlx_tx_layer)
+        serve(router, sqlx_tx_layer)
     });
     for ty in &tys {
         join_args.push(quote! {
@@ -256,6 +256,9 @@ pub fn my_main(item: TokenStream) -> TokenStream {
             #router_build
             #try_join_block
     };
+    eprintln!("{}", expanded);
+
 
     expanded.into()
+    
 }
