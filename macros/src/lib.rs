@@ -202,21 +202,18 @@ impl Parse for Workflows {
 #[proc_macro]
 pub fn my_main(item: TokenStream) -> TokenStream {
     let Workflows { tys } = parse_macro_input!(item as Workflows);
-    let types: Vec<_> = tys.iter().collect();
+    let mut types = tys.iter();
 
     // 1) control_server_setup block
-    let control_setup = quote! {
+    let control_server_setup = quote! {
         #[cfg(feature = "control_server")]
         let ((sqlx_tx_state, sqlx_tx_layer), _connection, mut session) =
             control_server_setup().await?;
     };
 
     // 2) build `router = A::control_router(…).await? .merge(B::control_router(…).await?) …;`
-    let router_build = if types.is_empty() {
-        quote! {}
-    } else {
-        let first = types[0];
-        let merges = types.iter().skip(1).map(|ty| {
+    let router_build = if let Some(first) = types.next() {
+        let merges = types.map(|ty| {
             quote! {
                 .merge(#ty::control_router(sqlx_tx_state.clone(), &mut session).await?)
             }
@@ -227,6 +224,8 @@ pub fn my_main(item: TokenStream) -> TokenStream {
                 .await?
                 #(#merges)*;
         }
+    } else {
+        quote! {}
     };
 
     // 3) try_join! arguments
@@ -235,7 +234,7 @@ pub fn my_main(item: TokenStream) -> TokenStream {
         #[cfg(feature = "control_server")]
         setup_server(router, sqlx_tx_layer)
     });
-    for ty in &types {
+    for ty in &tys {
         join_args.push(quote! {
             #[cfg(any(
                 feature = "active_step_worker",
@@ -252,12 +251,11 @@ pub fn my_main(item: TokenStream) -> TokenStream {
         )?;
     };
 
-    // 4) wrap it all in #[tokio::main]
     let expanded = quote! {
-            #control_setup
+            #control_server_setup
             #router_build
             #try_join_block
     };
 
-    TokenStream::from(expanded)
+    expanded.into()
 }
