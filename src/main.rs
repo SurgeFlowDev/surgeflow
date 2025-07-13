@@ -8,15 +8,19 @@ use axum::{
     extract::{Json, Request},
 };
 use macros::my_main;
-use rust_workflow_2::workflows::{TxState, workflow_0::Workflow0};
-
-use fe2o3_amqp::{Receiver, Session, connection::ConnectionHandle, session::SessionHandle};
+use rust_workflow_2::workers::workspace_instance_worker;
 use rust_workflow_2::{
-    WorkflowInstance,
+    step::NextStepSender,
+    workflows::{TxState, workflow_0::Workflow0},
+};
+
+use crate::workspace_instance_worker::RabbitMqHandleEventNewDependencies;
+use fe2o3_amqp::{Session, connection::ConnectionHandle, session::SessionHandle};
+use rust_workflow_2::{
     event::{EventReceiver, Immediate, InstanceEvent},
     step::{
         ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
-        NextStepReceiver, NextStepSender, Step, StepsAwaitingEventManager, WorkflowStep,
+        NextStepReceiver, NextStepSenderAmqp1_0, Step, StepsAwaitingEventManager, WorkflowStep,
     },
     workflows::{Tx, TxLayer, Workflow, WorkflowControl, WorkflowEvent, workflow_1::Workflow1},
 };
@@ -28,47 +32,6 @@ use tokio::{net::TcpListener, try_join};
 use tower_http::normalize_path::NormalizePathLayer;
 use tower_layer::Layer;
 
-async fn workspace_instance_worker<W: Workflow>() -> anyhow::Result<()> {
-    let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-3", "amqp://guest:guest@127.0.0.1:5672")
-            .await?;
-
-    let mut session = Session::begin(&mut connection).await?;
-
-    let mut instance_receiver = Receiver::attach(
-        &mut session,
-        format!("{}-instances-receiver-1", W::NAME),
-        format!("{}-instances", W::NAME),
-    )
-    .await?;
-
-    let next_step_sender = NextStepSender::<W>::new(&mut session).await?;
-
-    loop {
-        let Ok(msg) = instance_receiver.recv::<String>().await else {
-            continue;
-        };
-        tracing::info!("Received instance message");
-        let Ok(instance) = serde_json::from_str::<WorkflowInstance>(msg.body()) else {
-            continue;
-        };
-
-        instance_receiver.accept(msg).await?;
-
-        let entrypoint = FullyQualifiedStep {
-            instance_id: instance.id,
-            step: W::entrypoint(),
-            event: None,
-            retry_count: 0,
-        };
-
-        if let Err(err) = next_step_sender.send(entrypoint).await {
-            tracing::error!("Failed to send next step: {:?}", err);
-            continue;
-        }
-    }
-}
-
 async fn handle_event_new<W: Workflow>() -> anyhow::Result<()> {
     let mut connection =
         fe2o3_amqp::Connection::open("control-connection-2", "amqp://guest:guest@127.0.0.1:5672")
@@ -76,10 +39,12 @@ async fn handle_event_new<W: Workflow>() -> anyhow::Result<()> {
 
     let mut session = Session::begin(&mut connection).await?;
 
-    let active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
+    let mut active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
+
     let steps_awaiting_event =
         StepsAwaitingEventManager::<W>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
-    let event_receiver = EventReceiver::<W>::new(&mut session).await?;
+
+    let mut event_receiver = EventReceiver::<W>::new(&mut session).await?;
 
     loop {
         let Ok(InstanceEvent { event, instance_id }) = event_receiver.recv().await else {
@@ -117,8 +82,8 @@ async fn next_step_worker<W: Workflow + 'static>() -> anyhow::Result<()> {
             .await?;
     let mut session = Session::begin(&mut connection).await?;
 
-    let next_step_receiver = NextStepReceiver::<W>::new(&mut session).await?;
-    let active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
+    let mut next_step_receiver = NextStepReceiver::<W>::new(&mut session).await?;
+    let mut active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
 
     let steps_awaiting_event =
         StepsAwaitingEventManager::<W>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
@@ -155,11 +120,11 @@ async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
         fe2o3_amqp::Connection::open("control-connection-5", "amqp://guest:guest@127.0.0.1:5672")
             .await?;
     let mut session = Session::begin(&mut connection).await?;
-    let active_step_receiver = ActiveStepReceiver::<W>::new(&mut session).await?;
-    let active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
-    let next_step_sender = NextStepSender::<W>::new(&mut session).await?;
+    let mut active_step_receiver = ActiveStepReceiver::<W>::new(&mut session).await?;
+    let mut active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
+    let mut next_step_sender = NextStepSenderAmqp1_0::<W>::new(&mut session).await?;
 
-    let failed_step_sender = FailedStepSender::<W>::new(&mut session).await?;
+    let mut failed_step_sender = FailedStepSender::<W>::new(&mut session).await?;
 
     // let succeeded_step_sender = SucceededStepSender::<Workflow0>::new(&mut session).await?;
 
@@ -275,7 +240,7 @@ async fn main_handler<W: Workflow>(
         #[cfg(feature = "active_step_worker")]
         active_step_worker::<W>(wf),
         #[cfg(feature = "new_instance_worker")]
-        workspace_instance_worker::<W>(),
+        workspace_instance_worker::main::<W, RabbitMqHandleEventNewDependencies<_>>(),
         #[cfg(feature = "next_step_worker")]
         next_step_worker::<W>(),
         #[cfg(feature = "new_event_worker")]

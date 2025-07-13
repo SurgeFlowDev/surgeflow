@@ -26,36 +26,35 @@ pub struct InstanceEvent<W: Workflow> {
 }
 
 #[derive(Debug)]
-pub struct EventReceiver<W: Workflow>(Mutex<Receiver>, PhantomData<W>);
+pub struct EventReceiver<W: Workflow>(Receiver, PhantomData<W>);
 
 impl<W: Workflow> EventReceiver<W> {
     pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
         let addr = format!("{}-events", W::NAME);
         let link_name = format!("{addr}-receiver-{}", Uuid::new_v4().as_hyphenated());
         let receiver = Receiver::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(receiver), PhantomData))
+        Ok(Self(receiver, PhantomData))
     }
-    pub async fn recv(&self) -> anyhow::Result<InstanceEvent<W>> {
-        let mut receiver = self.0.lock().await;
-
+    pub async fn recv(&mut self) -> anyhow::Result<InstanceEvent<W>> {
         // TODO: using string while developing, change to Vec<u8> in production
-        let msg = receiver.recv::<String>().await?;
+        let msg = self.0.recv::<String>().await?;
 
         let event = match serde_json::from_str(msg.body()) {
             Ok(event) => event,
             Err(e) => {
                 let err = anyhow::anyhow!("Failed to deserialize step: {}", e);
                 tracing::error!("{}", err);
-                receiver.reject(msg, None).await?;
+                self.0.reject(msg, None).await?;
                 return Err(err);
             }
         };
-        receiver.accept(msg).await?;
+        self.0.accept(msg).await?;
 
         Ok(event)
     }
 }
 
+// must be thread-safe
 #[derive(Debug)]
 pub struct EventSender<W: Workflow>(Mutex<Sender>, PhantomData<W>);
 
