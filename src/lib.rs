@@ -12,8 +12,8 @@ use crate::{
 
 pub mod event;
 pub mod step;
-pub mod workflows;
 pub mod workers;
+pub mod workflows;
 
 pub struct AppState<W: Workflow> {
     pub event_sender: EventSender<W>,
@@ -23,7 +23,6 @@ pub struct AppState<W: Workflow> {
 
 #[derive(Clone)]
 pub struct ArcAppState<W: Workflow>(pub Arc<AppState<W>>);
-
 
 // must be thread-safe
 #[derive(Debug)]

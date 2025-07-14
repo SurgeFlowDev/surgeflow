@@ -72,47 +72,6 @@ pub struct FullyQualifiedStep<S: Debug + Step + for<'a> Deserialize<'a>> {
     pub retry_count: u32,
 }
 
-#[derive(Clone)]
-pub struct StepsAwaitingEventManager<W: Workflow> {
-    tikv_client: RawClient,
-    _phantom: PhantomData<W>,
-}
-impl<W: Workflow> StepsAwaitingEventManager<W> {
-    pub fn new(tikv_client: RawClient) -> Self {
-        Self {
-            tikv_client,
-            _phantom: PhantomData,
-        }
-    }
-    fn make_key(instance_id: WorkflowInstanceId) -> String {
-        format!("instance_{}", i32::from(instance_id))
-    }
-    pub async fn put_step(&self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
-        let instance_id = step.instance_id;
-        let payload = serde_json::to_vec(&step)?;
-        self.tikv_client
-            .put(Self::make_key(instance_id), payload)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn get_step(
-        &self,
-        instance_id: WorkflowInstanceId,
-    ) -> anyhow::Result<Option<FullyQualifiedStep<W::Step>>> {
-        let value = self.tikv_client.get(Self::make_key(instance_id)).await?;
-
-        let data = value.map(|v| serde_json::from_slice(&v)).transpose()?;
-
-        Ok(data)
-    }
-    pub async fn delete_step(&self, instance_id: WorkflowInstanceId) -> anyhow::Result<()> {
-        self.tikv_client.delete(Self::make_key(instance_id)).await?;
-
-        Ok(())
-    }
-}
-
 #[derive(Debug)]
 pub struct ActiveStepReceiver<W: Workflow>(Receiver, PhantomData<W>);
 
@@ -280,50 +239,5 @@ impl<W: Workflow> NextStepReceiver<W> {
         self.0.accept(msg).await?;
 
         Ok(event)
-    }
-}
-
-#[derive(Debug)]
-pub struct NextStepSenderAmqp1_0<W: Workflow>(Sender, PhantomData<W>);
-
-// impl<W: Workflow> NextStepSenderAmqp1_0<W> {
-//     pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
-//         let addr = format!("{}-next-steps", W::NAME);
-//         let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
-//         let sender = Sender::attach(session, link_name, addr).await?;
-//         Ok(Self(Mutex::new(sender), PhantomData))
-//     }
-//     pub async fn send(&mut self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
-//         let mut sender = self.0.lock().await;
-
-//         // TODO: using string while developing, change to Vec<u8> in production
-//         let event = serde_json::to_string(&step)?;
-//         sender.send(event).await?;
-//         Ok(())
-//     }
-// }
-
-pub trait NextStepSender<W: Workflow>: Sized {
-    async fn send(&mut self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()>;
-}
-
-impl<W: Workflow> NextStepSender<W> for NextStepSenderAmqp1_0<W> {
-    async fn send(
-        &mut self,
-        step: FullyQualifiedStep<<W as Workflow>::Step>,
-    ) -> anyhow::Result<()> {
-        // TODO: using string while developing, change to Vec<u8> in production
-        let event = serde_json::to_string(&step)?;
-        self.0.send(event).await?;
-        Ok(())
-    }
-}
-
-impl<W: Workflow> NextStepSenderAmqp1_0<W> {
-    pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
-        let addr = format!("{}-next-steps", W::NAME);
-        let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
-        let sender = Sender::attach(session, link_name, addr).await?;
-        Ok(Self(sender, PhantomData))
     }
 }

@@ -256,9 +256,6 @@ pub fn my_main(item: TokenStream) -> TokenStream {
             #router_build
             #try_join_block
     };
-    eprintln!("{}", expanded);
-
 
     expanded.into()
-    
 }
