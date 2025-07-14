@@ -3,7 +3,9 @@ use aide::{
     openapi::{Info, OpenApi},
     scalar::Scalar,
 };
+use rust_workflow_2::workers::next_step_worker;
 use rust_workflow_2::workers::rabbitmq_adapter::dependencies::new_event_worker::RabbitMqNewEventWorkerDependencies;
+use rust_workflow_2::workers::rabbitmq_adapter::dependencies::next_step_worker::RabbitMqNextStepWorkerDependencies;
 
 use axum::{
     Extension, ServiceExt,
@@ -11,71 +13,22 @@ use axum::{
 };
 use macros::my_main;
 use rust_workflow_2::workers::rabbitmq_adapter::dependencies::workspace_instance_worker::RabbitMqWorkspaceInstanceWorkerDependencies;
+use rust_workflow_2::workers::workspace_instance_worker::{self};
 use rust_workflow_2::workers::{
-    adapters::{managers::StepsAwaitingEventManager, senders::NextStepSender},
-    rabbitmq_adapter::senders::RabbitMqNextStepSender,
-};
-use rust_workflow_2::workers::{
-    rabbitmq_adapter::managers::RabbitMqStepsAwaitingEventManager,
-    workspace_instance_worker::{self},
+    adapters::senders::NextStepSender, rabbitmq_adapter::senders::RabbitMqNextStepSender,
 };
 use rust_workflow_2::workflows::{TxState, workflow_0::Workflow0};
 
 use fe2o3_amqp::{Session, connection::ConnectionHandle, session::SessionHandle};
 use rust_workflow_2::{
-    event::Immediate,
-    step::{
-        ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep,
-        NextStepReceiver, Step, WorkflowStep,
-    },
+    step::{ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep, Step},
     workflows::{Tx, TxLayer, Workflow, WorkflowControl, workflow_1::Workflow1},
 };
 
 use sqlx::PgPool;
-use std::any::TypeId;
-use tikv_client::RawClient;
 use tokio::{net::TcpListener, try_join};
 use tower_http::normalize_path::NormalizePathLayer;
 use tower_layer::Layer;
-
-async fn next_step_worker<W: Workflow + 'static>() -> anyhow::Result<()> {
-    let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-4", "amqp://guest:guest@127.0.0.1:5672")
-            .await?;
-    let mut session = Session::begin(&mut connection).await?;
-
-    let mut next_step_receiver = NextStepReceiver::<W>::new(&mut session).await?;
-    let mut active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
-
-    let mut steps_awaiting_event =
-        RabbitMqStepsAwaitingEventManager::<W>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
-
-    loop {
-        let Ok(step) = next_step_receiver.recv().await else {
-            continue;
-        };
-
-        if step.step.step.variant_event_type_id() == TypeId::of::<Immediate<W>>() {
-            active_step_sender
-                .send(FullyQualifiedStep {
-                    instance_id: step.instance_id,
-                    step: step.step,
-                    event: None,
-                    retry_count: 0,
-                })
-                .await?;
-        } else {
-            steps_awaiting_event
-                .put_step(FullyQualifiedStep {
-                    instance_id: step.instance_id,
-                    step: step.step,
-                    event: None,
-                    retry_count: 0,
-                })
-                .await?;
-        }
-    }
-}
 
 async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
     let mut connection =
@@ -208,7 +161,7 @@ async fn main_handler<W: Workflow>(
         workspace_instance_worker::main::<W, RabbitMqWorkspaceInstanceWorkerDependencies<_, _, _>>(
         ),
         #[cfg(feature = "next_step_worker")]
-        next_step_worker::<W>(),
+        next_step_worker::main::<W, RabbitMqNextStepWorkerDependencies<_, _, _>>(),
         #[cfg(feature = "new_event_worker")]
         new_event_worker::main::<W, RabbitMqNewEventWorkerDependencies<_, _, _>>(),
     )?;
