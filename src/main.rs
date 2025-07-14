@@ -158,12 +158,12 @@ async fn main_handler<W: Workflow>(
         #[cfg(feature = "active_step_worker")]
         active_step_worker::<W>(wf),
         #[cfg(feature = "new_instance_worker")]
-        workspace_instance_worker::main::<W, RabbitMqWorkspaceInstanceWorkerDependencies<_, _, _>>(
+        workspace_instance_worker::main::<W, RabbitMqWorkspaceInstanceWorkerDependencies<W, (), ()>>(
         ),
         #[cfg(feature = "next_step_worker")]
-        next_step_worker::main::<W, RabbitMqNextStepWorkerDependencies<_, _, _>>(),
+        next_step_worker::main::<W, RabbitMqNextStepWorkerDependencies<W, (), ()>>(),
         #[cfg(feature = "new_event_worker")]
-        new_event_worker::main::<W, RabbitMqNewEventWorkerDependencies<_, _, _>>(),
+        new_event_worker::main::<W, RabbitMqNewEventWorkerDependencies<W, (), ()>>(),
     )?;
 
     Ok(())
