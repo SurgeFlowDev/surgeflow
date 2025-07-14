@@ -1,34 +1,22 @@
-use fe2o3_amqp::Session;
-use tikv_client::RawClient;
-
 use crate::{
-    event::{EventReceiver, InstanceEvent},
-    step::{ActiveStepSender, FullyQualifiedStep, WorkflowStep},
-    workers::{
-        adapters::managers::StepsAwaitingEventManager,
-        rabbitmq_adapter::managers::RabbitMqStepsAwaitingEventManager,
+    event::InstanceEvent,
+    step::{FullyQualifiedStep, WorkflowStep},
+    workers::adapters::{
+        dependencies::new_event_worker::NewEventWorkerContext, managers::StepsAwaitingEventManager,
+        receivers::EventReceiver, senders::ActiveStepSender,
     },
     workflows::{Workflow, WorkflowEvent},
 };
 
-pub async fn main<W: Workflow>() -> anyhow::Result<()> {
-    let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-2", "amqp://guest:guest@127.0.0.1:5672")
-            .await?;
+pub async fn main<W: Workflow, C: NewEventWorkerContext<W>>() -> anyhow::Result<()> {
+    let dependencies = C::dependencies().await?;
 
-    let mut session = Session::begin(&mut connection).await?;
-
-    let mut active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
-
-    let steps_awaiting_event =
-        RabbitMqStepsAwaitingEventManager::<W>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
-
-    let mut event_receiver = EventReceiver::<W>::new(&mut session).await?;
+    let mut active_step_sender = dependencies.active_step_sender;
+    let mut event_receiver = dependencies.event_receiver;
+    let mut steps_awaiting_event = dependencies.steps_awaiting_event_manager;
 
     loop {
-        let Ok(InstanceEvent { event, instance_id }) = event_receiver.recv().await else {
-            continue;
-        };
+        let (InstanceEvent { event, instance_id }, handle) = event_receiver.receive().await?;
         let step = steps_awaiting_event.get_step(instance_id).await?;
         let Some(step) = step else {
             tracing::info!("No step awaiting event for instance {}", instance_id);

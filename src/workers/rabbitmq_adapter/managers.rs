@@ -28,7 +28,7 @@ impl<W: Workflow> RabbitMqStepsAwaitingEventManager<W> {
 
 impl<W: Workflow> StepsAwaitingEventManager<W> for RabbitMqStepsAwaitingEventManager<W> {
     async fn get_step(
-        &self,
+        &mut self,
         instance_id: WorkflowInstanceId,
     ) -> anyhow::Result<Option<FullyQualifiedStep<W::Step>>> {
         let value = self.tikv_client.get(Self::make_key(instance_id)).await?;
@@ -37,12 +37,12 @@ impl<W: Workflow> StepsAwaitingEventManager<W> for RabbitMqStepsAwaitingEventMan
 
         Ok(data)
     }
-    async fn delete_step(&self, instance_id: WorkflowInstanceId) -> anyhow::Result<()> {
+    async fn delete_step(&mut self, instance_id: WorkflowInstanceId) -> anyhow::Result<()> {
         self.tikv_client.delete(Self::make_key(instance_id)).await?;
 
         Ok(())
     }
-    async fn put_step(&self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
+    async fn put_step(&mut self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
         let instance_id = step.instance_id;
         let payload = serde_json::to_vec(&step)?;
         self.tikv_client

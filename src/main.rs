@@ -3,6 +3,8 @@ use aide::{
     openapi::{Info, OpenApi},
     scalar::Scalar,
 };
+use rust_workflow_2::workers::rabbitmq_adapter::dependencies::new_event_worker::RabbitMqNewEventWorkerDependencies;
+
 use axum::{
     Extension, ServiceExt,
     extract::{Json, Request},
@@ -45,7 +47,7 @@ async fn next_step_worker<W: Workflow + 'static>() -> anyhow::Result<()> {
     let mut next_step_receiver = NextStepReceiver::<W>::new(&mut session).await?;
     let mut active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
 
-    let steps_awaiting_event =
+    let mut steps_awaiting_event =
         RabbitMqStepsAwaitingEventManager::<W>::new(RawClient::new(vec!["127.0.0.1:2379"]).await?);
 
     loop {
@@ -208,7 +210,7 @@ async fn main_handler<W: Workflow>(
         #[cfg(feature = "next_step_worker")]
         next_step_worker::<W>(),
         #[cfg(feature = "new_event_worker")]
-        new_event_worker::main::<W>(),
+        new_event_worker::main::<W, RabbitMqNewEventWorkerDependencies<_, _, _>>(),
     )?;
 
     Ok(())
