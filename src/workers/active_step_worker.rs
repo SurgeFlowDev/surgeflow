@@ -1,30 +1,20 @@
-use fe2o3_amqp::Session;
-
 use crate::{
     step::{FullyQualifiedStep, Step},
     workers::{
         adapters::{
-            receivers::ActiveStepReceiver,
-            senders::{ActiveStepSender, FailedStepSender, NextStepSender},
-        },
-        rabbitmq_adapter::{
-            receivers::RabbitMqActiveStepReceiver,
-            senders::{RabbitMqActiveStepSender, RabbitMqFailedStepSender, RabbitMqNextStepSender},
+            dependencies::active_step_worker::ActiveStepWorkerContext, receivers::ActiveStepReceiver, senders::{ActiveStepSender, FailedStepSender, NextStepSender}
         },
     },
     workflows::Workflow,
 };
 
-pub async fn main<W: Workflow>(wf: W) -> anyhow::Result<()> {
-    let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-5", "amqp://guest:guest@127.0.0.1:5672")
-            .await?;
-    let mut session = Session::begin(&mut connection).await?;
+pub async fn main<W: Workflow, D: ActiveStepWorkerContext<W>>(wf: W) -> anyhow::Result<()> {
+    let dependencies = D::dependencies().await?;
 
-    let mut active_step_receiver = RabbitMqActiveStepReceiver::<W>::new(&mut session).await?;
-    let mut active_step_sender = RabbitMqActiveStepSender::<W>::new(&mut session).await?;
-    let mut next_step_sender = RabbitMqNextStepSender::<W>::new(&mut session).await?;
-    let mut failed_step_sender = RabbitMqFailedStepSender::<W>::new(&mut session).await?;
+    let mut active_step_receiver = dependencies.active_step_receiver;
+    let mut active_step_sender = dependencies.active_step_sender;
+    let mut next_step_sender =     dependencies.next_step_sender;
+    let mut failed_step_sender = dependencies.failed_step_sender;
 
     loop {
         let Ok((mut step, handle)) = active_step_receiver.receive().await else {

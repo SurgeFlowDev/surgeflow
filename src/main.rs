@@ -3,16 +3,16 @@ use aide::{
     openapi::{Info, OpenApi},
     scalar::Scalar,
 };
-use rust_workflow_2::workers::next_step_worker;
-use rust_workflow_2::workers::rabbitmq_adapter::dependencies::new_event_worker::RabbitMqNewEventWorkerDependencies;
-use rust_workflow_2::workers::rabbitmq_adapter::dependencies::next_step_worker::RabbitMqNextStepWorkerDependencies;
-
 use axum::{
     Extension, ServiceExt,
     extract::{Json, Request},
 };
 use macros::my_main;
 use rust_workflow_2::workers::active_step_worker;
+use rust_workflow_2::workers::next_step_worker;
+use rust_workflow_2::workers::rabbitmq_adapter::dependencies::active_step_worker::RabbitMqActiveStepWorkerDependencies;
+use rust_workflow_2::workers::rabbitmq_adapter::dependencies::new_event_worker::RabbitMqNewEventWorkerDependencies;
+use rust_workflow_2::workers::rabbitmq_adapter::dependencies::next_step_worker::RabbitMqNextStepWorkerDependencies;
 use rust_workflow_2::workers::rabbitmq_adapter::dependencies::workspace_instance_worker::RabbitMqWorkspaceInstanceWorkerDependencies;
 use rust_workflow_2::workers::workspace_instance_worker::{self};
 use rust_workflow_2::workflows::{TxState, workflow_0::Workflow0};
@@ -100,7 +100,7 @@ async fn main_handler<W: Workflow>(
 
     try_join!(
         #[cfg(feature = "active_step_worker")]
-        active_step_worker::main::<W>(wf),
+        active_step_worker::main::<W, RabbitMqActiveStepWorkerDependencies<W, (), ()>>(wf),
         #[cfg(feature = "new_instance_worker")]
         workspace_instance_worker::main::<W, RabbitMqWorkspaceInstanceWorkerDependencies<W, (), ()>>(
         ),
