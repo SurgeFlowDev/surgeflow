@@ -27,7 +27,7 @@ impl<W: Workflow> WorkspaceInstanceWorkerContext<W>
     type InstanceReceiver = RabbitMqInstanceReceiver<W>;
     async fn dependencies() -> anyhow::Result<WorkspaceInstanceWorkerDependencies<W, Self>> {
         let mut fe2o3_connection =
-            Connection::open("control-connection-3", "amqp://guest:guest@127.0.0.1:5672").await?;
+            Connection::open("control-connection-4", "amqp://guest:guest@127.0.0.1:5672").await?;
         let mut fe2o3_session = Session::begin(&mut fe2o3_connection).await?;
 
         let next_step_sender = RabbitMqNextStepSender::new(&mut fe2o3_session).await?;

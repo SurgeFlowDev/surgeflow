@@ -139,7 +139,7 @@ impl<W: Workflow> ActiveStepReceiver<W> for RabbitMqActiveStepReceiver<W> {
 
 impl<W: Workflow> RabbitMqActiveStepReceiver<W> {
     pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
-        let addr = format!("{}-next-steps", W::NAME);
+        let addr = format!("{}-active-steps", W::NAME);
         let link_name = format!("{addr}-receiver-{}", Uuid::new_v4().as_hyphenated());
         let receiver = Receiver::attach(session, link_name, addr).await?;
         Ok(Self(receiver, PhantomData))

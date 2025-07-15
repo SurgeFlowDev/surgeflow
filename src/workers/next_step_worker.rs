@@ -21,6 +21,7 @@ pub async fn main<W: Workflow, D: NextStepWorkerContext<W>>() -> anyhow::Result<
         let Ok((step, handle)) = next_step_receiver.receive().await else {
             continue;
         };
+        tracing::info!("received next step for instance: {}", step.instance_id);
 
         if step.step.step.variant_event_type_id() == TypeId::of::<Immediate<W>>() {
             active_step_sender

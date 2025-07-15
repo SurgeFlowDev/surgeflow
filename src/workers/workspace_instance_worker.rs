@@ -15,6 +15,7 @@ pub async fn main<W: Workflow, C: WorkspaceInstanceWorkerContext<W>>() -> anyhow
 
     loop {
         let (instance, handle) = instance_receiver.receive().await?;
+        tracing::info!("received instance: {}", instance.id);
 
         let entrypoint = FullyQualifiedStep {
             instance_id: instance.id,

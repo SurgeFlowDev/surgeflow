@@ -77,7 +77,7 @@ impl<W: Workflow> FailedStepSender<W> for RabbitMqFailedStepSender<W> {
 
 impl<W: Workflow> RabbitMqFailedStepSender<W> {
     pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
-        let addr = format!("{}-active-steps", W::NAME);
+        let addr = format!("{}-failed-steps", W::NAME);
         let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
         let sender = Sender::attach(session, link_name, addr).await?;
         Ok(Self(sender, PhantomData))
