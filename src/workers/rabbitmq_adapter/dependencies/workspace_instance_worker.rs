@@ -1,10 +1,3 @@
-use std::marker::PhantomData;
-
-use fe2o3_amqp::{
-    Connection, Receiver, Sender, Session, connection::ConnectionHandle, session::SessionHandle,
-};
-use uuid::Uuid;
-
 use crate::{
     workers::{
         adapters::dependencies::workspace_instance_worker::{
@@ -14,6 +7,10 @@ use crate::{
     },
     workflows::Workflow,
 };
+use fe2o3_amqp::{
+    Connection, Receiver, Session, connection::ConnectionHandle, session::SessionHandle,
+};
+use std::marker::PhantomData;
 
 pub struct RabbitMqWorkspaceInstanceWorkerDependencies<W: Workflow, C, S> {
     #[expect(dead_code)]

@@ -15,16 +15,10 @@ use macros::my_main;
 use rust_workflow_2::workers::active_step_worker;
 use rust_workflow_2::workers::rabbitmq_adapter::dependencies::workspace_instance_worker::RabbitMqWorkspaceInstanceWorkerDependencies;
 use rust_workflow_2::workers::workspace_instance_worker::{self};
-use rust_workflow_2::workers::{
-    adapters::senders::NextStepSender, rabbitmq_adapter::senders::RabbitMqNextStepSender,
-};
 use rust_workflow_2::workflows::{TxState, workflow_0::Workflow0};
 
 use fe2o3_amqp::{Session, connection::ConnectionHandle, session::SessionHandle};
-use rust_workflow_2::{
-    step::{ActiveStepReceiver, ActiveStepSender, FailedStepSender, FullyQualifiedStep, Step},
-    workflows::{Tx, TxLayer, Workflow, WorkflowControl, workflow_1::Workflow1},
-};
+use rust_workflow_2::workflows::{Tx, TxLayer, Workflow, WorkflowControl, workflow_1::Workflow1};
 
 use sqlx::PgPool;
 use tokio::{net::TcpListener, try_join};

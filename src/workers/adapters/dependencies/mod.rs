@@ -38,11 +38,11 @@ impl<W: Workflow, T: Dependencies<W> + std::marker::Send> DependencyConstructors
     ) -> anyhow::Result<
         WorkspaceInstanceWorkerDependencies<W, Self::WorkspaceInstanceWorkerDependenciesT>,
     > {
-        Ok(Self::WorkspaceInstanceWorkerDependenciesT::dependencies().await?)
+        Self::WorkspaceInstanceWorkerDependenciesT::dependencies().await
     }
     async fn new_event_worker_dependencies(
         &mut self,
     ) -> anyhow::Result<NewEventWorkerDependencies<W, Self::NewEventWorkerDependenciesT>> {
-        Ok(Self::NewEventWorkerDependenciesT::dependencies().await?)
+        Self::NewEventWorkerDependenciesT::dependencies().await
     }
 }

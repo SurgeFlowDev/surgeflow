@@ -1,25 +1,18 @@
-use std::marker::PhantomData;
-
-use fe2o3_amqp::{
-    Connection, Receiver, Sender, Session, connection::ConnectionHandle, session::SessionHandle,
-};
-use tikv_client::RawClient;
-use uuid::Uuid;
-
 use crate::{
     workers::{
-        adapters::{
-            dependencies::new_event_worker::{NewEventWorkerContext, NewEventWorkerDependencies},
-            senders::ActiveStepSender,
+        adapters::dependencies::new_event_worker::{
+            NewEventWorkerContext, NewEventWorkerDependencies,
         },
         rabbitmq_adapter::{
-            managers::RabbitMqStepsAwaitingEventManager,
-            receivers::{RabbitMqEventReceiver, RabbitMqInstanceReceiver},
-            senders::{RabbitMqActiveStepSender, RabbitMqNextStepSender},
+            managers::RabbitMqStepsAwaitingEventManager, receivers::RabbitMqEventReceiver,
+            senders::RabbitMqActiveStepSender,
         },
     },
     workflows::Workflow,
 };
+use fe2o3_amqp::{Session, connection::ConnectionHandle, session::SessionHandle};
+use std::marker::PhantomData;
+use tikv_client::RawClient;
 
 pub struct RabbitMqNewEventWorkerDependencies<W: Workflow, C, S> {
     #[expect(dead_code)]

@@ -1,24 +1,13 @@
-use std::any::TypeId;
-
-use fe2o3_amqp::Session;
-use tikv_client::RawClient;
-
 use crate::{
     event::Immediate,
     step::{FullyQualifiedStep, WorkflowStep},
-    workers::{
-        adapters::{
-            dependencies::next_step_worker::NextStepWorkerContext,
-            managers::StepsAwaitingEventManager, receivers::NextStepReceiver,
-            senders::ActiveStepSender,
-        },
-        rabbitmq_adapter::{
-            managers::RabbitMqStepsAwaitingEventManager, receivers::RabbitMqNextStepReceiver,
-            senders::RabbitMqActiveStepSender,
-        },
+    workers::adapters::{
+        dependencies::next_step_worker::NextStepWorkerContext, managers::StepsAwaitingEventManager,
+        receivers::NextStepReceiver, senders::ActiveStepSender,
     },
     workflows::Workflow,
 };
+use std::any::TypeId;
 
 pub async fn main<W: Workflow, D: NextStepWorkerContext<W>>() -> anyhow::Result<()> {
     let dependencies = D::dependencies().await?;
@@ -52,6 +41,6 @@ pub async fn main<W: Workflow, D: NextStepWorkerContext<W>>() -> anyhow::Result<
                 })
                 .await?;
         }
-        next_step_receiver.accept(handle);
+        next_step_receiver.accept(handle).await?;
     }
 }

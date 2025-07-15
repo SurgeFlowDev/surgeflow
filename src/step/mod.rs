@@ -1,9 +1,6 @@
 use fe2o3_amqp::{Receiver, Sender, session::SessionHandle};
 use serde::{Deserialize, Serialize};
 use std::{any::TypeId, fmt::Debug, marker::PhantomData};
-
-use tikv_client::RawClient;
-use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::{

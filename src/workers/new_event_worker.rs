@@ -40,5 +40,6 @@ pub async fn main<W: Workflow, C: NewEventWorkerContext<W>>() -> anyhow::Result<
                 retry_count: 0,
             })
             .await?;
+        event_receiver.accept(handle).await?;
     }
 }
