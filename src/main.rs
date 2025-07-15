@@ -12,6 +12,7 @@ use axum::{
     extract::{Json, Request},
 };
 use macros::my_main;
+use rust_workflow_2::workers::active_step_worker;
 use rust_workflow_2::workers::rabbitmq_adapter::dependencies::workspace_instance_worker::RabbitMqWorkspaceInstanceWorkerDependencies;
 use rust_workflow_2::workers::workspace_instance_worker::{self};
 use rust_workflow_2::workers::{
@@ -29,57 +30,6 @@ use sqlx::PgPool;
 use tokio::{net::TcpListener, try_join};
 use tower_http::normalize_path::NormalizePathLayer;
 use tower_layer::Layer;
-
-async fn active_step_worker<W: Workflow>(wf: W) -> anyhow::Result<()> {
-    let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-5", "amqp://guest:guest@127.0.0.1:5672")
-            .await?;
-    let mut session = Session::begin(&mut connection).await?;
-    let mut active_step_receiver = ActiveStepReceiver::<W>::new(&mut session).await?;
-    let mut active_step_sender = ActiveStepSender::<W>::new(&mut session).await?;
-    // let mut next_step_sender = RabbitMqNextStepSender::<W>::new(&mut session).await?;
-    let mut next_step_sender: RabbitMqNextStepSender<W> = todo!();
-
-    let mut failed_step_sender = FailedStepSender::<W>::new(&mut session).await?;
-
-    // let succeeded_step_sender = SucceededStepSender::<Workflow0>::new(&mut session).await?;
-
-    loop {
-        let Ok(mut step) = active_step_receiver.recv().await else {
-            continue;
-        };
-        tracing::info!("Received new step");
-        let next_step = step.step.step.run_raw(wf.clone(), step.event.clone()).await;
-        step.retry_count += 1;
-        if let Ok(next_step) = next_step {
-            // TODO: maybe use `succeeded-step-sender` and push the old step into it? and handle workflow completion there
-            if let Some(next_step) = next_step {
-                next_step_sender
-                    .send(FullyQualifiedStep {
-                        instance_id: step.instance_id,
-                        step: next_step,
-                        event: None,
-                        retry_count: 0,
-                    })
-                    .await?;
-            } else {
-                tracing::info!("Instance {} completed", step.instance_id);
-            }
-        } else {
-            tracing::info!("Failed to run step: {:?}", step.step);
-
-            if step.retry_count <= step.step.settings.max_retries {
-                tracing::info!("Retrying step. Retry count: {}", step.retry_count);
-                active_step_sender.send(step).await?;
-            } else {
-                tracing::info!("Max retries reached for step: {:?}", step.step);
-                // TODO: push into "step failed" queue.
-                // TODO: and maybe "workflow failed" queue. though this could be done in the "step failed" queue consumer
-                failed_step_sender.send(step).await?;
-            }
-        }
-    }
-}
 
 async fn serve(router: ApiRouter, sqlx_tx_layer: TxLayer) -> anyhow::Result<()> {
     let router = ApiRouter::new().merge(router).layer(sqlx_tx_layer);
@@ -156,7 +106,7 @@ async fn main_handler<W: Workflow>(
 
     try_join!(
         #[cfg(feature = "active_step_worker")]
-        active_step_worker::<W>(wf),
+        active_step_worker::main::<W>(wf),
         #[cfg(feature = "new_instance_worker")]
         workspace_instance_worker::main::<W, RabbitMqWorkspaceInstanceWorkerDependencies<W, (), ()>>(
         ),

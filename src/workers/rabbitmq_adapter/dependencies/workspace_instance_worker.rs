@@ -33,12 +33,7 @@ impl<W: Workflow> WorkspaceInstanceWorkerContext<W>
             Connection::open("control-connection-3", "amqp://guest:guest@127.0.0.1:5672").await?;
         let mut fe2o3_session = Session::begin(&mut fe2o3_connection).await?;
 
-        let next_step_sender = {
-            let addr = format!("{}-next-steps", W::NAME);
-            let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
-            let sender: Sender = Sender::attach(&mut fe2o3_session, link_name, addr).await?;
-            RabbitMqNextStepSender(sender, PhantomData)
-        };
+        let next_step_sender = RabbitMqNextStepSender::new(&mut fe2o3_session).await?;
 
         let instance_receiver = {
             let receiver = Receiver::attach(
