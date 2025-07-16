@@ -5,10 +5,7 @@ use sqlx::{PgConnection, query_as};
 use std::{marker::PhantomData, sync::Arc};
 use tokio::sync::Mutex;
 
-use crate::{
-    event::EventSender,
-    workflows::{TxState, Workflow, WorkflowId, WorkflowInstanceId},
-};
+use crate::{workers::rabbitmq_adapter::senders::RabbitMqEventSender, workflows::{TxState, Workflow, WorkflowId, WorkflowInstanceId}};
 
 pub mod event;
 pub mod step;
@@ -16,7 +13,7 @@ pub mod workers;
 pub mod workflows;
 
 pub struct AppState<W: Workflow> {
-    pub event_sender: EventSender<W>,
+    pub event_sender: RabbitMqEventSender<W>,
     pub workflow_instance_manager: WorkflowInstanceManager<W>,
     pub sqlx_tx_state: TxState,
 }

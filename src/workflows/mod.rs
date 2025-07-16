@@ -1,7 +1,5 @@
 use crate::{
-    AppState, ArcAppState, WorkflowInstance, WorkflowInstanceManager,
-    event::{Event, EventSender, InstanceEvent},
-    step::{Step, StepWithSettings, WorkflowStep},
+    event::{Event,  InstanceEvent}, step::{Step, StepWithSettings, WorkflowStep}, workers::{adapters::senders::EventSender, rabbitmq_adapter::senders::RabbitMqEventSender}, AppState, ArcAppState, WorkflowInstance, WorkflowInstanceManager
 };
 use aide::{NoApi, OperationIo, axum::ApiRouter};
 use axum::{
@@ -82,7 +80,7 @@ pub async fn init_app_state<W: Workflow>(
     )
     .await?;
 
-    let event_sender = EventSender::<W>::new(session).await?;
+    let event_sender = RabbitMqEventSender::<W>::new(session).await?;
 
     Ok(ArcAppState(Arc::new(AppState {
         event_sender,
