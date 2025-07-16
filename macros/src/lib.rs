@@ -215,13 +215,17 @@ pub fn my_main(item: TokenStream) -> TokenStream {
     let router_build = if let Some(first) = types.next() {
         let merges = types.map(|ty| {
             quote! {
-                .merge(#ty::control_router(sqlx_tx_state.clone(), &mut session).await?)
+                .merge(#ty::control_router()
+                .await?
+                .with_state(init_app_state::<#ty, ControlServerDependencies<#ty>>(sqlx_tx_state.clone(), &mut session).await?)
+                )
             }
         });
         quote! {
             #[cfg(feature = "control_server")]
-            let router = #first::control_router(sqlx_tx_state.clone(), &mut session)
+            let router = #first::control_router()
                 .await?
+                .with_state(init_app_state::<#first, ControlServerDependencies<#first>>(sqlx_tx_state.clone(), &mut session).await?)
                 #(#merges)*;
         }
     } else {

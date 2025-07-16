@@ -5,22 +5,29 @@ use sqlx::{PgConnection, query_as};
 use std::{marker::PhantomData, sync::Arc};
 use tokio::sync::Mutex;
 
-use crate::{workers::rabbitmq_adapter::senders::RabbitMqEventSender, workflows::{TxState, Workflow, WorkflowId, WorkflowInstanceId}};
+use crate::{
+    workers::adapters::senders::EventSender,
+    workflows::{TxState, Workflow, WorkflowId, WorkflowInstanceId},
+};
 
 pub mod event;
 pub mod step;
 pub mod workers;
 pub mod workflows;
 
-pub struct AppState<W: Workflow> {
-    pub event_sender: RabbitMqEventSender<W>,
+pub struct AppState<W: Workflow, E: EventSender<W>> {
+    pub event_sender: E,
     pub workflow_instance_manager: WorkflowInstanceManager<W>,
     pub sqlx_tx_state: TxState,
 }
 
-#[derive(Clone)]
-pub struct ArcAppState<W: Workflow>(pub Arc<AppState<W>>);
+pub struct ArcAppState<W: Workflow, E: EventSender<W>>(pub Arc<AppState<W, E>>);
 
+impl<W: Workflow, E: EventSender<W>> Clone for ArcAppState<W, E> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 // must be thread-safe
 #[derive(Debug)]
 pub struct WorkflowInstanceManager<W: Workflow> {

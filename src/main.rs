@@ -16,6 +16,10 @@ use rust_workflow_2::workers::rabbitmq_adapter::dependencies::next_step_worker::
 use rust_workflow_2::workers::rabbitmq_adapter::dependencies::workspace_instance_worker::RabbitMqWorkspaceInstanceWorkerDependencies;
 use rust_workflow_2::workers::workspace_instance_worker::{self};
 use rust_workflow_2::workflows::{TxState, workflow_0::Workflow0};
+use rust_workflow_2::{
+    workers::rabbitmq_adapter::dependencies::control_server::RabbitMqControlServerDependencies,
+    workflows::init_app_state,
+};
 
 use fe2o3_amqp::{Session, connection::ConnectionHandle, session::SessionHandle};
 use rust_workflow_2::workflows::{Tx, TxLayer, Workflow, WorkflowControl, workflow_1::Workflow1};
@@ -67,7 +71,7 @@ async fn control_server_setup()
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
-
+    type ControlServerDependencies<W> = RabbitMqControlServerDependencies<W, (), ()>;
     my_main!(Workflow0, Workflow1);
 
     Ok(())

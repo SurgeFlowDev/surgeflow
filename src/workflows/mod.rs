@@ -1,5 +1,8 @@
 use crate::{
-    event::{Event,  InstanceEvent}, step::{Step, StepWithSettings, WorkflowStep}, workers::{adapters::senders::EventSender, rabbitmq_adapter::senders::RabbitMqEventSender}, AppState, ArcAppState, WorkflowInstance, WorkflowInstanceManager
+    AppState, ArcAppState, WorkflowInstance, WorkflowInstanceManager,
+    event::{Event, InstanceEvent},
+    step::{Step, StepWithSettings, WorkflowStep},
+    workers::adapters::{dependencies::control_server::ControlServerContext, senders::EventSender},
 };
 use aide::{NoApi, OperationIo, axum::ApiRouter};
 use axum::{
@@ -63,16 +66,16 @@ pub type Tx = axum_sqlx_tx::Tx<sqlx::Postgres>;
 pub type TxState = axum_sqlx_tx::State<Postgres>;
 pub type TxLayer = axum_sqlx_tx::Layer<Postgres, axum_sqlx_tx::Error>;
 
-impl<W: Workflow> FromRef<ArcAppState<W>> for TxState {
-    fn from_ref(input: &ArcAppState<W>) -> Self {
+impl<W: Workflow, E: EventSender<W>> FromRef<ArcAppState<W, E>> for TxState {
+    fn from_ref(input: &ArcAppState<W, E>) -> Self {
         input.0.sqlx_tx_state.clone()
     }
 }
 
-pub async fn init_app_state<W: Workflow>(
+pub async fn init_app_state<W: Workflow, D: ControlServerContext<W>>(
     sqlx_tx_state: TxState,
     session: &mut SessionHandle<()>,
-) -> anyhow::Result<ArcAppState<W>> {
+) -> anyhow::Result<ArcAppState<W, D::EventSender>> {
     let instance_sender = Sender::attach(
         session,
         format!("{}-instances-receiver-1", W::NAME),
@@ -80,7 +83,10 @@ pub async fn init_app_state<W: Workflow>(
     )
     .await?;
 
-    let event_sender = RabbitMqEventSender::<W>::new(session).await?;
+    let dependencies = D::dependencies().await?;
+
+    // TODO
+    let event_sender = dependencies.event_sender;
 
     Ok(ArcAppState(Arc::new(AppState {
         event_sender,
@@ -93,10 +99,8 @@ pub async fn init_app_state<W: Workflow>(
 }
 
 pub trait WorkflowControl: Workflow {
-    fn control_router(
-        sqlx_tx_state: TxState,
-        session: &mut SessionHandle<()>,
-    ) -> impl Future<Output = anyhow::Result<ApiRouter<()>>> + Send {
+    fn control_router<E: EventSender<Self> + Send + Sync + 'static>()
+    -> impl Future<Output = anyhow::Result<ApiRouter<ArcAppState<Self, E>>>> + Send {
         async {
             let post_workflow_event_api_route = Self::post_workflow_event_api_route();
             let post_workflow_instance_api_route = Self::post_workflow_instance_api_route();
@@ -105,14 +109,14 @@ pub trait WorkflowControl: Workflow {
                 &format!("/workflow/{}", Self::NAME),
                 ApiRouter::new()
                     .merge(post_workflow_instance_api_route)
-                    .merge(post_workflow_event_api_route)
-                    .with_state(init_app_state::<Self>(sqlx_tx_state, session).await?),
+                    .merge(post_workflow_event_api_route),
             );
             Ok(router)
         }
     }
 
-    fn post_workflow_event_api_route() -> ApiRouter<ArcAppState<Self>> {
+    fn post_workflow_event_api_route<E: EventSender<Self> + Send + Sync + 'static>()
+    -> ApiRouter<ArcAppState<Self, E>> {
         #[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
         #[typed_path("/{instance_id}/event")]
         pub struct PostWorkflowEvent {
@@ -136,9 +140,9 @@ pub trait WorkflowControl: Workflow {
         }
 
         // more readable than a closure
-        async fn handler<T: Workflow>(
+        async fn handler<T: Workflow, E: EventSender<T>>(
             PostWorkflowEvent { instance_id }: PostWorkflowEvent,
-            State(ArcAppState(state)): State<ArcAppState<T>>,
+            State(ArcAppState(state)): State<ArcAppState<T, E>>,
             Json(event): Json<<T as Workflow>::Event>,
         ) -> Result<(), PostWorkflowEventError> {
             state
@@ -158,7 +162,8 @@ pub trait WorkflowControl: Workflow {
         })
     }
 
-    fn post_workflow_instance_api_route() -> ApiRouter<ArcAppState<Self>> {
+    fn post_workflow_instance_api_route<E: EventSender<Self> + Send + Sync + 'static>()
+    -> ApiRouter<ArcAppState<Self, E>> {
         #[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
         #[typed_path("/")]
         pub struct PostWorkflowInstance;
@@ -180,10 +185,10 @@ pub trait WorkflowControl: Workflow {
         }
 
         // more readable than a closure
-        async fn handler<T: Workflow>(
+        async fn handler<T: Workflow, E: EventSender<T>>(
             _: PostWorkflowInstance,
             NoApi(mut tx): NoApi<Tx>,
-            State(ArcAppState(state)): State<ArcAppState<T>>,
+            State(ArcAppState(state)): State<ArcAppState<T, E>>,
         ) -> Result<Json<WorkflowInstance>, PostWorkflowInstanceError> {
             tracing::info!("creating instance...");
             let res = state
