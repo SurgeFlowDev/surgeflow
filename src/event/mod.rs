@@ -1,4 +1,4 @@
-use fe2o3_amqp::{Receiver, Sender, session::SessionHandle};
+use fe2o3_amqp::{Sender, session::SessionHandle};
 use futures::lock::Mutex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -23,35 +23,6 @@ pub struct InstanceEvent<W: Workflow> {
     #[serde(bound = "")]
     pub event: W::Event,
     pub instance_id: WorkflowInstanceId,
-}
-
-#[derive(Debug)]
-pub struct EventReceiver<W: Workflow>(Receiver, PhantomData<W>);
-
-impl<W: Workflow> EventReceiver<W> {
-    pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
-        let addr = format!("{}-events", W::NAME);
-        let link_name = format!("{addr}-receiver-{}", Uuid::new_v4().as_hyphenated());
-        let receiver = Receiver::attach(session, link_name, addr).await?;
-        Ok(Self(receiver, PhantomData))
-    }
-    pub async fn recv(&mut self) -> anyhow::Result<InstanceEvent<W>> {
-        // TODO: using string while developing, change to Vec<u8> in production
-        let msg = self.0.recv::<String>().await?;
-
-        let event = match serde_json::from_str(msg.body()) {
-            Ok(event) => event,
-            Err(e) => {
-                let err = anyhow::anyhow!("Failed to deserialize step: {}", e);
-                tracing::error!("{}", err);
-                self.0.reject(msg, None).await?;
-                return Err(err);
-            }
-        };
-        self.0.accept(msg).await?;
-
-        Ok(event)
-    }
 }
 
 // must be thread-safe
