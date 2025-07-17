@@ -13,23 +13,23 @@ use crate::{
 use tokio::sync::Mutex;
 
 #[derive(Debug)]
-pub struct RabbitMqNextStepSender<W: Workflow> {
+pub struct AzureServiceBusNextStepSender<W: Workflow> {
     sender: ServiceBusSender,
     _marker: PhantomData<W>,
 }
 
-impl<W: Workflow> NextStepSender<W> for RabbitMqNextStepSender<W> {
+impl<W: Workflow> NextStepSender<W> for AzureServiceBusNextStepSender<W> {
     async fn send(
         &mut self,
         step: FullyQualifiedStep<<W as Workflow>::Step>,
     ) -> anyhow::Result<()> {
-        // TODO: using string while developing, change to Vec<u8> in production
+        // TODO: using json, could use bincode in production
         self.sender.send_message(serde_json::to_vec(&step)?).await?;
         Ok(())
     }
 }
 
-impl<W: Workflow> RabbitMqNextStepSender<W> {
+impl<W: Workflow> AzureServiceBusNextStepSender<W> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -46,23 +46,23 @@ impl<W: Workflow> RabbitMqNextStepSender<W> {
 }
 
 #[derive(Debug)]
-pub struct RabbitMqActiveStepSender<W: Workflow> {
+pub struct AzureServiceBusActiveStepSender<W: Workflow> {
     sender: ServiceBusSender,
     _marker: PhantomData<W>,
 }
 
-impl<W: Workflow> ActiveStepSender<W> for RabbitMqActiveStepSender<W> {
+impl<W: Workflow> ActiveStepSender<W> for AzureServiceBusActiveStepSender<W> {
     async fn send(
         &mut self,
         step: FullyQualifiedStep<<W as Workflow>::Step>,
     ) -> anyhow::Result<()> {
-        // TODO: using string while developing, change to Vec<u8> in production
+        // TODO: using json, could use bincode in production
         self.sender.send_message(serde_json::to_vec(&step)?).await?;
         Ok(())
     }
 }
 
-impl<W: Workflow> RabbitMqActiveStepSender<W> {
+impl<W: Workflow> AzureServiceBusActiveStepSender<W> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -80,23 +80,23 @@ impl<W: Workflow> RabbitMqActiveStepSender<W> {
 
 // TODO: fields should not be pub?
 #[derive(Debug)]
-pub struct RabbitMqFailedStepSender<W: Workflow> {
+pub struct AzureServiceBusFailedStepSender<W: Workflow> {
     sender: ServiceBusSender,
     _marker: PhantomData<W>,
 }
 
-impl<W: Workflow> FailedStepSender<W> for RabbitMqFailedStepSender<W> {
+impl<W: Workflow> FailedStepSender<W> for AzureServiceBusFailedStepSender<W> {
     async fn send(
         &mut self,
         step: FullyQualifiedStep<<W as Workflow>::Step>,
     ) -> anyhow::Result<()> {
-        // TODO: using string while developing, change to Vec<u8> in production
+        // TODO: using json, could use bincode in production
         self.sender.send_message(serde_json::to_vec(&step)?).await?;
         Ok(())
     }
 }
 
-impl<W: Workflow> RabbitMqFailedStepSender<W> {
+impl<W: Workflow> AzureServiceBusFailedStepSender<W> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -120,7 +120,7 @@ pub struct AzureServiceBusEventSender<W: Workflow> {
 
 impl<W: Workflow> EventSender<W> for AzureServiceBusEventSender<W> {
     async fn send(&self, step: InstanceEvent<W>) -> anyhow::Result<()> {
-        // TODO: using string while developing, change to Vec<u8> in production
+        // TODO: using json, could use bincode in production
         self.sender
             .lock()
             .await
