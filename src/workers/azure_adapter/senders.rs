@@ -1,11 +1,24 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 
+use azservicebus::{
+    ServiceBusClient, ServiceBusClientOptions, ServiceBusMessage, ServiceBusRetryPolicy,
+    ServiceBusSender, ServiceBusSenderOptions,
+    primitives::service_bus_retry_policy::ServiceBusRetryPolicyExt,
+};
+use azure_core::{HttpClient, RetryPolicy};
+use azure_messaging_servicebus::{
+    prelude::QueueClient,
+    service_bus::{SendMessageOptions, SettableBrokerProperties},
+};
 use fe2o3_amqp::{Sender, session::SessionHandle};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::{
-    event::InstanceEvent, step::FullyQualifiedStep, workers::adapters::senders::{ActiveStepSender, EventSender, FailedStepSender, NextStepSender}, workflows::Workflow
+    event::InstanceEvent,
+    step::FullyQualifiedStep,
+    workers::adapters::senders::{ActiveStepSender, EventSender, FailedStepSender, NextStepSender},
+    workflows::Workflow,
 };
 
 // TODO: fields should not be pub?
@@ -83,29 +96,33 @@ impl<W: Workflow> RabbitMqFailedStepSender<W> {
     }
 }
 
-// TODO: fields should not be pub?
 #[derive(Debug)]
-pub struct RabbitMqEventSender<W: Workflow>(Mutex<Sender>, PhantomData<W>);
+pub struct AzureServiceBusEventSender<W: Workflow> {
+    sender: Mutex<ServiceBusSender>,
+    _marker: PhantomData<W>,
+}
 
-impl<W: Workflow> EventSender<W> for RabbitMqEventSender<W> {
-    async fn send(
-        &self,
-        step: InstanceEvent<W>,
-    ) -> anyhow::Result<()> {
-        let mut sender = self.0.lock().await;
+impl<W: Workflow> EventSender<W> for AzureServiceBusEventSender<W> {
+    async fn send(&self, step: InstanceEvent<W>) -> anyhow::Result<()> {
+        let mut sender = self.sender.lock().await;
+        sender.send_message(serde_json::to_vec(&step)?).await?;
 
-        // TODO: using string while developing, change to Vec<u8> in production
-        let event = serde_json::to_string(&step)?;
-        sender.send(event).await?;
         Ok(())
     }
 }
 
-impl<W: Workflow> RabbitMqEventSender<W> {
-    pub async fn new<T>(session: &mut SessionHandle<T>) -> anyhow::Result<Self> {
-        let addr = format!("{}-events", W::NAME);
-        let link_name = format!("{addr}-sender-{}", Uuid::new_v4().as_hyphenated());
-        let sender = Sender::attach(session, link_name, addr).await?;
-        Ok(Self(Mutex::new(sender), PhantomData))
+impl<W: Workflow> AzureServiceBusEventSender<W> {
+    pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
+        service_bus_client: &mut ServiceBusClient<RP>,
+        queue_name: &str,
+    ) -> anyhow::Result<Self> {
+        let sender = service_bus_client
+            .create_sender(queue_name, ServiceBusSenderOptions::default())
+            .await?;
+
+        Ok(Self {
+            sender: Mutex::new(sender),
+            _marker: PhantomData,
+        })
     }
 }
