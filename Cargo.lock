@@ -679,13 +679,31 @@ dependencies = [
  "async-trait",
  "bytes",
  "futures",
+ "hmac",
  "pin-project",
  "rustc_version",
  "serde",
  "serde_json",
+ "sha2",
  "tracing",
  "typespec",
  "typespec_client_core",
+]
+
+[[package]]
+name = "azure_data_cosmos"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "765c555a888d70fd3d6c12168e686a94afff698be77bbe2cfc3e217d1857f968"
+dependencies = [
+ "async-trait",
+ "azure_core 0.25.0",
+ "futures",
+ "serde",
+ "serde_json",
+ "tracing",
+ "typespec_client_core",
+ "url",
 ]
 
 [[package]]
@@ -3163,6 +3181,7 @@ dependencies = [
  "axum_thiserror",
  "azservicebus",
  "azure_core 0.21.0",
+ "azure_data_cosmos",
  "azure_messaging_servicebus",
  "bytes",
  "derive_more",
@@ -3186,6 +3205,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "typemap_rev",
+ "typespec",
  "uuid",
 ]
 
