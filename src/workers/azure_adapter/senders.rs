@@ -1,15 +1,10 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData};
 
 use azservicebus::{
-    ServiceBusClient, ServiceBusClientOptions, ServiceBusMessage, ServiceBusRetryPolicy,
-    ServiceBusSender, ServiceBusSenderOptions,
+    ServiceBusClient, ServiceBusSender, ServiceBusSenderOptions, ServiceBusClientOptions,
     primitives::service_bus_retry_policy::ServiceBusRetryPolicyExt,
 };
-use azure_core::{HttpClient, RetryPolicy};
-use azure_messaging_servicebus::{
-    prelude::QueueClient,
-    service_bus::{SendMessageOptions, SettableBrokerProperties},
-};
+
 use fe2o3_amqp::{Sender, session::SessionHandle};
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -118,6 +113,105 @@ impl<W: Workflow> AzureServiceBusEventSender<W> {
     ) -> anyhow::Result<Self> {
         let sender = service_bus_client
             .create_sender(queue_name, ServiceBusSenderOptions::default())
+            .await?;
+
+        Ok(Self {
+            sender: Mutex::new(sender),
+            _marker: PhantomData,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct AzureServiceBusNextStepSender<W: Workflow> {
+    sender: Mutex<ServiceBusSender>,
+    _marker: PhantomData<W>,
+}
+
+impl<W: Workflow> NextStepSender<W> for AzureServiceBusNextStepSender<W> {
+    async fn send(
+        &mut self,
+        step: FullyQualifiedStep<<W as Workflow>::Step>,
+    ) -> anyhow::Result<()> {
+        let mut sender = self.sender.lock().await;
+        sender.send_message(serde_json::to_vec(&step)?).await?;
+        Ok(())
+    }
+}
+
+impl<W: Workflow> AzureServiceBusNextStepSender<W> {
+    pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
+        service_bus_client: &mut ServiceBusClient<RP>,
+    ) -> anyhow::Result<Self> {
+        let queue_name = format!("{}-next-steps", W::NAME);
+        let sender = service_bus_client
+            .create_sender(&queue_name, ServiceBusSenderOptions::default())
+            .await?;
+
+        Ok(Self {
+            sender: Mutex::new(sender),
+            _marker: PhantomData,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct AzureServiceBusActiveStepSender<W: Workflow> {
+    sender: Mutex<ServiceBusSender>,
+    _marker: PhantomData<W>,
+}
+
+impl<W: Workflow> ActiveStepSender<W> for AzureServiceBusActiveStepSender<W> {
+    async fn send(
+        &mut self,
+        step: FullyQualifiedStep<<W as Workflow>::Step>,
+    ) -> anyhow::Result<()> {
+        let mut sender = self.sender.lock().await;
+        sender.send_message(serde_json::to_vec(&step)?).await?;
+        Ok(())
+    }
+}
+
+impl<W: Workflow> AzureServiceBusActiveStepSender<W> {
+    pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
+        service_bus_client: &mut ServiceBusClient<RP>,
+    ) -> anyhow::Result<Self> {
+        let queue_name = format!("{}-active-steps", W::NAME);
+        let sender = service_bus_client
+            .create_sender(&queue_name, ServiceBusSenderOptions::default())
+            .await?;
+
+        Ok(Self {
+            sender: Mutex::new(sender),
+            _marker: PhantomData,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct AzureServiceBusFailedStepSender<W: Workflow> {
+    sender: Mutex<ServiceBusSender>,
+    _marker: PhantomData<W>,
+}
+
+impl<W: Workflow> FailedStepSender<W> for AzureServiceBusFailedStepSender<W> {
+    async fn send(
+        &mut self,
+        step: FullyQualifiedStep<<W as Workflow>::Step>,
+    ) -> anyhow::Result<()> {
+        let mut sender = self.sender.lock().await;
+        sender.send_message(serde_json::to_vec(&step)?).await?;
+        Ok(())
+    }
+}
+
+impl<W: Workflow> AzureServiceBusFailedStepSender<W> {
+    pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
+        service_bus_client: &mut ServiceBusClient<RP>,
+    ) -> anyhow::Result<Self> {
+        let queue_name = format!("{}-failed-steps", W::NAME);
+        let sender = service_bus_client
+            .create_sender(&queue_name, ServiceBusSenderOptions::default())
             .await?;
 
         Ok(Self {
