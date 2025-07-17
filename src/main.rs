@@ -70,6 +70,7 @@ async fn control_server_setup()
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
     // this shouldn't have to be hard coded
