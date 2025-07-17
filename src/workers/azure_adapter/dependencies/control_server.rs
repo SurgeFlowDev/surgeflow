@@ -27,7 +27,7 @@ impl<W: Workflow> ControlServerContext<W> for AzureServiceBusControlServerDepend
         )
         .await?;
 
-        let mut fe2o3_session = Session::begin(&mut fe2o3_connection).await?;
+        let fe2o3_session = Session::begin(&mut fe2o3_connection).await?;
 
         let mut service_bus_client = ServiceBusClient::with_custom_retry_policy::<BasicRetryPolicy>()
             .new_from_connection_string(
