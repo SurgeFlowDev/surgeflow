@@ -13,19 +13,17 @@ use azservicebus::{
     primitives::service_bus_received_message::ServiceBusReceivedMessage,
 };
 use std::marker::PhantomData;
-use tokio::sync::Mutex;
 
 #[derive(Debug)]
 pub struct AzureServiceBusInstanceReceiver<W: Workflow> {
-    receiver: Mutex<ServiceBusReceiver>,
+    receiver: ServiceBusReceiver,
     _marker: PhantomData<W>,
 }
 
 impl<W: Workflow> InstanceReceiver<W> for AzureServiceBusInstanceReceiver<W> {
     type Handle = ServiceBusReceivedMessage;
     async fn receive(&mut self) -> anyhow::Result<(WorkflowInstance, ServiceBusReceivedMessage)> {
-        let mut receiver = self.receiver.lock().await;
-        let message = receiver.receive_message().await?;
+        let message = self.receiver.receive_message().await?;
 
         let body = message.body()?;
         let event = match serde_json::from_slice(body) {
@@ -33,7 +31,7 @@ impl<W: Workflow> InstanceReceiver<W> for AzureServiceBusInstanceReceiver<W> {
             Err(e) => {
                 let err = anyhow::anyhow!("Failed to deserialize workflow instance: {}", e);
                 tracing::error!("{}", err);
-                receiver.abandon_message(&message, None).await?;
+                self.receiver.abandon_message(&message, None).await?;
                 return Err(err);
             }
         };
@@ -41,8 +39,7 @@ impl<W: Workflow> InstanceReceiver<W> for AzureServiceBusInstanceReceiver<W> {
     }
 
     async fn accept(&mut self, handle: ServiceBusReceivedMessage) -> anyhow::Result<()> {
-        let mut receiver = self.receiver.lock().await;
-        receiver.complete_message(&handle).await.map_err(Into::into)
+        self.receiver.complete_message(&handle).await.map_err(Into::into)
     }
 }
 
@@ -56,7 +53,7 @@ impl<W: Workflow> AzureServiceBusInstanceReceiver<W> {
             .await?;
 
         Ok(Self {
-            receiver: Mutex::new(receiver),
+            receiver,
             _marker: PhantomData,
         })
     }
@@ -64,15 +61,14 @@ impl<W: Workflow> AzureServiceBusInstanceReceiver<W> {
 
 #[derive(Debug)]
 pub struct AzureServiceBusEventReceiver<W: Workflow> {
-    receiver: Mutex<ServiceBusReceiver>,
+    receiver: ServiceBusReceiver,
     _marker: PhantomData<W>,
 }
 
 impl<W: Workflow> EventReceiver<W> for AzureServiceBusEventReceiver<W> {
     type Handle = ServiceBusReceivedMessage;
     async fn receive(&mut self) -> anyhow::Result<(InstanceEvent<W>, ServiceBusReceivedMessage)> {
-        let mut receiver = self.receiver.lock().await;
-        let message = receiver.receive_message().await?;
+        let message = self.receiver.receive_message().await?;
 
         let body = message.body()?;
         let event = match serde_json::from_slice(body) {
@@ -80,7 +76,7 @@ impl<W: Workflow> EventReceiver<W> for AzureServiceBusEventReceiver<W> {
             Err(e) => {
                 let err = anyhow::anyhow!("Failed to deserialize event: {}", e);
                 tracing::error!("{}", err);
-                receiver.abandon_message(&message, None).await?;
+                self.receiver.abandon_message(&message, None).await?;
                 return Err(err);
             }
         };
@@ -88,8 +84,7 @@ impl<W: Workflow> EventReceiver<W> for AzureServiceBusEventReceiver<W> {
     }
 
     async fn accept(&mut self, handle: ServiceBusReceivedMessage) -> anyhow::Result<()> {
-        let mut receiver = self.receiver.lock().await;
-        receiver.complete_message(&handle).await.map_err(Into::into)
+        self.receiver.complete_message(&handle).await.map_err(Into::into)
     }
 }
 
@@ -103,22 +98,21 @@ impl<W: Workflow> AzureServiceBusEventReceiver<W> {
             .await?;
 
         Ok(Self {
-            receiver: Mutex::new(receiver),
+            receiver,
             _marker: PhantomData,
         })
     }
 }
 #[derive(Debug)]
 pub struct AzureServiceBusNextStepReceiver<W: Workflow> {
-    receiver: Mutex<ServiceBusReceiver>,
+    receiver: ServiceBusReceiver,
     _marker: PhantomData<W>,
 }
 
 impl<W: Workflow> NextStepReceiver<W> for AzureServiceBusNextStepReceiver<W> {
     type Handle = ServiceBusReceivedMessage;
     async fn receive(&mut self) -> anyhow::Result<(FullyQualifiedStep<W::Step>, ServiceBusReceivedMessage)> {
-        let mut receiver = self.receiver.lock().await;
-        let message = receiver.receive_message().await?;
+        let message = self.receiver.receive_message().await?;
 
         let body = message.body()?;
         let event = match serde_json::from_slice(body) {
@@ -126,7 +120,7 @@ impl<W: Workflow> NextStepReceiver<W> for AzureServiceBusNextStepReceiver<W> {
             Err(e) => {
                 let err = anyhow::anyhow!("Failed to deserialize step: {}", e);
                 tracing::error!("{}", err);
-                receiver.abandon_message(&message, None).await?;
+                self.receiver.abandon_message(&message, None).await?;
                 return Err(err);
             }
         };
@@ -134,8 +128,7 @@ impl<W: Workflow> NextStepReceiver<W> for AzureServiceBusNextStepReceiver<W> {
     }
 
     async fn accept(&mut self, handle: ServiceBusReceivedMessage) -> anyhow::Result<()> {
-        let mut receiver = self.receiver.lock().await;
-        receiver.complete_message(&handle).await.map_err(Into::into)
+        self.receiver.complete_message(&handle).await.map_err(Into::into)
     }
 }
 
@@ -149,7 +142,7 @@ impl<W: Workflow> AzureServiceBusNextStepReceiver<W> {
             .await?;
 
         Ok(Self {
-            receiver: Mutex::new(receiver),
+            receiver,
             _marker: PhantomData,
         })
     }
@@ -157,15 +150,14 @@ impl<W: Workflow> AzureServiceBusNextStepReceiver<W> {
 
 #[derive(Debug)]
 pub struct AzureServiceBusActiveStepReceiver<W: Workflow> {
-    receiver: Mutex<ServiceBusReceiver>,
+    receiver: ServiceBusReceiver,
     _marker: PhantomData<W>,
 }
 
 impl<W: Workflow> ActiveStepReceiver<W> for AzureServiceBusActiveStepReceiver<W> {
     type Handle = ServiceBusReceivedMessage;
     async fn receive(&mut self) -> anyhow::Result<(FullyQualifiedStep<W::Step>, ServiceBusReceivedMessage)> {
-        let mut receiver = self.receiver.lock().await;
-        let message = receiver.receive_message().await?;
+        let message = self.receiver.receive_message().await?;
 
         let body = message.body()?;
         let event = match serde_json::from_slice(body) {
@@ -173,7 +165,7 @@ impl<W: Workflow> ActiveStepReceiver<W> for AzureServiceBusActiveStepReceiver<W>
             Err(e) => {
                 let err = anyhow::anyhow!("Failed to deserialize step: {}", e);
                 tracing::error!("{}", err);
-                receiver.abandon_message(&message, None).await?;
+                self.receiver.abandon_message(&message, None).await?;
                 return Err(err);
             }
         };
@@ -181,8 +173,7 @@ impl<W: Workflow> ActiveStepReceiver<W> for AzureServiceBusActiveStepReceiver<W>
     }
 
     async fn accept(&mut self, handle: ServiceBusReceivedMessage) -> anyhow::Result<()> {
-        let mut receiver = self.receiver.lock().await;
-        receiver.complete_message(&handle).await.map_err(Into::into)
+        self.receiver.complete_message(&handle).await.map_err(Into::into)
     }
 }
 
@@ -196,7 +187,7 @@ impl<W: Workflow> AzureServiceBusActiveStepReceiver<W> {
             .await?;
 
         Ok(Self {
-            receiver: Mutex::new(receiver),
+            receiver,
             _marker: PhantomData,
         })
     }
