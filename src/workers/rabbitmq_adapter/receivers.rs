@@ -1,10 +1,10 @@
 use crate::{
-    WorkflowInstance,
+    
     event::InstanceEvent,
     step::FullyQualifiedStep,
-    workers::adapters::receivers::{
+    workers::adapters::{managers::WorkflowInstance, receivers::{
         ActiveStepReceiver, EventReceiver, InstanceReceiver, NextStepReceiver,
-    },
+    }},
     workflows::Workflow,
 };
 use fe2o3_amqp::{Receiver, link::delivery::DeliveryInfo, session::SessionHandle};

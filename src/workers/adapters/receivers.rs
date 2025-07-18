@@ -1,5 +1,6 @@
 use crate::{
-    WorkflowInstance, event::InstanceEvent, step::FullyQualifiedStep, workflows::Workflow,
+    event::InstanceEvent, step::FullyQualifiedStep, workers::adapters::managers::WorkflowInstance,
+    workflows::Workflow,
 };
 
 pub trait InstanceReceiver<W: Workflow>: Sized {

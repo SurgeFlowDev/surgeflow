@@ -7,7 +7,12 @@ use std::marker::PhantomData;
 use crate::{
     event::InstanceEvent,
     step::FullyQualifiedStep,
-    workers::adapters::senders::{ActiveStepSender, EventSender, FailedStepSender, NextStepSender},
+    workers::adapters::{
+        managers::WorkflowInstance,
+        senders::{
+            ActiveStepSender, EventSender, FailedStepSender, InstanceSender, NextStepSender,
+        },
+    },
     workflows::Workflow,
 };
 use tokio::sync::Mutex;
@@ -132,6 +137,41 @@ impl<W: Workflow> EventSender<W> for AzureServiceBusEventSender<W> {
 }
 
 impl<W: Workflow> AzureServiceBusEventSender<W> {
+    pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
+        service_bus_client: &mut ServiceBusClient<RP>,
+        queue_name: &str,
+    ) -> anyhow::Result<Self> {
+        let sender = service_bus_client
+            .create_sender(queue_name, ServiceBusSenderOptions::default())
+            .await?;
+
+        Ok(Self {
+            sender: Mutex::new(sender),
+            _marker: PhantomData,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct AzureServiceBusInstanceSender<W: Workflow> {
+    sender: Mutex<ServiceBusSender>,
+    _marker: PhantomData<W>,
+}
+
+impl<W: Workflow> InstanceSender<W> for AzureServiceBusInstanceSender<W> {
+    async fn send(&self, step: &WorkflowInstance) -> anyhow::Result<()> {
+        // TODO: using json, could use bincode in production
+        self.sender
+            .lock()
+            .await
+            .send_message(serde_json::to_vec(step)?)
+            .await?;
+
+        Ok(())
+    }
+}
+
+impl<W: Workflow> AzureServiceBusInstanceSender<W> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,

@@ -114,3 +114,94 @@ where
         Err(e) => Err(e),
     }
 }
+
+mod workflow_instance_manager {
+    use std::marker::PhantomData;
+
+    use azservicebus::{
+        ServiceBusClient, primitives::service_bus_retry_policy::ServiceBusRetryPolicyExt,
+    };
+    use sqlx::{PgConnection, query_as};
+
+    use crate::{
+        workers::{
+            adapters::{
+                managers::{WorkflowInstance, WorkflowInstanceManager},
+                senders::InstanceSender,
+            },
+            azure_adapter::senders::AzureServiceBusInstanceSender,
+        },
+        workflows::Workflow,
+    };
+
+    // must be thread-safe
+    #[derive(Debug)]
+    pub struct AzureServiceBusWorkflowInstanceManager<W: Workflow> {
+        sender: AzureServiceBusInstanceSender<W>,
+        _marker: PhantomData<W>,
+    }
+    impl<W: Workflow> AzureServiceBusWorkflowInstanceManager<W> {
+        pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
+            service_bus_client: &mut ServiceBusClient<RP>,
+            instance_queue_name: &str,
+        ) -> anyhow::Result<Self> {
+            let sender =
+                AzureServiceBusInstanceSender::<W>::new(service_bus_client, instance_queue_name)
+                    .await?;
+            Ok(Self {
+                sender,
+                _marker: PhantomData,
+            })
+        }
+    }
+
+    struct WorkflowInstanceRecord {
+        pub id: i32,
+        pub workflow_id: i32,
+    }
+
+    impl<W: Workflow> WorkflowInstanceManager<W> for AzureServiceBusWorkflowInstanceManager<W> {
+        async fn create_instance(
+            &self,
+            conn: &mut PgConnection,
+        ) -> anyhow::Result<WorkflowInstance> {
+            let res = query_as!(
+                WorkflowInstanceRecord,
+                r#"
+            INSERT INTO workflow_instances ("workflow_id")
+            SELECT "id"
+            FROM workflows
+            WHERE "name" = $1
+            RETURNING "id", "workflow_id";
+        "#,
+                W::NAME
+            )
+            .fetch_one(conn)
+            .await?;
+
+            let res = res.try_into()?;
+
+            self.sender.send(&res).await?;
+            Ok(res)
+        }
+    }
+
+    impl TryFrom<WorkflowInstanceRecord> for WorkflowInstance {
+        type Error = WorkflowInstanceError;
+
+        fn try_from(value: WorkflowInstanceRecord) -> Result<Self, Self::Error> {
+            Ok(WorkflowInstance {
+                id: value.id.into(),
+                workflow_id: value.workflow_id.into(),
+            })
+        }
+    }
+
+    #[derive(Debug, thiserror::Error)]
+    pub enum WorkflowInstanceError {
+        #[error("Database error")]
+        Database(#[from] sqlx::Error),
+    }
+}
+
+pub use workflow_instance_manager::AzureServiceBusWorkflowInstanceManager;

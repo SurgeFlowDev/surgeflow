@@ -9,15 +9,15 @@ use axum::{
 };
 use macros::my_main;
 use rust_workflow_2::workers::active_step_worker;
+use rust_workflow_2::workers::azure_adapter::dependencies::active_step_worker::AzureServiceBusActiveStepWorkerDependencies;
+use rust_workflow_2::workers::azure_adapter::dependencies::new_event_worker::AzureServiceBusNewEventWorkerDependencies;
+use rust_workflow_2::workers::azure_adapter::dependencies::next_step_worker::AzureServiceBusNextStepWorkerDependencies;
+use rust_workflow_2::workers::azure_adapter::dependencies::workspace_instance_worker::AzureServiceBusWorkspaceInstanceWorkerDependencies;
 use rust_workflow_2::workers::next_step_worker;
-use rust_workflow_2::workers::rabbitmq_adapter::dependencies::active_step_worker::RabbitMqActiveStepWorkerDependencies;
-use rust_workflow_2::workers::rabbitmq_adapter::dependencies::new_event_worker::RabbitMqNewEventWorkerDependencies;
-use rust_workflow_2::workers::rabbitmq_adapter::dependencies::next_step_worker::RabbitMqNextStepWorkerDependencies;
-use rust_workflow_2::workers::rabbitmq_adapter::dependencies::workspace_instance_worker::RabbitMqWorkspaceInstanceWorkerDependencies;
 use rust_workflow_2::workers::workspace_instance_worker::{self};
 use rust_workflow_2::workflows::{TxState, workflow_0::Workflow0};
 use rust_workflow_2::{
-    workers::rabbitmq_adapter::dependencies::control_server::RabbitMqControlServerDependencies,
+    workers::azure_adapter::dependencies::control_server::AzureServiceBusControlServerDependencies,
     workflows::init_app_state,
 };
 
@@ -74,9 +74,10 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     // this shouldn't have to be hard coded
-    type ControlServerDependencies<W> = RabbitMqControlServerDependencies<W, (), ()>;
+    type ControlServerDependencies<W> = AzureServiceBusControlServerDependencies<W>;
 
-    my_main!(Workflow0, Workflow1);
+    // my_main!(Workflow0, Workflow1);
+    my_main!(Workflow0);
 
     Ok(())
 }
@@ -108,14 +109,14 @@ async fn main_handler<W: Workflow>(
 
     try_join!(
         #[cfg(feature = "active_step_worker")]
-        active_step_worker::main::<W, RabbitMqActiveStepWorkerDependencies<W, (), ()>>(wf),
+        active_step_worker::main::<W, AzureServiceBusActiveStepWorkerDependencies<W>>(wf),
         #[cfg(feature = "new_instance_worker")]
-        workspace_instance_worker::main::<W, RabbitMqWorkspaceInstanceWorkerDependencies<W, (), ()>>(
+        workspace_instance_worker::main::<W, AzureServiceBusWorkspaceInstanceWorkerDependencies<W>>(
         ),
         #[cfg(feature = "next_step_worker")]
-        next_step_worker::main::<W, RabbitMqNextStepWorkerDependencies<W, (), ()>>(),
+        next_step_worker::main::<W, AzureServiceBusNextStepWorkerDependencies<W>>(),
         #[cfg(feature = "new_event_worker")]
-        new_event_worker::main::<W, RabbitMqNewEventWorkerDependencies<W, (), ()>>(),
+        new_event_worker::main::<W, AzureServiceBusNewEventWorkerDependencies<W>>(),
     )?;
 
     Ok(())
