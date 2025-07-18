@@ -93,7 +93,7 @@ FROM
     AND wsv.version = latest.latest_version
     INNER JOIN lu_workflow_step_status status ON wsv.status = status.id;
 
-CREATE OR REPLACE FUNCTION insert_latest_workflow_step()
+CREATE FUNCTION insert_latest_workflow_step()
 RETURNS TRIGGER AS $$
 DECLARE
     new_step_id INTEGER;
@@ -113,7 +113,7 @@ SECURITY DEFINER;
 
 CREATE TRIGGER insert_latest_workflow_step_trigger INSTEAD OF INSERT ON latest_workflow_steps FOR EACH ROW EXECUTE FUNCTION insert_latest_workflow_step ();
 
-CREATE OR REPLACE FUNCTION update_latest_workflow_step()
+CREATE FUNCTION update_latest_workflow_step()
 RETURNS TRIGGER AS $$
 DECLARE
     next_version INTEGER;
