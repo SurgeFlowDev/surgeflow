@@ -175,7 +175,7 @@ pub fn startup_workflow(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         (
-            #workflow_ty::control_router(sqlx_tx_state, &mut session).await?,
+            #workflow_ty::control_router(sqlx_tx_state).await?,
             async {
                 try_join!(
                     #(#handlers),*
@@ -207,7 +207,7 @@ pub fn my_main(item: TokenStream) -> TokenStream {
     // 1) control_server_setup block
     let control_server_setup = quote! {
         #[cfg(feature = "control_server")]
-        let ((sqlx_tx_state, sqlx_tx_layer), _connection, mut session) =
+        let (sqlx_tx_state, sqlx_tx_layer) =
             control_server_setup().await?;
     };
 

@@ -9,7 +9,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::any::TypeId;
 use std::fmt::Debug;
-use std::sync::atomic::AtomicUsize;
 
 impl WorkflowStep for Workflow0Step {
     fn variant_event_type_id(&self) -> TypeId {
@@ -129,8 +128,6 @@ impl Step0 {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Step1 {}
 
-static DEV_COUNT: AtomicUsize = AtomicUsize::new(0);
-
 #[step]
 impl Step1 {
     #[expect(unused_variables)]
@@ -140,10 +137,6 @@ impl Step1 {
             "Running Step1, Workflow0, event.test_string: {}",
             event.test_string
         );
-        let dev_count = DEV_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        if dev_count == 3 {
-            return Ok(None);
-        }
-        Err(StepError::Unknown)
+        Ok(None)
     }
 }

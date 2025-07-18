@@ -12,12 +12,10 @@ aide = { git = "https://github.com/Zizico2/aide.git", branch = "feat/typed-routi
     "axum-query",
     "axum-extra-typed-routing",
 ] }
-# TODO: wait for https://github.com/tamasfe/aide/pull/232 to be merged
-anyhow = "1.0.98"
+anyhow = { version = "1.0.98" }
 axum = { version = "0.8.4", features = ["http2", "macros", "multipart"] }
 axum-extra = { version = "0.10.1", features = ["typed-routing"] }
 axum-sqlx-tx = "0.10.0"
-# axum-typed-routing = { version = "0.3.0", features = ["aide"] }
 axum_thiserror = "0.1.0"
 azservicebus = "0.25.1"
 azure_core = "0.21.0"
@@ -40,6 +38,7 @@ sqlx = { version = "0.8.6", default-features = false, features = [
     "postgres",
     "macros",
     "runtime-tokio",
+    "tls-rustls",
 ] }
 surrealdb-tikv-client = "0.3.0-surreal.3"
 thiserror = "2.0.12"

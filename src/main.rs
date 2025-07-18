@@ -21,7 +21,6 @@ use rust_workflow_2::{
     workflows::init_app_state,
 };
 
-use fe2o3_amqp::{Session, connection::ConnectionHandle, session::SessionHandle};
 use rust_workflow_2::workflows::{Tx, TxLayer, Workflow, WorkflowControl, workflow_1::Workflow1};
 
 use sqlx::PgPool;
@@ -53,19 +52,11 @@ async fn serve(router: ApiRouter, sqlx_tx_layer: TxLayer) -> anyhow::Result<()> 
     Ok(())
 }
 #[cfg(feature = "control_server")]
-async fn control_server_setup()
--> anyhow::Result<((TxState, TxLayer), ConnectionHandle<()>, SessionHandle<()>)> {
-    let mut connection =
-        fe2o3_amqp::Connection::open("control-connection-6", "amqp://guest:guest@127.0.0.1:5672")
-            .await?;
+async fn control_server_setup() -> anyhow::Result<(TxState, TxLayer)> {
+    let connection_string = std::env::var("APP_USER_DATABASE_URL")
+        .expect("APP_USER_DATABASE_URL must be set");
 
-    let session = Session::begin(&mut connection).await?;
-
-    Ok((
-        Tx::setup(PgPool::connect("postgres://workflow:workflow@localhost:5432/workflow").await?),
-        connection,
-        session,
-    ))
+    Ok(Tx::setup(PgPool::connect(&connection_string).await?))
 }
 
 #[tokio::main]
