@@ -1,27 +1,3 @@
-CREATE ROLE app_user
-  WITH LOGIN
-       PASSWORD ''
-       NOSUPERUSER
-       NOCREATEDB
-       NOCREATEROLE
-       INHERIT;
-
-GRANT CONNECT ON DATABASE neondb TO app_user;
-GRANT USAGE ON SCHEMA public TO app_user;
-
-ALTER DEFAULT PRIVILEGES 
-  FOR ROLE neondb_owner
-  IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE
-  ON TABLES
-  TO app_user;
-
-ALTER DEFAULT PRIVILEGES
-  FOR ROLE neondb_owner
-  IN SCHEMA public
-  GRANT USAGE
-  ON SEQUENCES
-  TO app_user;
 
 CREATE TABLE
     workflows (
@@ -45,10 +21,14 @@ CREATE TABLE
 INSERT INTO
     lu_workflow_step_status ("id", "label")
 VALUES
-    (1, 'pending'),
-    (2, 'running'),
-    (3, 'completed'),
-    (4, 'failed');
+    (1, 'created'),
+    (2, 'next'),
+    (3, 'awaiting_event'),
+    (4, 'active'),
+    (5, 'completed'),
+    (6, 'failed');
+
+    
 
 CREATE TABLE
     workflow_steps (
@@ -118,10 +98,6 @@ RETURNS TRIGGER AS $$
 DECLARE
     next_version INTEGER;
 BEGIN
-    IF NEW.version IS NOT NULL THEN
-        RAISE EXCEPTION 'Version must be NULL when updating a workflow step, it is automatically set.';
-    END IF;
-
     -- Calculate next version number
     SELECT MAX(version) + 1 INTO next_version
     FROM workflow_step_versions

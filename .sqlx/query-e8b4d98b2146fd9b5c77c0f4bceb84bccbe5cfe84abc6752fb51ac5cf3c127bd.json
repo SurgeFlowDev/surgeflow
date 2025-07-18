@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO latest_workflow_steps (\"workflow_instance_id\")\n        VALUES ($1)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e8b4d98b2146fd9b5c77c0f4bceb84bccbe5cfe84abc6752fb51ac5cf3c127bd"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE latest_workflow_steps SET \"status\" = $1\n        WHERE \"workflow_instance_id\" = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6b3ffb1c344de2417c540aaeaabed59e365e590357258a1baa42537c16e591e4"
+}

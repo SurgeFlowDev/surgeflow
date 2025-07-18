@@ -165,6 +165,7 @@ mod workflow_instance_manager {
             &self,
             conn: &mut PgConnection,
         ) -> anyhow::Result<WorkflowInstance> {
+            tracing::info!("Creating workflow instance for: {}", W::NAME);
             let res = query_as!(
                 WorkflowInstanceRecord,
                 r#"
@@ -177,9 +178,18 @@ mod workflow_instance_manager {
                 W::NAME
             )
             .fetch_one(conn)
-            .await?;
+            .await
+            .inspect_err(|e| tracing::error!("Failed to create workflow instance: {:?}", e))?;
 
-            let res = res.try_into()?;
+            tracing::info!("Created workflow instance: {} with id: {}", W::NAME, res.id);
+
+            let res: WorkflowInstance = res.try_into()?;
+
+            tracing::info!(
+                "Sending workflow instance: {} with id: {} to Azure Service Bus",
+                W::NAME,
+                res.id
+            );
 
             self.sender.send(&res).await?;
             Ok(res)

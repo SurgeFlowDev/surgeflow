@@ -7,21 +7,29 @@ use crate::{
     },
     workflows::Workflow,
 };
-use anyhow::bail;
+use sqlx::{PgConnection, query};
 
 async fn process<W: Workflow>(
     wf: W,
-    active_step_receiver: &mut impl ActiveStepReceiver<W>,
+
     active_step_sender: &mut impl ActiveStepSender<W>,
     next_step_sender: &mut impl NextStepSender<W>,
     failed_step_sender: &mut impl FailedStepSender<W>,
+    conn: &mut PgConnection,
+    mut step: FullyQualifiedStep<W::Step>,
 ) -> anyhow::Result<()> {
-    tracing::info!("Active Step Worker started for workflow: {}", W::NAME);
-    tracing::info!("Listening for active steps...");
-    let Ok((mut step, handle)) = active_step_receiver.receive().await else {
-        bail!("Failed to receive active step");
-    };
     tracing::info!("Received new step");
+    query!(
+        r#"
+        UPDATE latest_workflow_steps SET "status" = $1
+        WHERE "workflow_instance_id" = $2
+        "#,
+        4,
+        i32::from(step.instance_id)
+    )
+    .execute(conn)
+    .await?;
+
     let next_step = step.step.step.run_raw(wf.clone(), step.event.clone()).await;
     step.retry_count += 1;
     if let Ok(next_step) = next_step {
@@ -51,12 +59,12 @@ async fn process<W: Workflow>(
             failed_step_sender.send(step).await?;
         }
     }
-    active_step_receiver.accept(handle).await?;
 
     Ok(())
 }
 
 pub async fn main<W: Workflow, D: ActiveStepWorkerContext<W>>(wf: W) -> anyhow::Result<()> {
+    tracing::info!("Active Step Worker started for workflow: {}", W::NAME);
     let dependencies = D::dependencies().await?;
 
     let mut active_step_receiver = dependencies.active_step_receiver;
@@ -64,18 +72,31 @@ pub async fn main<W: Workflow, D: ActiveStepWorkerContext<W>>(wf: W) -> anyhow::
     let mut next_step_sender = dependencies.next_step_sender;
     let mut failed_step_sender = dependencies.failed_step_sender;
 
+    let connection_string =
+        std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
+    let pool = sqlx::PgPool::connect(&connection_string).await?;
+
     loop {
-        if let Err(err) = process(
+        let Ok((step, handle)) = active_step_receiver.receive().await else {
+            tracing::error!("Failed to receive next step");
+            continue;
+        };
+        let mut tx = pool.begin().await?;
+
+        if let Err(err) = process::<W>(
             wf.clone(),
-            &mut active_step_receiver,
             &mut active_step_sender,
             &mut next_step_sender,
             &mut failed_step_sender,
+            &mut tx,
+            step,
         )
         .await
         {
-            tracing::error!("Error occurred in loop_content: {}", err);
-            continue;
+            tracing::error!("Error processing next step: {:?}", err);
         }
+
+        tx.commit().await?;
+        active_step_receiver.accept(handle).await?;
     }
 }
