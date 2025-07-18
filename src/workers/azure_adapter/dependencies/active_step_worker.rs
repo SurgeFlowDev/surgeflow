@@ -29,8 +29,12 @@ impl<W: Workflow> ActiveStepWorkerContext<W> for AzureServiceBusActiveStepWorker
     type FailedStepSender = AzureServiceBusFailedStepSender<W>;
     type NextStepSender = AzureServiceBusNextStepSender<W>;
     async fn dependencies() -> anyhow::Result<ActiveStepWorkerDependencies<W, Self>> {
+        let azure_service_bus_connection_string =
+            std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
+                .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set");
+            
         let mut service_bus_client = ServiceBusClient::new_from_connection_string(
-            "connection_string",
+            azure_service_bus_connection_string,
             ServiceBusClientOptions::default(),
         )
         .await?;

@@ -1,52 +1,66 @@
 use std::marker::PhantomData;
 
-use fe2o3_amqp::{Connection, Session, connection::ConnectionHandle, session::SessionHandle};
-use tikv_client::RawClient;
+use azservicebus::{ServiceBusClient, ServiceBusClientOptions, core::BasicRetryPolicy};
+use azure_data_cosmos::CosmosClient;
 
 use crate::{
     workers::{
         adapters::dependencies::next_step_worker::{
             NextStepWorkerContext, NextStepWorkerDependencies,
         },
-        rabbitmq_adapter::{
-            managers::RabbitMqStepsAwaitingEventManager, receivers::RabbitMqNextStepReceiver,
-            senders::RabbitMqActiveStepSender,
+        azure_adapter::{
+            managers::AzureServiceBusStepsAwaitingEventManager,
+            receivers::AzureServiceBusNextStepReceiver, senders::AzureServiceBusActiveStepSender,
         },
     },
     workflows::Workflow,
 };
 
-pub struct RabbitMqNextStepWorkerDependencies<W: Workflow, C, S> {
+pub struct AzureServiceBusNextStepWorkerDependencies<W: Workflow> {
     #[expect(dead_code)]
-    fe2o3_connection: ConnectionHandle<C>,
-    #[expect(dead_code)]
-    fe2o3_session: SessionHandle<S>,
+    service_bus_client: ServiceBusClient<BasicRetryPolicy>,
     phantom: PhantomData<W>,
 }
 
-impl<W: Workflow> NextStepWorkerContext<W> for RabbitMqNextStepWorkerDependencies<W, (), ()> {
-    type NextStepReceiver = RabbitMqNextStepReceiver<W>;
-    type ActiveStepSender = RabbitMqActiveStepSender<W>;
-    type StepsAwaitingEventManager = RabbitMqStepsAwaitingEventManager<W>;
+impl<W: Workflow> NextStepWorkerContext<W> for AzureServiceBusNextStepWorkerDependencies<W> {
+    type NextStepReceiver = AzureServiceBusNextStepReceiver<W>;
+    type ActiveStepSender = AzureServiceBusActiveStepSender<W>;
+    type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<W>;
     async fn dependencies() -> anyhow::Result<NextStepWorkerDependencies<W, Self>> {
-        let mut fe2o3_connection =
-            Connection::open("control-connection-3", "amqp://guest:guest@127.0.0.1:5672").await?;
-        let mut fe2o3_session = Session::begin(&mut fe2o3_connection).await?;
+        let azure_service_bus_connection_string =
+            std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
+                .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set");
 
-        let next_step_receiver = RabbitMqNextStepReceiver::<W>::new(&mut fe2o3_session).await?;
-        let active_step_sender = RabbitMqActiveStepSender::<W>::new(&mut fe2o3_session).await?;
+        let mut service_bus_client = ServiceBusClient::new_from_connection_string(
+            azure_service_bus_connection_string,
+            ServiceBusClientOptions::default(),
+        )
+        .await?;
 
-        let steps_awaiting_event_manager = RabbitMqStepsAwaitingEventManager::<W>::new(
-            RawClient::new(vec!["127.0.0.1:2379"]).await?,
-        );
+        let active_steps_queue = format!("{}-active-steps", W::NAME);
+        let next_steps_queue = format!("{}-next-steps", W::NAME);
+
+        let next_step_receiver =
+            AzureServiceBusNextStepReceiver::<W>::new(&mut service_bus_client, &next_steps_queue)
+                .await?;
+        let active_step_sender =
+            AzureServiceBusActiveStepSender::<W>::new(&mut service_bus_client, &active_steps_queue)
+                .await?;
+
+        let cosmos_connection_string = std::env::var("COSMOS_CONNECTION_STRING")
+            .expect("COSMOS_CONNECTION_STRING must be set");
+
+        let cosmos_client =
+            CosmosClient::with_connection_string(cosmos_connection_string.into(), None)?;
+        let steps_awaiting_event_manager =
+            AzureServiceBusStepsAwaitingEventManager::<W>::new(&cosmos_client);
 
         Ok(NextStepWorkerDependencies::new(
             next_step_receiver,
             active_step_sender,
             steps_awaiting_event_manager,
             Self {
-                fe2o3_connection,
-                fe2o3_session,
+                service_bus_client,
                 phantom: PhantomData,
             },
         ))

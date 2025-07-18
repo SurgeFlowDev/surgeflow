@@ -3,51 +3,52 @@ use crate::{
         adapters::dependencies::workspace_instance_worker::{
             WorkspaceInstanceWorkerContext, WorkspaceInstanceWorkerDependencies,
         },
-        rabbitmq_adapter::{receivers::RabbitMqInstanceReceiver, senders::RabbitMqNextStepSender},
+        azure_adapter::{
+            receivers::AzureServiceBusInstanceReceiver, senders::AzureServiceBusNextStepSender,
+        },
     },
     workflows::Workflow,
 };
-use fe2o3_amqp::{
-    Connection, Receiver, Session, connection::ConnectionHandle, session::SessionHandle,
-};
+use azservicebus::{ServiceBusClient, ServiceBusClientOptions, core::BasicRetryPolicy};
 use std::marker::PhantomData;
 
-pub struct RabbitMqWorkspaceInstanceWorkerDependencies<W: Workflow, C, S> {
+pub struct AzureServiceBusWorkspaceInstanceWorkerDependencies<W: Workflow> {
     #[expect(dead_code)]
-    fe2o3_connection: ConnectionHandle<C>,
-    #[expect(dead_code)]
-    fe2o3_session: SessionHandle<S>,
+    service_bus_client: ServiceBusClient<BasicRetryPolicy>,
     phantom: PhantomData<W>,
 }
 
 impl<W: Workflow> WorkspaceInstanceWorkerContext<W>
-    for RabbitMqWorkspaceInstanceWorkerDependencies<W, (), ()>
+    for AzureServiceBusWorkspaceInstanceWorkerDependencies<W>
 {
-    type NextStepSender = RabbitMqNextStepSender<W>;
-    type InstanceReceiver = RabbitMqInstanceReceiver<W>;
+    type NextStepSender = AzureServiceBusNextStepSender<W>;
+    type InstanceReceiver = AzureServiceBusInstanceReceiver<W>;
     async fn dependencies() -> anyhow::Result<WorkspaceInstanceWorkerDependencies<W, Self>> {
-        let mut fe2o3_connection =
-            Connection::open("control-connection-4", "amqp://guest:guest@127.0.0.1:5672").await?;
-        let mut fe2o3_session = Session::begin(&mut fe2o3_connection).await?;
+        let azure_service_bus_connection_string =
+            std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
+                .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set");
 
-        let next_step_sender = RabbitMqNextStepSender::new(&mut fe2o3_session).await?;
+        let mut service_bus_client = ServiceBusClient::new_from_connection_string(
+            azure_service_bus_connection_string,
+            ServiceBusClientOptions::default(),
+        )
+        .await?;
 
-        let instance_receiver = {
-            let receiver = Receiver::attach(
-                &mut fe2o3_session,
-                format!("{}-instances-receiver-1", W::NAME),
-                format!("{}-instances", W::NAME),
-            )
-            .await?;
-            RabbitMqInstanceReceiver(receiver, PhantomData)
-        };
+        let next_steps_queue = format!("{}-next-steps", W::NAME);
+
+        let instance_queue = format!("{}-instance", W::NAME);
+
+        let next_step_sender =
+            AzureServiceBusNextStepSender::new(&mut service_bus_client, &next_steps_queue).await?;
+
+        let instance_receiver =
+            AzureServiceBusInstanceReceiver::new(&mut service_bus_client, &instance_queue).await?;
 
         Ok(WorkspaceInstanceWorkerDependencies::new(
             next_step_sender,
             instance_receiver,
             Self {
-                fe2o3_connection,
-                fe2o3_session,
+                service_bus_client,
                 phantom: PhantomData,
             },
         ))

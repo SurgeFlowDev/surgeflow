@@ -39,7 +39,7 @@ impl<W: Workflow> AzureServiceBusNextStepSender<W> {
             .await?;
 
         Ok(Self {
-            sender: sender,
+            sender,
             _marker: PhantomData,
         })
     }
@@ -72,7 +72,7 @@ impl<W: Workflow> AzureServiceBusActiveStepSender<W> {
             .await?;
 
         Ok(Self {
-            sender: sender,
+            sender,
             _marker: PhantomData,
         })
     }
@@ -106,7 +106,7 @@ impl<W: Workflow> AzureServiceBusFailedStepSender<W> {
             .await?;
 
         Ok(Self {
-            sender: sender,
+            sender,
             _marker: PhantomData,
         })
     }

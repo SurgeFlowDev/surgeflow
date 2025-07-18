@@ -1,40 +1,44 @@
 use crate::{
     workers::{
         adapters::dependencies::control_server::{ControlServerContext, ControlServerDependencies},
-        rabbitmq_adapter::senders::RabbitMqEventSender,
+        azure_adapter::senders::AzureServiceBusEventSender,
     },
     workflows::Workflow,
 };
-use fe2o3_amqp::{Session, connection::ConnectionHandle, session::SessionHandle};
+use azservicebus::{ServiceBusClient, ServiceBusClientOptions, core::BasicRetryPolicy};
+
 use std::marker::PhantomData;
 
-pub struct RabbitMqControlServerDependencies<W: Workflow, C, S> {
+pub struct AzureServiceBusControlServerDependencies<W: Workflow> {
     #[expect(dead_code)]
-    fe2o3_connection: ConnectionHandle<C>,
-    #[expect(dead_code)]
-    fe2o3_session: SessionHandle<S>,
-    phantom: PhantomData<W>,
+    service_bus_client: ServiceBusClient<BasicRetryPolicy>,
+    _marker: PhantomData<W>,
 }
 
-impl<W: Workflow> ControlServerContext<W> for RabbitMqControlServerDependencies<W, (), ()> {
-    type EventSender = RabbitMqEventSender<W>;
+impl<W: Workflow> ControlServerContext<W> for AzureServiceBusControlServerDependencies<W> {
+    type EventSender = AzureServiceBusEventSender<W>;
     async fn dependencies() -> anyhow::Result<ControlServerDependencies<W, Self>> {
-        let mut fe2o3_connection = fe2o3_amqp::Connection::open(
-            "control-connection-control-server",
-            "amqp://guest:guest@127.0.0.1:5672",
+        let azure_service_bus_connection_string =
+            std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
+                .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set");
+            
+        let mut service_bus_client = ServiceBusClient::new_from_connection_string(
+            azure_service_bus_connection_string,
+            ServiceBusClientOptions::default(),
         )
         .await?;
 
-        let mut fe2o3_session = Session::begin(&mut fe2o3_connection).await?;
+        let events_queue = format!("{}-events", W::NAME);
 
-        let event_sender = RabbitMqEventSender::<W>::new(&mut fe2o3_session).await?;
+        let event_sender =
+            AzureServiceBusEventSender::<W>::new(&mut service_bus_client, &events_queue)
+                .await?;
 
         Ok(ControlServerDependencies::new(
             event_sender,
             Self {
-                fe2o3_connection,
-                fe2o3_session,
-                phantom: PhantomData,
+                service_bus_client,
+                _marker: PhantomData,
             },
         ))
     }

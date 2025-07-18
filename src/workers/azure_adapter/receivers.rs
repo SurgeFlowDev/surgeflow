@@ -38,7 +38,7 @@ impl<W: Workflow> InstanceReceiver<W> for AzureServiceBusInstanceReceiver<W> {
                 return Err(err);
             }
         };
-        Ok((event, msg.into()))
+        Ok((event, msg))
     }
 
     async fn accept(&mut self, handle: Self::Handle) -> anyhow::Result<()> {
@@ -90,7 +90,7 @@ impl<W: Workflow> EventReceiver<W> for AzureServiceBusEventReceiver<W> {
                 return Err(err);
             }
         };
-        Ok((event, msg.into()))
+        Ok((event, msg))
     }
 
     async fn accept(&mut self, handle: Self::Handle) -> anyhow::Result<()> {
@@ -141,7 +141,7 @@ impl<W: Workflow> NextStepReceiver<W> for AzureServiceBusNextStepReceiver<W> {
                 return Err(err);
             }
         };
-        Ok((event, msg.into()))
+        Ok((event, msg))
     }
 
     async fn accept(&mut self, handle: Self::Handle) -> anyhow::Result<()> {
@@ -197,7 +197,7 @@ impl<W: Workflow> ActiveStepReceiver<W> for AzureServiceBusActiveStepReceiver<W>
                 return Err(err);
             }
         };
-        Ok((event, msg.into()))
+        Ok((event, msg))
     }
 
     async fn accept(&mut self, handle: Self::Handle) -> anyhow::Result<()> {

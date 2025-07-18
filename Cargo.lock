@@ -707,6 +707,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "azure_identity"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fb64e97087965481c94f1703c57e678df09df73e2cdaee8952558f9c6c7d100"
+dependencies = [
+ "async-lock",
+ "async-trait",
+ "azure_core 0.25.0",
+ "futures",
+ "pin-project",
+ "serde",
+ "time",
+ "tracing",
+ "typespec_client_core",
+ "url",
+]
+
+[[package]]
 name = "azure_messaging_servicebus"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3182,6 +3200,7 @@ dependencies = [
  "azservicebus",
  "azure_core 0.21.0",
  "azure_data_cosmos",
+ "azure_identity",
  "azure_messaging_servicebus",
  "bytes",
  "derive_more",

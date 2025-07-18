@@ -11,12 +11,12 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct AzureServiceBusAwaitingEventManager<W: Workflow> {
+pub struct AzureServiceBusStepsAwaitingEventManager<W: Workflow> {
     container_client: ContainerClient,
     _phantom: PhantomData<W>,
 }
 
-impl<W: Workflow> AzureServiceBusAwaitingEventManager<W> {
+impl<W: Workflow> AzureServiceBusStepsAwaitingEventManager<W> {
     // TODO: should be private
     pub fn new(cosmos_client: &CosmosClient) -> Self {
         let container_client = cosmos_client
@@ -32,7 +32,7 @@ impl<W: Workflow> AzureServiceBusAwaitingEventManager<W> {
     }
 }
 
-impl<W: Workflow> StepsAwaitingEventManager<W> for AzureServiceBusAwaitingEventManager<W> {
+impl<W: Workflow> StepsAwaitingEventManager<W> for AzureServiceBusStepsAwaitingEventManager<W> {
     async fn get_step(
         &mut self,
         instance_id: WorkflowInstanceId,
