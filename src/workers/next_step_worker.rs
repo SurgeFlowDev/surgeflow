@@ -7,6 +7,7 @@ use crate::{
     },
     workflows::Workflow,
 };
+use derive_more::Debug;
 use sqlx::{PgConnection, PgPool, query};
 use std::any::TypeId;
 use uuid::Uuid;
@@ -63,12 +64,22 @@ async fn receive_and_process<W: Workflow, D: NextStepWorkerContext<W>>(
     Ok(())
 }
 
+#[derive(thiserror::Error, Debug)]
+enum NextStepWorkerError<W: Workflow, D: NextStepWorkerContext<W>> {
+    #[error("Database error occurred")]
+    DatabaseError(#[from] sqlx::Error),
+    #[error("Failed to send active step")]
+    SendActiveStepError(#[source] <D::ActiveStepSender as ActiveStepSender<W>>::Error),
+    #[error("Failed to put step in awaiting event manager")]
+    AwaitEventError(#[source] anyhow::Error),
+}
+
 async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
     active_step_sender: &mut D::ActiveStepSender,
     steps_awaiting_event_manager: &mut D::StepsAwaitingEventManager,
     conn: &mut PgConnection,
     step: FullyQualifiedStep<W::Step>,
-) -> anyhow::Result<()> {
+) -> Result<(), NextStepWorkerError<W, D>> {
     tracing::info!("received next step for instance: {}", step.instance_id);
 
     query!(
@@ -91,7 +102,8 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
                 retry_count: 0,
                 step_id: step.step_id,
             })
-            .await?;
+            .await
+            .map_err(NextStepWorkerError::SendActiveStepError)?;
     } else {
         steps_awaiting_event_manager
             .put_step(FullyQualifiedStep {
@@ -101,7 +113,8 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
                 retry_count: 0,
                 step_id: step.step_id,
             })
-            .await?;
+            .await
+            .map_err(NextStepWorkerError::AwaitEventError)?;
     }
 
     Ok(())

@@ -80,32 +80,37 @@ pub struct AzureServiceBusEventReceiver<W: Workflow> {
 }
 
 impl<W: Workflow> EventReceiver<W> for AzureServiceBusEventReceiver<W> {
+    type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(&mut self) -> anyhow::Result<(InstanceEvent<W>, Self::Handle)> {
-        let msg = self.receiver.receive_message().await?;
+    async fn receive(&mut self) -> Result<(InstanceEvent<W>, Self::Handle), Self::Error> {
+        let msg = self
+            .receiver
+            .receive_message()
+            .await
+            .map_err(AzureAdapterError::ServiceBusError)?;
 
         // TODO: using json, could use bincode in production
-        let event = match serde_json::from_slice(msg.body()?) {
+        let event = match serde_json::from_slice(
+            msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
+        ) {
             Ok(event) => event,
             Err(e) => {
-                let err = anyhow::anyhow!("Failed to deserialize step: {}", e);
-                tracing::error!("{}", err);
-
                 self.receiver
                     .dead_letter_message(msg, DeadLetterOptions::default())
-                    .await?;
+                    .await
+                    .map_err(AzureAdapterError::ServiceBusError)?;
 
-                return Err(err);
+                return Err(AzureAdapterError::DeserializeError(e));
             }
         };
         Ok((event, msg))
     }
 
-    async fn accept(&mut self, handle: Self::Handle) -> anyhow::Result<()> {
+    async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
             .complete_message(handle)
             .await
-            .map_err(Into::into)
+            .map_err(AzureAdapterError::ServiceBusError)
     }
 }
 
@@ -131,32 +136,37 @@ pub struct AzureServiceBusNextStepReceiver<W: Workflow> {
 }
 
 impl<W: Workflow> NextStepReceiver<W> for AzureServiceBusNextStepReceiver<W> {
+    type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(&mut self) -> anyhow::Result<(FullyQualifiedStep<W::Step>, Self::Handle)> {
-        let msg = self.receiver.receive_message().await?;
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error> {
+        let msg = self
+            .receiver
+            .receive_message()
+            .await
+            .map_err(AzureAdapterError::ServiceBusError)?;
 
         // TODO: using json, could use bincode in production
-        let event = match serde_json::from_slice(msg.body()?) {
+        let event = match serde_json::from_slice(
+            msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
+        ) {
             Ok(event) => event,
             Err(e) => {
-                let err = anyhow::anyhow!("Failed to deserialize step: {}", e);
-                tracing::error!("{}", err);
-
                 self.receiver
                     .dead_letter_message(msg, DeadLetterOptions::default())
-                    .await?;
+                    .await
+                    .map_err(AzureAdapterError::ServiceBusError)?;
 
-                return Err(err);
+                return Err(AzureAdapterError::DeserializeError(e));
             }
         };
         Ok((event, msg))
     }
 
-    async fn accept(&mut self, handle: Self::Handle) -> anyhow::Result<()> {
+    async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
             .complete_message(handle)
             .await
-            .map_err(Into::into)
+            .map_err(AzureAdapterError::ServiceBusError)
     }
 }
 
@@ -187,32 +197,37 @@ pub struct AzureServiceBusActiveStepReceiver<W: Workflow> {
 }
 
 impl<W: Workflow> ActiveStepReceiver<W> for AzureServiceBusActiveStepReceiver<W> {
+    type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(&mut self) -> anyhow::Result<(FullyQualifiedStep<W::Step>, Self::Handle)> {
-        let msg = self.receiver.receive_message().await?;
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error> {
+        let msg = self
+            .receiver
+            .receive_message()
+            .await
+            .map_err(AzureAdapterError::ServiceBusError)?;
 
         // TODO: using json, could use bincode in production
-        let event = match serde_json::from_slice(msg.body()?) {
+        let event = match serde_json::from_slice(
+            msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
+        ) {
             Ok(event) => event,
             Err(e) => {
-                let err = anyhow::anyhow!("Failed to deserialize step: {}", e);
-                tracing::error!("{}", err);
-
                 self.receiver
                     .dead_letter_message(msg, DeadLetterOptions::default())
-                    .await?;
+                    .await
+                    .map_err(AzureAdapterError::ServiceBusError)?;
 
-                return Err(err);
+                return Err(AzureAdapterError::DeserializeError(e));
             }
         };
         Ok((event, msg))
     }
 
-    async fn accept(&mut self, handle: Self::Handle) -> anyhow::Result<()> {
+    async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
             .complete_message(handle)
             .await
-            .map_err(Into::into)
+            .map_err(AzureAdapterError::ServiceBusError)
     }
 }
 
