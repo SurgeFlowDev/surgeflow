@@ -7,12 +7,15 @@ use std::marker::PhantomData;
 use crate::{
     event::InstanceEvent,
     step::FullyQualifiedStep,
-    workers::adapters::{
-        managers::WorkflowInstance,
-        senders::{
-            ActiveStepSender, CompletedStepSender, EventSender, FailedStepSender,
-            NewInstanceSender, NextStepSender,
+    workers::{
+        adapters::{
+            managers::WorkflowInstance,
+            senders::{
+                ActiveStepSender, CompletedStepSender, EventSender, FailedStepSender,
+                NewInstanceSender, NextStepSender,
+            },
         },
+        azure_adapter::AzureAdapterError,
     },
     workflows::Workflow,
 };
@@ -58,12 +61,16 @@ pub struct AzureServiceBusActiveStepSender<W: Workflow> {
 }
 
 impl<W: Workflow> ActiveStepSender<W> for AzureServiceBusActiveStepSender<W> {
+    type Error = AzureAdapterError;
     async fn send(
         &mut self,
         step: FullyQualifiedStep<<W as Workflow>::Step>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
-        self.sender.send_message(serde_json::to_vec(&step)?).await?;
+        self.sender
+            .send_message(serde_json::to_vec(&step).map_err(AzureAdapterError::SerializeError)?)
+            .await
+            .map_err(AzureAdapterError::ServiceBusError)?;
         Ok(())
     }
 }
