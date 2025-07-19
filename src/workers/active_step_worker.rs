@@ -3,21 +3,22 @@ use crate::{
     workers::adapters::{
         dependencies::active_step_worker::ActiveStepWorkerContext,
         receivers::ActiveStepReceiver,
-        senders::{ActiveStepSender, FailedStepSender, NextStepSender},
+        senders::{ActiveStepSender, CompletedStepSender, FailedStepSender, NextStepSender},
     },
     workflows::Workflow,
 };
 use sqlx::{PgConnection, query};
 
-async fn process<W: Workflow>(
+async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
     wf: W,
-
-    active_step_sender: &mut impl ActiveStepSender<W>,
-    next_step_sender: &mut impl NextStepSender<W>,
-    failed_step_sender: &mut impl FailedStepSender<W>,
+    active_step_sender: &mut D::ActiveStepSender,
+    next_step_sender: &mut D::NextStepSender,
+    failed_step_sender: &mut D::FailedStepSender,
+    completed_step_sender: &mut D::CompletedStepSender,
     conn: &mut PgConnection,
     mut step: FullyQualifiedStep<W::Step>,
 ) -> anyhow::Result<()> {
+    let instance_id = step.instance_id;
     tracing::info!("Received new step");
     query!(
         r#"
@@ -33,18 +34,19 @@ async fn process<W: Workflow>(
     let next_step = step.step.step.run_raw(wf.clone(), step.event.clone()).await;
     step.retry_count += 1;
     if let Ok(next_step) = next_step {
-        // TODO: maybe use `succeeded-step-sender` and push the old step into it? and handle workflow completion there
+        completed_step_sender.send(step).await?;
         if let Some(next_step) = next_step {
             next_step_sender
                 .send(FullyQualifiedStep {
-                    instance_id: step.instance_id,
+                    instance_id,
                     step: next_step,
                     event: None,
                     retry_count: 0,
                 })
                 .await?;
         } else {
-            tracing::info!("Instance {} completed", step.instance_id);
+            // TODO: push to instance completed queue ?
+            tracing::info!("Instance {instance_id} completed");
         }
     } else {
         tracing::info!("Failed to run step: {:?}", step.step);
@@ -71,6 +73,7 @@ pub async fn main<W: Workflow, D: ActiveStepWorkerContext<W>>(wf: W) -> anyhow::
     let mut active_step_sender = dependencies.active_step_sender;
     let mut next_step_sender = dependencies.next_step_sender;
     let mut failed_step_sender = dependencies.failed_step_sender;
+    let mut completed_step_sender = dependencies.completed_step_sender;
 
     let connection_string =
         std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
@@ -83,11 +86,12 @@ pub async fn main<W: Workflow, D: ActiveStepWorkerContext<W>>(wf: W) -> anyhow::
         };
         let mut tx = pool.begin().await?;
 
-        if let Err(err) = process::<W>(
+        if let Err(err) = process::<W, D>(
             wf.clone(),
             &mut active_step_sender,
             &mut next_step_sender,
             &mut failed_step_sender,
+            &mut completed_step_sender,
             &mut tx,
             step,
         )

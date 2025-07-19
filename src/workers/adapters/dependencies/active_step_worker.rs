@@ -1,7 +1,7 @@
 use crate::{
     workers::adapters::{
         receivers::ActiveStepReceiver,
-        senders::{ActiveStepSender, FailedStepSender, NextStepSender},
+        senders::{ActiveStepSender, CompletedStepSender, FailedStepSender, NextStepSender},
     },
     workflows::Workflow,
 };
@@ -11,6 +11,7 @@ pub struct ActiveStepWorkerDependencies<W: Workflow, C: ActiveStepWorkerContext<
     pub active_step_sender: C::ActiveStepSender,
     pub next_step_sender: C::NextStepSender,
     pub failed_step_sender: C::FailedStepSender,
+    pub completed_step_sender: C::CompletedStepSender,
     #[expect(dead_code)]
     context: C,
 }
@@ -21,6 +22,7 @@ impl<W: Workflow, C: ActiveStepWorkerContext<W>> ActiveStepWorkerDependencies<W,
         active_step_sender: C::ActiveStepSender,
         next_step_sender: C::NextStepSender,
         failed_step_sender: C::FailedStepSender,
+        completed_step_sender: C::CompletedStepSender,
         context: C,
     ) -> Self {
         Self {
@@ -28,6 +30,7 @@ impl<W: Workflow, C: ActiveStepWorkerContext<W>> ActiveStepWorkerDependencies<W,
             active_step_sender,
             next_step_sender,
             failed_step_sender,
+            completed_step_sender,
             context,
         }
     }
@@ -41,11 +44,9 @@ pub trait ActiveStepWorkerContext<W: Workflow>: Sized {
     type NextStepSender: NextStepSender<W>;
     //
     type FailedStepSender: FailedStepSender<W>;
-
-    // let mut active_step_receiver = RabbitMqActiveStepReceiver::<W>::new(&mut session).await?;
-    // let mut active_step_sender = RabbitMqActiveStepSender::<W>::new(&mut session).await?;
-    // let mut next_step_sender = RabbitMqNextStepSender::<W>::new(&mut session).await?;
-    // let mut failed_step_sender = RabbitMqFailedStepSender::<W>::new(&mut session).await?;
+    //
+    type CompletedStepSender: CompletedStepSender<W>;
+    //
     fn dependencies()
     -> impl Future<Output = anyhow::Result<ActiveStepWorkerDependencies<W, Self>>> + Send;
 }

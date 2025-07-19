@@ -10,7 +10,7 @@ use crate::{
     workers::adapters::{
         managers::WorkflowInstance,
         senders::{
-            ActiveStepSender, EventSender, FailedStepSender, InstanceSender, NextStepSender,
+            ActiveStepSender, CompletedStepSender, EventSender, FailedStepSender, InstanceSender, NextStepSender
         },
     },
     workflows::Workflow,
@@ -182,6 +182,40 @@ impl<W: Workflow> AzureServiceBusInstanceSender<W> {
 
         Ok(Self {
             sender: Mutex::new(sender),
+            _marker: PhantomData,
+        })
+    }
+}
+
+// TODO: fields should not be pub?
+#[derive(Debug)]
+pub struct AzureServiceBusCompletedStepSender<W: Workflow> {
+    sender: ServiceBusSender,
+    _marker: PhantomData<W>,
+}
+
+impl<W: Workflow> CompletedStepSender<W> for AzureServiceBusCompletedStepSender<W> {
+    async fn send(
+        &mut self,
+        step: FullyQualifiedStep<<W as Workflow>::Step>,
+    ) -> anyhow::Result<()> {
+        // TODO: using json, could use bincode in production
+        self.sender.send_message(serde_json::to_vec(&step)?).await?;
+        Ok(())
+    }
+}
+
+impl<W: Workflow> AzureServiceBusCompletedStepSender<W> {
+    pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
+        service_bus_client: &mut ServiceBusClient<RP>,
+        queue_name: &str,
+    ) -> anyhow::Result<Self> {
+        let sender = service_bus_client
+            .create_sender(queue_name, ServiceBusSenderOptions::default())
+            .await?;
+
+        Ok(Self {
+            sender,
             _marker: PhantomData,
         })
     }

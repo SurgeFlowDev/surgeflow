@@ -24,6 +24,13 @@ pub trait FailedStepSender<W: Workflow>: Sized {
     ) -> impl Future<Output = anyhow::Result<()>> + Send;
 }
 
+pub trait CompletedStepSender<W: Workflow>: Sized {
+    fn send(
+        &mut self,
+        step: FullyQualifiedStep<W::Step>,
+    ) -> impl Future<Output = anyhow::Result<()>> + Send;
+}
+
 pub trait EventSender<W: Workflow>: Sized {
     fn send(&self, event: InstanceEvent<W>) -> impl Future<Output = anyhow::Result<()>> + Send;
 }
