@@ -41,7 +41,7 @@ mod workflow_instance_manager {
     // }
     #[derive(Debug, Deserialize, Serialize, JsonSchema)]
     pub struct WorkflowInstance {
-        pub id: WorkflowInstanceId,
+        pub external_id: WorkflowInstanceId,
         pub workflow_id: WorkflowId,
     }
 

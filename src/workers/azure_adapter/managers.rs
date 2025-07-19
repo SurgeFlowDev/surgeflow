@@ -28,7 +28,7 @@ impl<W: Workflow> AzureServiceBusStepsAwaitingEventManager<W> {
         }
     }
     fn make_key(instance_id: WorkflowInstanceId) -> String {
-        format!("instance_{}", i32::from(instance_id))
+        instance_id.to_string()
     }
 }
 
@@ -122,12 +122,13 @@ mod workflow_instance_manager {
         ServiceBusClient, primitives::service_bus_retry_policy::ServiceBusRetryPolicyExt,
     };
     use sqlx::{PgConnection, query_as};
+    use uuid::Uuid;
 
     use crate::{
         workers::{
             adapters::{
                 managers::{WorkflowInstance, WorkflowInstanceManager},
-                senders::InstanceSender,
+                senders::NewInstanceSender,
             },
             azure_adapter::senders::AzureServiceBusInstanceSender,
         },
@@ -156,7 +157,7 @@ mod workflow_instance_manager {
     }
 
     struct WorkflowInstanceRecord {
-        pub id: i32,
+        pub external_id: Uuid,
         pub workflow_id: i32,
     }
 
@@ -173,7 +174,7 @@ mod workflow_instance_manager {
             SELECT "id"
             FROM workflows
             WHERE "name" = $1
-            RETURNING "id", "workflow_id";
+            RETURNING "external_id", "workflow_id";
         "#,
                 W::NAME
             )
@@ -181,14 +182,14 @@ mod workflow_instance_manager {
             .await
             .inspect_err(|e| tracing::error!("Failed to create workflow instance: {:?}", e))?;
 
-            tracing::info!("Created workflow instance: {} with id: {}", W::NAME, res.id);
+            tracing::info!("Created workflow instance: {} with id: {}", W::NAME, res.external_id);
 
             let res: WorkflowInstance = res.try_into()?;
 
             tracing::info!(
                 "Sending workflow instance: {} with id: {} to Azure Service Bus",
                 W::NAME,
-                res.id
+                res.external_id
             );
 
             self.sender.send(&res).await?;
@@ -201,7 +202,7 @@ mod workflow_instance_manager {
 
         fn try_from(value: WorkflowInstanceRecord) -> Result<Self, Self::Error> {
             Ok(WorkflowInstance {
-                id: value.id.into(),
+                external_id: value.external_id.into(),
                 workflow_id: value.workflow_id.into(),
             })
         }

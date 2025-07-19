@@ -1,12 +1,12 @@
-use sqlx::{PgConnection, PgPool, query};
+use sqlx::{PgConnection, PgPool};
 
 use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
         dependencies::workspace_instance_worker::WorkspaceInstanceWorkerContext,
-        managers::WorkflowInstance, receivers::InstanceReceiver, senders::NextStepSender,
+        managers::WorkflowInstance, receivers::NewInstanceReceiver, senders::NextStepSender,
     },
-    workflows::Workflow,
+    workflows::{StepId, Workflow},
 };
 
 async fn process<W: Workflow, C: WorkspaceInstanceWorkerContext<W>>(
@@ -15,20 +15,12 @@ async fn process<W: Workflow, C: WorkspaceInstanceWorkerContext<W>>(
     instance: WorkflowInstance,
 ) -> anyhow::Result<()> {
     let entrypoint = FullyQualifiedStep {
-        instance_id: instance.id,
+        instance_id: instance.external_id,
         step: W::entrypoint(),
         event: None,
         retry_count: 0,
+        step_id: StepId::new(),
     };
-    query!(
-        r#"
-        INSERT INTO latest_workflow_steps ("workflow_instance_id")
-        VALUES ($1)
-        "#,
-        i32::from(instance.id)
-    )
-    .execute(conn)
-    .await?;
 
     next_step_sender.send(entrypoint).await?;
 

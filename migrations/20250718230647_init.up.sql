@@ -8,6 +8,7 @@ CREATE TABLE
 CREATE TABLE
     workflow_instances (
         "id" INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        "external_id" UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
         "workflow_id" INTEGER NOT NULL REFERENCES workflows ("id"),
         "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -21,68 +22,69 @@ CREATE TABLE
 INSERT INTO
     lu_workflow_step_status ("id", "label")
 VALUES
-    (1, 'created'),
-    (2, 'next'),
-    (3, 'awaiting_event'),
-    (4, 'active'),
-    (5, 'completed'),
-    (6, 'failed');
+    (1, 'next'),
+    (2, 'awaiting_event'),
+    (3, 'active'),
+    (4, 'completed'),
+    (5, 'failed');
 
     
 
 CREATE TABLE
-    workflow_steps (
+    workflow_steps_base (
         "id" INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        "external_id" UUID NOT NULL UNIQUE,
         "workflow_instance_id" INTEGER NOT NULL REFERENCES workflow_instances ("id")
     );
 
 CREATE TABLE
     workflow_step_versions (
         "id" INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        "workflow_step_id" INTEGER NOT NULL REFERENCES workflow_steps ("id"),
+        "workflow_step_id" INTEGER NOT NULL REFERENCES workflow_steps_base ("id"),
         "status" INTEGER NOT NULL REFERENCES lu_workflow_step_status ("id"),
         "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "version" INTEGER NOT NULL DEFAULT 1
     );
 
-CREATE VIEW
-    latest_workflow_steps AS
-SELECT
-    ws.id AS step_id,
-    ws.workflow_instance_id,
-    wi.workflow_id,
-    wsv.id AS step_version_id,
-    wsv.version,
-    wsv.status,
-    status.label AS status_label,
-    wsv.created_at AS version_created_at,
-    wi.created_at AS instance_created_at
-FROM
-    workflow_steps ws
-    INNER JOIN workflow_instances wi ON ws.workflow_instance_id = wi.id
-    INNER JOIN (
-        SELECT
+CREATE VIEW workflow_steps AS
+    SELECT 
+        wsb.id AS "id",
+        wsb.external_id AS "external_id",
+        wi.external_id AS "workflow_instance_external_id",
+        wsv.status AS "status",
+        wsv.version AS "version",
+        wsv.created_at AS "created_at"
+    FROM 
+        workflow_steps_base AS wsb
+    INNER JOIN workflow_instances AS wi ON wi.id = wsb.workflow_instance_id
+    JOIN (
+        SELECT 
             workflow_step_id,
-            MAX(version) AS latest_version
-        FROM
+            MAX(version) AS max_version
+        FROM 
             workflow_step_versions
-        GROUP BY
+        GROUP BY 
             workflow_step_id
-    ) latest ON ws.id = latest.workflow_step_id
-    INNER JOIN workflow_step_versions wsv ON ws.id = wsv.workflow_step_id
-    AND wsv.version = latest.latest_version
-    INNER JOIN lu_workflow_step_status status ON wsv.status = status.id;
+    ) AS latest ON latest.workflow_step_id = wsb.id
+    JOIN 
+        workflow_step_versions AS wsv ON wsv.workflow_step_id = wsb.id AND wsv.version = latest.max_version;
 
 CREATE FUNCTION insert_latest_workflow_step()
 RETURNS TRIGGER AS $$
 DECLARE
     new_step_id INTEGER;
-BEGIN    
-    INSERT INTO workflow_steps (workflow_instance_id)
-    VALUES (NEW.workflow_instance_id)
+    instance_id INTEGER;
+BEGIN
+    -- Get workflow_instance_id from external_id
+    SELECT id INTO instance_id
+    FROM workflow_instances
+    WHERE external_id = NEW."workflow_instance_external_id";
+    
+    INSERT INTO workflow_steps_base ("workflow_instance_id", "external_id")
+    VALUES (instance_id, NEW."external_id")
     RETURNING id INTO new_step_id;
     
-    INSERT INTO workflow_step_versions (workflow_step_id, status, version)
+    INSERT INTO workflow_step_versions ("workflow_step_id", "status", "version")
     -- ignore NEW.version and NEW.status, these values are set by the trigger
     VALUES (new_step_id, 1, 1);
     RETURN NEW;
@@ -91,7 +93,7 @@ $$
 LANGUAGE plpgsql
 SECURITY DEFINER;
 
-CREATE TRIGGER insert_latest_workflow_step_trigger INSTEAD OF INSERT ON latest_workflow_steps FOR EACH ROW EXECUTE FUNCTION insert_latest_workflow_step ();
+CREATE TRIGGER insert_latest_workflow_step_trigger INSTEAD OF INSERT ON workflow_steps FOR EACH ROW EXECUTE FUNCTION insert_latest_workflow_step ();
 
 CREATE FUNCTION update_latest_workflow_step()
 RETURNS TRIGGER AS $$
@@ -101,7 +103,7 @@ BEGIN
     -- Calculate next version number
     SELECT MAX(version) + 1 INTO next_version
     FROM workflow_step_versions
-    WHERE workflow_step_id = OLD.step_id;
+    WHERE workflow_step_id = OLD.id;
     
     -- Insert a new version with the new status
     INSERT INTO workflow_step_versions (
@@ -110,7 +112,7 @@ BEGIN
         version
     )
     VALUES (
-        OLD.step_id,
+        OLD.id,
         NEW.status,
         next_version
     );
@@ -122,7 +124,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER;
 
 CREATE TRIGGER update_latest_workflow_step_trigger 
-INSTEAD OF UPDATE ON latest_workflow_steps 
+INSTEAD OF UPDATE ON workflow_steps 
 FOR EACH ROW 
 EXECUTE FUNCTION update_latest_workflow_step();
 
@@ -131,7 +133,7 @@ EXECUTE FUNCTION update_latest_workflow_step();
 -------------------------------
 -------------------------------
 
-REVOKE INSERT, UPDATE ON workflow_steps FROM app_user;
+REVOKE INSERT, UPDATE ON workflow_steps_base FROM app_user;
 REVOKE INSERT, UPDATE ON workflow_step_versions FROM app_user;
 
 -------------------------------

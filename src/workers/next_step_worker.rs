@@ -1,5 +1,5 @@
 use sqlx::{PgConnection, PgPool, query};
-
+use uuid::Uuid;
 use crate::{
     event::Immediate,
     step::{FullyQualifiedStep, WorkflowStep},
@@ -53,13 +53,14 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
     step: FullyQualifiedStep<W::Step>,
 ) -> anyhow::Result<()> {
     tracing::info!("received next step for instance: {}", step.instance_id);
+
     query!(
         r#"
-        UPDATE latest_workflow_steps SET "status" = $1
-        WHERE "workflow_instance_id" = $2
+        INSERT INTO workflow_steps ("workflow_instance_external_id", "external_id")
+        VALUES ($1, $2)
         "#,
-        2,
-        i32::from(step.instance_id)
+        Uuid::from(step.instance_id),
+        Uuid::from(step.step_id)
     )
     .execute(conn)
     .await?;
@@ -71,6 +72,7 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
                 step: step.step,
                 event: None,
                 retry_count: 0,
+                step_id: step.step_id,
             })
             .await?;
     } else {
@@ -80,6 +82,7 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
                 step: step.step,
                 event: None,
                 retry_count: 0,
+                step_id: step.step_id,
             })
             .await?;
     }

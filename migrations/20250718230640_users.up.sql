@@ -1,7 +1,7 @@
 -- Add up migration script here
 CREATE ROLE app_user
   WITH LOGIN
-       PASSWORD ''
+       PASSWORD 'YourAppUserPasssword!'
        NOSUPERUSER
        NOCREATEDB
        NOCREATEROLE

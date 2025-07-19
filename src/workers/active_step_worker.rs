@@ -5,9 +5,10 @@ use crate::{
         receivers::ActiveStepReceiver,
         senders::{ActiveStepSender, CompletedStepSender, FailedStepSender, NextStepSender},
     },
-    workflows::Workflow,
+    workflows::{StepId, Workflow},
 };
 use sqlx::{PgConnection, query};
+use uuid::Uuid;
 
 async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
     wf: W,
@@ -22,11 +23,11 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
     tracing::info!("Received new step");
     query!(
         r#"
-        UPDATE latest_workflow_steps SET "status" = $1
-        WHERE "workflow_instance_id" = $2
+        UPDATE workflow_steps SET "status" = $1
+        WHERE "workflow_instance_external_id" = $2
         "#,
         4,
-        i32::from(step.instance_id)
+        Uuid::from(step.instance_id)
     )
     .execute(conn)
     .await?;
@@ -42,6 +43,7 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
                     step: next_step,
                     event: None,
                     retry_count: 0,
+                    step_id: StepId::new(),
                 })
                 .await?;
         } else {

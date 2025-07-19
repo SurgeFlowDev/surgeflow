@@ -1,18 +1,18 @@
 -- Add down migration script here
 
-DROP TRIGGER update_latest_workflow_step_trigger ON latest_workflow_steps;
-DROP TRIGGER insert_latest_workflow_step_trigger ON latest_workflow_steps;
+DROP TRIGGER update_latest_workflow_step_trigger ON workflow_steps;
+DROP TRIGGER insert_latest_workflow_step_trigger ON workflow_steps;
 
 -- Drop functions
 DROP FUNCTION update_latest_workflow_step();
 DROP FUNCTION insert_latest_workflow_step();
 
 -- Drop view
-DROP VIEW latest_workflow_steps;
+DROP VIEW workflow_steps;
 
 -- Drop tables (in reverse order to handle dependencies)
 DROP TABLE workflow_step_versions;
-DROP TABLE workflow_steps;
+DROP TABLE workflow_steps_base;
 DROP TABLE lu_workflow_step_status;
 DROP TABLE workflow_instances;
 

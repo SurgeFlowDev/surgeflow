@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     event::Event,
-    workflows::{Workflow, WorkflowInstanceId},
+    workflows::{StepId, Workflow, WorkflowInstanceId},
 };
 
 pub type StepResult<W> = Result<Option<StepWithSettings<<W as Workflow>::Step>>, StepError>;
@@ -63,6 +63,7 @@ pub struct StepSettings {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FullyQualifiedStep<S: Debug + Step + for<'a> Deserialize<'a>> {
     pub instance_id: WorkflowInstanceId,
+    pub step_id: StepId,
     #[serde(bound = "")]
     pub step: StepWithSettings<S>,
     pub event: Option<<S::Workflow as Workflow>::Event>,

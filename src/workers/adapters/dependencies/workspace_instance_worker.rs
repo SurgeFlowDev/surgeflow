@@ -1,5 +1,5 @@
 use crate::{
-    workers::adapters::{receivers::InstanceReceiver, senders::NextStepSender},
+    workers::adapters::{receivers::NewInstanceReceiver, senders::NextStepSender},
     workflows::Workflow,
 };
 
@@ -27,7 +27,7 @@ impl<W: Workflow, C: WorkspaceInstanceWorkerContext<W>> WorkspaceInstanceWorkerD
 pub trait WorkspaceInstanceWorkerContext<W: Workflow>: Sized {
     type NextStepSender: NextStepSender<W>;
     //
-    type InstanceReceiver: InstanceReceiver<W>;
+    type InstanceReceiver: NewInstanceReceiver<W>;
     //
     fn dependencies()
     -> impl Future<Output = anyhow::Result<WorkspaceInstanceWorkerDependencies<W, Self>>> + Send;

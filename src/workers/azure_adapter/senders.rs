@@ -10,7 +10,7 @@ use crate::{
     workers::adapters::{
         managers::WorkflowInstance,
         senders::{
-            ActiveStepSender, CompletedStepSender, EventSender, FailedStepSender, InstanceSender, NextStepSender
+            ActiveStepSender, CompletedStepSender, EventSender, FailedStepSender, NewInstanceSender, NextStepSender
         },
     },
     workflows::Workflow,
@@ -158,7 +158,7 @@ pub struct AzureServiceBusInstanceSender<W: Workflow> {
     _marker: PhantomData<W>,
 }
 
-impl<W: Workflow> InstanceSender<W> for AzureServiceBusInstanceSender<W> {
+impl<W: Workflow> NewInstanceSender<W> for AzureServiceBusInstanceSender<W> {
     async fn send(&self, step: &WorkflowInstance) -> anyhow::Result<()> {
         // TODO: using json, could use bincode in production
         self.sender

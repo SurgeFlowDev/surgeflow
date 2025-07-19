@@ -16,8 +16,9 @@ use derive_more::{Display, From, Into};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::Postgres;
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 use std::{any::TypeId, marker::PhantomData, sync::Arc};
+use uuid::Uuid;
 
 pub mod workflow_0;
 pub mod workflow_1;
@@ -27,9 +28,50 @@ pub trait WorkflowEvent: Event + Debug + JsonSchema + Send {
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema, Display,
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema,
 )]
-pub struct WorkflowInstanceId(i32);
+pub struct WorkflowInstanceId(Uuid);
+
+impl fmt::Display for WorkflowInstanceId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.hyphenated())
+    }
+}
+
+impl WorkflowInstanceId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+}
+
+impl Default for WorkflowInstanceId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema,
+)]
+pub struct StepId(Uuid);
+
+impl fmt::Display for StepId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.hyphenated())
+    }
+}
+
+impl StepId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+}
+
+impl Default for StepId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema, Display,

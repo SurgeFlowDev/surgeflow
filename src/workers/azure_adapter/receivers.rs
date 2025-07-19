@@ -3,7 +3,7 @@ use crate::{
     event::InstanceEvent,
     step::FullyQualifiedStep,
     workers::adapters::{managers::WorkflowInstance, receivers::{
-        ActiveStepReceiver, EventReceiver, InstanceReceiver, NextStepReceiver,
+        ActiveStepReceiver, EventReceiver, NewInstanceReceiver, NextStepReceiver,
     }},
     workflows::Workflow,
 };
@@ -19,7 +19,7 @@ pub struct AzureServiceBusInstanceReceiver<W: Workflow> {
     _marker: PhantomData<W>,
 }
 
-impl<W: Workflow> InstanceReceiver<W> for AzureServiceBusInstanceReceiver<W> {
+impl<W: Workflow> NewInstanceReceiver<W> for AzureServiceBusInstanceReceiver<W> {
     type Handle = ServiceBusReceivedMessage;
     async fn receive(&mut self) -> anyhow::Result<(WorkflowInstance, Self::Handle)> {
         let msg = self.receiver.receive_message().await?;
