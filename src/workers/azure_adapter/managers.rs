@@ -6,7 +6,7 @@ use typespec::{error::ErrorKind, http::StatusCode};
 
 use crate::{
     step::FullyQualifiedStep,
-    workers::adapters::managers::StepsAwaitingEventManager,
+    workers::{adapters::managers::StepsAwaitingEventManager, azure_adapter::AzureAdapterError},
     workflows::{Workflow, WorkflowInstanceId},
 };
 
@@ -33,22 +33,23 @@ impl<W: Workflow> AzureServiceBusStepsAwaitingEventManager<W> {
 }
 
 impl<W: Workflow> StepsAwaitingEventManager<W> for AzureServiceBusStepsAwaitingEventManager<W> {
+    type Error = AzureAdapterError;
     async fn get_step(
         &mut self,
         instance_id: WorkflowInstanceId,
-    ) -> anyhow::Result<Option<FullyQualifiedStep<W::Step>>> {
+    ) -> Result<Option<FullyQualifiedStep<W::Step>>, Self::Error> {
         let id = Self::make_key(instance_id);
         let item =
             CosmosItem::<FullyQualifiedStep<W::Step>>::read(&self.container_client, id).await?;
 
         Ok(item.map(|item| item.data))
     }
-    async fn delete_step(&mut self, instance_id: WorkflowInstanceId) -> anyhow::Result<()> {
+    async fn delete_step(&mut self, instance_id: WorkflowInstanceId) -> Result<(), Self::Error> {
         let id = Self::make_key(instance_id);
         CosmosItem::<FullyQualifiedStep<W::Step>>::delete(&self.container_client, id).await?;
         Ok(())
     }
-    async fn put_step(&mut self, step: FullyQualifiedStep<W::Step>) -> anyhow::Result<()> {
+    async fn put_step(&mut self, step: FullyQualifiedStep<W::Step>) -> Result<(), Self::Error> {
         let id = Self::make_key(step.instance_id);
         let item = CosmosItem::new(step, id);
         item.create(&self.container_client).await?;
@@ -67,18 +68,32 @@ impl<T: Serialize + for<'de> Deserialize<'de>> CosmosItem<T> {
     fn new(data: T, id: String) -> Self {
         Self { id, data }
     }
-    async fn read(container_client: &ContainerClient, id: String) -> anyhow::Result<Option<Self>> {
-        let response = try_read_item(container_client, &id, &id).await?;
+    async fn read(
+        container_client: &ContainerClient,
+        id: String,
+    ) -> Result<Option<Self>, AzureAdapterError> {
+        let response = try_read_item(container_client, &id, &id)
+            .await
+            .map_err(AzureAdapterError::CosmosDbError)?;
         Ok(response)
     }
-    async fn delete(container_client: &ContainerClient, id: String) -> anyhow::Result<()> {
-        container_client.delete_item(&id, &id, None).await?;
+    async fn delete(
+        container_client: &ContainerClient,
+        id: String,
+    ) -> Result<(), AzureAdapterError> {
+        container_client
+            .delete_item(&id, &id, None)
+            .await
+            .map_err(AzureAdapterError::CosmosDbError)?;
 
         Ok(())
     }
-    async fn create(self, container_client: &ContainerClient) -> anyhow::Result<()> {
+    async fn create(self, container_client: &ContainerClient) -> Result<(), AzureAdapterError> {
         let id = self.id.clone();
-        container_client.create_item(id, self, None).await?;
+        container_client
+            .create_item(id, self, None)
+            .await
+            .map_err(AzureAdapterError::CosmosDbError)?;
         Ok(())
     }
 }
@@ -130,7 +145,7 @@ mod workflow_instance_manager {
                 managers::{WorkflowInstance, WorkflowInstanceManager},
                 senders::NewInstanceSender,
             },
-            azure_adapter::senders::AzureServiceBusInstanceSender,
+            azure_adapter::{AzureAdapterError, senders::AzureServiceBusInstanceSender},
         },
         workflows::Workflow,
     };
@@ -162,25 +177,26 @@ mod workflow_instance_manager {
     }
 
     impl<W: Workflow> WorkflowInstanceManager<W> for AzureServiceBusWorkflowInstanceManager<W> {
+        type Error = AzureAdapterError;
         async fn create_instance(
             &self,
             conn: &mut PgConnection,
-        ) -> anyhow::Result<WorkflowInstance> {
+        ) -> Result<WorkflowInstance, AzureAdapterError> {
             tracing::info!("Creating workflow instance for: {}", W::NAME);
             let res = query_as!(
                 WorkflowInstanceRecord,
                 r#"
-            INSERT INTO workflow_instances ("workflow_id")
-            SELECT "id"
-            FROM workflows
-            WHERE "name" = $1
-            RETURNING "external_id", "workflow_id";
-        "#,
+                    INSERT INTO workflow_instances ("workflow_id")
+                    SELECT "id"
+                    FROM workflows
+                    WHERE "name" = $1
+                    RETURNING "external_id", "workflow_id";
+                "#,
                 W::NAME
             )
             .fetch_one(conn)
             .await
-            .inspect_err(|e| tracing::error!("Failed to create workflow instance: {:?}", e))?;
+            .map_err(AzureAdapterError::DatabaseError)?;
 
             tracing::info!(
                 "Created workflow instance: {} with id: {}",
@@ -188,7 +204,7 @@ mod workflow_instance_manager {
                 res.external_id
             );
 
-            let res: WorkflowInstance = res.try_into()?;
+            let res: WorkflowInstance = res.try_into().expect("TODO: handle conversion error");
 
             tracing::info!(
                 "Sending workflow instance: {} with id: {} to Azure Service Bus",

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO workflow_instances (\"workflow_id\")\n            SELECT \"id\"\n            FROM workflows\n            WHERE \"name\" = $1\n            RETURNING \"external_id\", \"workflow_id\";\n        ",
+  "query": "\n                    INSERT INTO workflow_instances (\"workflow_id\")\n                    SELECT \"id\"\n                    FROM workflows\n                    WHERE \"name\" = $1\n                    RETURNING \"external_id\", \"workflow_id\";\n                ",
   "describe": {
     "columns": [
       {
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "205c7e84c92fd3c46a976ddfa5c75d472997864c4ce9d38952baefa05b46c5d9"
+  "hash": "c5e76fd71fe87311f74fc6eb1906c35f952a7b80d75fff501f175380fd8778c2"
 }

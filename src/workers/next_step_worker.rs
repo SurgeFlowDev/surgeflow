@@ -71,7 +71,7 @@ enum NextStepWorkerError<W: Workflow, D: NextStepWorkerContext<W>> {
     #[error("Failed to send active step")]
     SendActiveStepError(#[source] <D::ActiveStepSender as ActiveStepSender<W>>::Error),
     #[error("Failed to put step in awaiting event manager")]
-    AwaitEventError(#[source] anyhow::Error),
+    AwaitEventError(#[source] <D::StepsAwaitingEventManager as StepsAwaitingEventManager<W>>::Error),
 }
 
 async fn process<W: Workflow, D: NextStepWorkerContext<W>>(

@@ -1,44 +1,36 @@
+use std::error::Error;
+
 use crate::{
     step::FullyQualifiedStep,
     workflows::{Workflow, WorkflowInstanceId},
 };
 
 pub trait StepsAwaitingEventManager<W: Workflow>: Sized {
+    type Error: Error + Send + Sync + 'static;
     fn get_step(
         &mut self,
         instance_id: WorkflowInstanceId,
-    ) -> impl std::future::Future<Output = anyhow::Result<Option<FullyQualifiedStep<W::Step>>>> + Send;
+    ) -> impl std::future::Future<Output = Result<Option<FullyQualifiedStep<W::Step>>, Self::Error>> + Send;
     fn delete_step(
         &mut self,
         instance_id: WorkflowInstanceId,
-    ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
 
     fn put_step(
         &mut self,
         step: FullyQualifiedStep<W::Step>,
-    ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
 }
 
 mod workflow_instance_manager {
+    use std::error::Error;
+
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
     use sqlx::PgConnection;
 
     use crate::workflows::{Workflow, WorkflowId, WorkflowInstanceId};
 
-    // pub struct WorkflowInstanceRecord {
-    //     pub id: i32,
-    //     pub workflow_id: i32,
-    // }
-    // impl TryFrom<WorkflowInstanceRecord> for WorkflowInstance {
-    //     type Error = WorkflowInstanceError;
-    //     fn try_from(value: WorkflowInstanceRecord) -> Result<Self, Self::Error> {
-    //         Ok(WorkflowInstance {
-    //             id: value.id.into(),
-    //             workflow_id: value.workflow_id.into(),
-    //         })
-    //     }
-    // }
     #[derive(Debug, Deserialize, Serialize, JsonSchema)]
     pub struct WorkflowInstance {
         pub external_id: WorkflowInstanceId,
@@ -46,10 +38,11 @@ mod workflow_instance_manager {
     }
 
     pub trait WorkflowInstanceManager<W: Workflow> {
+        type Error: Error + Send + Sync + 'static;
         fn create_instance(
             &self,
             conn: &mut PgConnection,
-        ) -> impl std::future::Future<Output = anyhow::Result<WorkflowInstance>> + Send;
+        ) -> impl Future<Output = Result<WorkflowInstance, Self::Error>> + Send;
     }
 }
 
