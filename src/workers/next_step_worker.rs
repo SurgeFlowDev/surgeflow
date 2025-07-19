@@ -1,5 +1,3 @@
-use sqlx::{PgConnection, PgPool, query};
-use uuid::Uuid;
 use crate::{
     event::Immediate,
     step::{FullyQualifiedStep, WorkflowStep},
@@ -9,7 +7,9 @@ use crate::{
     },
     workflows::Workflow,
 };
+use sqlx::{PgConnection, PgPool, query};
 use std::any::TypeId;
+use uuid::Uuid;
 
 pub async fn main<W: Workflow, D: NextStepWorkerContext<W>>() -> anyhow::Result<()> {
     let dependencies = D::dependencies().await?;
@@ -21,29 +21,46 @@ pub async fn main<W: Workflow, D: NextStepWorkerContext<W>>() -> anyhow::Result<
 
     let connection_string =
         std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
-    let pool = PgPool::connect(&connection_string).await?;
+    let mut pool = PgPool::connect(&connection_string).await?;
 
     loop {
-        let Ok((step, handle)) = next_step_receiver.receive().await else {
-            tracing::error!("Failed to receive next step");
-            continue;
-        };
-        let mut tx = pool.begin().await?;
-
-        if let Err(err) = process::<W, D>(
+        if let Err(err) = receive_and_process::<W, D>(
+            &mut next_step_receiver,
             &mut active_step_sender,
             &mut steps_awaiting_event_manager,
-            &mut tx,
-            step,
+            &mut pool,
         )
         .await
         {
             tracing::error!("Error processing next step: {:?}", err);
         }
-
-        tx.commit().await?;
-        next_step_receiver.accept(handle).await?;
     }
+}
+
+async fn receive_and_process<W: Workflow, D: NextStepWorkerContext<W>>(
+    next_step_receiver: &mut D::NextStepReceiver,
+    active_step_sender: &mut D::ActiveStepSender,
+    steps_awaiting_event_manager: &mut D::StepsAwaitingEventManager,
+    pool: &mut PgPool,
+) -> anyhow::Result<()> {
+    let (step, handle) = next_step_receiver.receive().await?;
+    let mut tx = pool.begin().await?;
+
+    if let Err(err) = process::<W, D>(
+        active_step_sender,
+        steps_awaiting_event_manager,
+        &mut tx,
+        step,
+    )
+    .await
+    {
+        tracing::error!("Error processing next step: {:?}", err);
+    }
+
+    tx.commit().await?;
+    next_step_receiver.accept(handle).await?;
+
+    Ok(())
 }
 
 async fn process<W: Workflow, D: NextStepWorkerContext<W>>(

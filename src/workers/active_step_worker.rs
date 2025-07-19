@@ -24,10 +24,10 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
     query!(
         r#"
         UPDATE workflow_steps SET "status" = $1
-        WHERE "workflow_instance_external_id" = $2
+        WHERE "external_id" = $2
         "#,
         4,
-        Uuid::from(step.instance_id)
+        Uuid::from(step.step_id)
     )
     .execute(conn)
     .await?;

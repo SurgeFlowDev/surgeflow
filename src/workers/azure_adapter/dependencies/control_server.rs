@@ -51,6 +51,4 @@ impl<W: Workflow> ControlServerContext<W> for AzureServiceBusControlServerDepend
             },
         ))
     }
-
-    
 }

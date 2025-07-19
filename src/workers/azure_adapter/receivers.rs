@@ -1,10 +1,10 @@
 use crate::{
-    
     event::InstanceEvent,
     step::FullyQualifiedStep,
-    workers::adapters::{managers::WorkflowInstance, receivers::{
-        ActiveStepReceiver, EventReceiver, NewInstanceReceiver, NextStepReceiver,
-    }},
+    workers::adapters::{
+        managers::WorkflowInstance,
+        receivers::{ActiveStepReceiver, EventReceiver, NewInstanceReceiver, NextStepReceiver},
+    },
     workflows::Workflow,
 };
 use azservicebus::{

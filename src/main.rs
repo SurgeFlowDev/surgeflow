@@ -53,8 +53,8 @@ async fn serve(router: ApiRouter, sqlx_tx_layer: TxLayer) -> anyhow::Result<()> 
 }
 #[cfg(feature = "control_server")]
 async fn control_server_setup() -> anyhow::Result<(TxState, TxLayer)> {
-    let connection_string = std::env::var("APP_USER_DATABASE_URL")
-        .expect("APP_USER_DATABASE_URL must be set");
+    let connection_string =
+        std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
 
     Ok(Tx::setup(PgPool::connect(&connection_string).await?))
 }

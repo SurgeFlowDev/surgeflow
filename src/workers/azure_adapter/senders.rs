@@ -10,7 +10,8 @@ use crate::{
     workers::adapters::{
         managers::WorkflowInstance,
         senders::{
-            ActiveStepSender, CompletedStepSender, EventSender, FailedStepSender, NewInstanceSender, NextStepSender
+            ActiveStepSender, CompletedStepSender, EventSender, FailedStepSender,
+            NewInstanceSender, NextStepSender,
         },
     },
     workflows::Workflow,

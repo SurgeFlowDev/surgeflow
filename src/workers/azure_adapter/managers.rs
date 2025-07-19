@@ -182,7 +182,11 @@ mod workflow_instance_manager {
             .await
             .inspect_err(|e| tracing::error!("Failed to create workflow instance: {:?}", e))?;
 
-            tracing::info!("Created workflow instance: {} with id: {}", W::NAME, res.external_id);
+            tracing::info!(
+                "Created workflow instance: {} with id: {}",
+                W::NAME,
+                res.external_id
+            );
 
             let res: WorkflowInstance = res.try_into()?;
 
