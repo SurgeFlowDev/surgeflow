@@ -10,7 +10,7 @@ pub trait StepsAwaitingEventManager<W: Workflow>: Sized {
     fn get_step(
         &mut self,
         instance_id: WorkflowInstanceId,
-    ) -> impl std::future::Future<Output = Result<Option<FullyQualifiedStep<W::Step>>, Self::Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<Option<FullyQualifiedStep<W>>, Self::Error>> + Send;
     fn delete_step(
         &mut self,
         instance_id: WorkflowInstanceId,
@@ -18,7 +18,7 @@ pub trait StepsAwaitingEventManager<W: Workflow>: Sized {
 
     fn put_step(
         &mut self,
-        step: FullyQualifiedStep<W::Step>,
+        step: FullyQualifiedStep<W>,
     ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
 }
 

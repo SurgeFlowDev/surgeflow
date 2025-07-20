@@ -12,7 +12,7 @@ pub trait NextStepReceiver<W: Workflow>: Sized {
     type Handle;
     fn receive(
         &mut self,
-    ) -> impl Future<Output = Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error>> + Send;
+    ) -> impl Future<Output = Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error>> + Send;
     fn accept(
         &mut self,
         handle: Self::Handle,
@@ -24,7 +24,7 @@ pub trait ActiveStepReceiver<W: Workflow>: Sized {
     type Handle;
     fn receive(
         &mut self,
-    ) -> impl Future<Output = Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error>> + Send;
+    ) -> impl Future<Output = Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error>> + Send;
     fn accept(
         &mut self,
         handle: Self::Handle,
@@ -36,7 +36,7 @@ pub trait CompletedStepReceiver<W: Workflow>: Sized {
     type Handle;
     fn receive(
         &mut self,
-    ) -> impl Future<Output = Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error>> + Send;
+    ) -> impl Future<Output = Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error>> + Send;
     fn accept(
         &mut self,
         handle: Self::Handle,
@@ -48,7 +48,7 @@ pub trait FailedStepReceiver<W: Workflow>: Sized {
     type Handle;
     fn receive(
         &mut self,
-    ) -> impl Future<Output = Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error>> + Send;
+    ) -> impl Future<Output = Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error>> + Send;
     fn accept(
         &mut self,
         handle: Self::Handle,

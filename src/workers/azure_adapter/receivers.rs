@@ -266,7 +266,7 @@ impl<W: Workflow> NextStepReceiver<W> for AzureServiceBusNextStepReceiver<W> {
     type Handle = ServiceBusReceivedMessage;
     async fn receive(
         &mut self,
-    ) -> Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error> {
+    ) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -329,7 +329,7 @@ impl<W: Workflow> CompletedStepReceiver<W> for AzureServiceBusCompletedStepRecei
     type Handle = ServiceBusReceivedMessage;
     async fn receive(
         &mut self,
-    ) -> Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error> {
+    ) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -392,7 +392,7 @@ impl<W: Workflow> FailedStepReceiver<W> for AzureServiceBusFailedStepReceiver<W>
     type Handle = ServiceBusReceivedMessage;
     async fn receive(
         &mut self,
-    ) -> Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error> {
+    ) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -455,7 +455,7 @@ impl<W: Workflow> ActiveStepReceiver<W> for AzureServiceBusActiveStepReceiver<W>
     type Handle = ServiceBusReceivedMessage;
     async fn receive(
         &mut self,
-    ) -> Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error> {
+    ) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()

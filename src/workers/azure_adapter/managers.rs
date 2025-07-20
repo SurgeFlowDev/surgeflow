@@ -37,19 +37,19 @@ impl<W: Workflow> StepsAwaitingEventManager<W> for AzureServiceBusStepsAwaitingE
     async fn get_step(
         &mut self,
         instance_id: WorkflowInstanceId,
-    ) -> Result<Option<FullyQualifiedStep<W::Step>>, Self::Error> {
+    ) -> Result<Option<FullyQualifiedStep<W>>, Self::Error> {
         let id = Self::make_key(instance_id);
         let item =
-            CosmosItem::<FullyQualifiedStep<W::Step>>::read(&self.container_client, id).await?;
+            CosmosItem::<FullyQualifiedStep<W>>::read(&self.container_client, id).await?;
 
         Ok(item.map(|item| item.data))
     }
     async fn delete_step(&mut self, instance_id: WorkflowInstanceId) -> Result<(), Self::Error> {
         let id = Self::make_key(instance_id);
-        CosmosItem::<FullyQualifiedStep<W::Step>>::delete(&self.container_client, id).await?;
+        CosmosItem::<FullyQualifiedStep<W>>::delete(&self.container_client, id).await?;
         Ok(())
     }
-    async fn put_step(&mut self, step: FullyQualifiedStep<W::Step>) -> Result<(), Self::Error> {
+    async fn put_step(&mut self, step: FullyQualifiedStep<W>) -> Result<(), Self::Error> {
         let id = Self::make_key(step.instance.external_id);
         let item = CosmosItem::new(step, id);
         item.create(&self.container_client).await?;

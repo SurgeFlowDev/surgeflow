@@ -17,7 +17,7 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
     failed_step_sender: &mut D::FailedStepSender,
     completed_step_sender: &mut D::CompletedStepSender,
     conn: &mut PgConnection,
-    mut step: FullyQualifiedStep<W::Step>,
+    mut step: FullyQualifiedStep<W>,
 ) -> anyhow::Result<()> {
     let instance = step.instance.clone();
     tracing::info!("Received new step");

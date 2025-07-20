@@ -65,7 +65,7 @@ enum FailedStepWorkerError<W: Workflow, D: FailedStepWorkerContext<W>> {
 async fn process<W: Workflow, D: FailedStepWorkerContext<W>>(
     failed_instance_sender: &mut D::FailedInstanceSender,
     conn: &mut PgConnection,
-    step: FullyQualifiedStep<W::Step>,
+    step: FullyQualifiedStep<W>,
 ) -> Result<(), FailedStepWorkerError<W, D>> {
     tracing::info!(
         "received failed step for instance: {}",

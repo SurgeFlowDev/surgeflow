@@ -58,12 +58,12 @@ CREATE VIEW workflow_steps AS
         workflow_steps_base AS wsb
     INNER JOIN workflow_instances AS wi ON wi.id = wsb.workflow_instance_id
     JOIN (
-        SELECT 
+        SELECT
             workflow_step_id,
             MAX(version) AS max_version
-        FROM 
+        FROM
             workflow_step_versions
-        GROUP BY 
+        GROUP BY
             workflow_step_id
     ) AS latest ON latest.workflow_step_id = wsb.id
     JOIN 

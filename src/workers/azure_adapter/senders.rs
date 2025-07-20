@@ -31,7 +31,7 @@ impl<W: Workflow> NextStepSender<W> for AzureServiceBusNextStepSender<W> {
 
     async fn send(
         &mut self,
-        step: FullyQualifiedStep<<W as Workflow>::Step>,
+        step: FullyQualifiedStep<W>,
     ) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
@@ -68,7 +68,7 @@ impl<W: Workflow> ActiveStepSender<W> for AzureServiceBusActiveStepSender<W> {
     type Error = AzureAdapterError;
     async fn send(
         &mut self,
-        step: FullyQualifiedStep<<W as Workflow>::Step>,
+        step: FullyQualifiedStep<W>,
     ) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
@@ -107,7 +107,7 @@ impl<W: Workflow> FailedStepSender<W> for AzureServiceBusFailedStepSender<W> {
 
     async fn send(
         &mut self,
-        step: FullyQualifiedStep<<W as Workflow>::Step>,
+        step: FullyQualifiedStep<W>,
     ) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
@@ -308,7 +308,7 @@ impl<W: Workflow> CompletedStepSender<W> for AzureServiceBusCompletedStepSender<
 
     async fn send(
         &mut self,
-        step: FullyQualifiedStep<<W as Workflow>::Step>,
+        step: FullyQualifiedStep<W>,
     ) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender

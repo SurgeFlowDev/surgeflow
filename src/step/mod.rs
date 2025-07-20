@@ -4,7 +4,9 @@ use std::{any::TypeId, fmt::Debug, marker::PhantomData};
 use uuid::Uuid;
 
 use crate::{
-    event::Event, workers::adapters::managers::WorkflowInstance, workflows::{StepId, Workflow, WorkflowInstanceId}
+    event::Event,
+    workers::adapters::managers::WorkflowInstance,
+    workflows::{StepId, Workflow, WorkflowInstanceId},
 };
 
 pub type StepResult<W> = Result<Option<StepWithSettings<<W as Workflow>::Step>>, StepError>;
@@ -60,11 +62,11 @@ pub struct StepSettings {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct FullyQualifiedStep<S: Debug + Step + for<'a> Deserialize<'a>> {
+pub struct FullyQualifiedStep<W: Workflow> {
     pub instance: WorkflowInstance,
     pub step_id: StepId,
     #[serde(bound = "")]
-    pub step: StepWithSettings<S>,
-    pub event: Option<<S::Workflow as Workflow>::Event>,
+    pub step: StepWithSettings<W::Step>,
+    pub event: Option<W::Event>,
     pub retry_count: u32,
 }

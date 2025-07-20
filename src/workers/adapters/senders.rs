@@ -1,7 +1,4 @@
-use std::{
-    error::Error,
-    fmt::{Debug, Display},
-};
+use std::error::Error;
 
 use crate::{
     event::InstanceEvent, step::FullyQualifiedStep, workers::adapters::managers::WorkflowInstance,
@@ -14,7 +11,7 @@ pub trait NextStepSender<W: Workflow>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
-        step: FullyQualifiedStep<W::Step>,
+        step: FullyQualifiedStep<W>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
@@ -22,7 +19,7 @@ pub trait ActiveStepSender<W: Workflow>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
-        step: FullyQualifiedStep<W::Step>,
+        step: FullyQualifiedStep<W>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
@@ -30,7 +27,7 @@ pub trait FailedStepSender<W: Workflow>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
-        step: FullyQualifiedStep<W::Step>,
+        step: FullyQualifiedStep<W>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
@@ -38,7 +35,7 @@ pub trait CompletedStepSender<W: Workflow>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
-        step: FullyQualifiedStep<W::Step>,
+        step: FullyQualifiedStep<W>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 

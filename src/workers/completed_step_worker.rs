@@ -55,7 +55,7 @@ enum CompletedStepWorkerError {
 
 async fn process<W: Workflow>(
     conn: &mut PgConnection,
-    step: FullyQualifiedStep<W::Step>,
+    step: FullyQualifiedStep<W>,
 ) -> Result<(), CompletedStepWorkerError> {
     tracing::info!("received completed step for instance: {}", step.instance.external_id);
 

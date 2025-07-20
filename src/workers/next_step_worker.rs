@@ -80,7 +80,7 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
     active_step_sender: &mut D::ActiveStepSender,
     steps_awaiting_event_manager: &mut D::StepsAwaitingEventManager,
     conn: &mut PgConnection,
-    step: FullyQualifiedStep<W::Step>,
+    step: FullyQualifiedStep<W>,
 ) -> Result<(), NextStepWorkerError<W, D>> {
     tracing::info!(
         "received next step for instance: {}",
