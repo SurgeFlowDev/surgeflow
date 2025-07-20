@@ -3,7 +3,7 @@ use sqlx::{PgConnection, PgPool};
 use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
-        dependencies::workspace_instance_worker::WorkspaceInstanceWorkerContext,
+        dependencies::new_instance_worker::WorkspaceInstanceWorkerContext,
         managers::WorkflowInstance, receivers::NewInstanceReceiver, senders::NextStepSender,
     },
     workflows::{StepId, Workflow},

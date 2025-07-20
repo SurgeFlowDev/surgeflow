@@ -14,11 +14,11 @@ use rust_workflow_2::workers::azure_adapter::dependencies::completed_step_worker
 use rust_workflow_2::workers::azure_adapter::dependencies::failed_step_worker::AzureServiceBusFailedStepWorkerDependencies;
 use rust_workflow_2::workers::azure_adapter::dependencies::new_event_worker::AzureServiceBusNewEventWorkerDependencies;
 use rust_workflow_2::workers::azure_adapter::dependencies::next_step_worker::AzureServiceBusNextStepWorkerDependencies;
-use rust_workflow_2::workers::azure_adapter::dependencies::workspace_instance_worker::AzureServiceBusWorkspaceInstanceWorkerDependencies;
+use rust_workflow_2::workers::azure_adapter::dependencies::new_instance_worker::AzureServiceBusWorkspaceInstanceWorkerDependencies;
 use rust_workflow_2::workers::completed_step_worker;
 use rust_workflow_2::workers::failed_step_worker;
 use rust_workflow_2::workers::next_step_worker;
-use rust_workflow_2::workers::workspace_instance_worker::{self};
+use rust_workflow_2::workers::new_instance_worker::{self};
 use rust_workflow_2::workflows::{TxState, workflow_0::Workflow0};
 use rust_workflow_2::{
     workers::azure_adapter::dependencies::control_server::AzureServiceBusControlServerDependencies,
@@ -108,7 +108,7 @@ async fn main_handler<W: Workflow>(
         #[cfg(feature = "active_step_worker")]
         active_step_worker::main::<W, AzureServiceBusActiveStepWorkerDependencies<W>>(wf),
         #[cfg(feature = "new_instance_worker")]
-        workspace_instance_worker::main::<W, AzureServiceBusWorkspaceInstanceWorkerDependencies<W>>(
+        new_instance_worker::main::<W, AzureServiceBusWorkspaceInstanceWorkerDependencies<W>>(
         ),
         #[cfg(feature = "next_step_worker")]
         next_step_worker::main::<W, AzureServiceBusNextStepWorkerDependencies<W>>(),

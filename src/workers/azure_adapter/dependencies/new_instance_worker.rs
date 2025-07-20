@@ -1,6 +1,6 @@
 use crate::{
     workers::{
-        adapters::dependencies::workspace_instance_worker::{
+        adapters::dependencies::new_instance_worker::{
             WorkspaceInstanceWorkerContext, WorkspaceInstanceWorkerDependencies,
         },
         azure_adapter::{
