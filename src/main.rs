@@ -10,9 +10,13 @@ use axum::{
 use macros::my_main;
 use rust_workflow_2::workers::active_step_worker;
 use rust_workflow_2::workers::azure_adapter::dependencies::active_step_worker::AzureServiceBusActiveStepWorkerDependencies;
+use rust_workflow_2::workers::azure_adapter::dependencies::completed_step_worker::AzureServiceBusCompletedStepWorkerDependencies;
+use rust_workflow_2::workers::azure_adapter::dependencies::failed_step_worker::AzureServiceBusFailedStepWorkerDependencies;
 use rust_workflow_2::workers::azure_adapter::dependencies::new_event_worker::AzureServiceBusNewEventWorkerDependencies;
 use rust_workflow_2::workers::azure_adapter::dependencies::next_step_worker::AzureServiceBusNextStepWorkerDependencies;
 use rust_workflow_2::workers::azure_adapter::dependencies::workspace_instance_worker::AzureServiceBusWorkspaceInstanceWorkerDependencies;
+use rust_workflow_2::workers::completed_step_worker;
+use rust_workflow_2::workers::failed_step_worker;
 use rust_workflow_2::workers::next_step_worker;
 use rust_workflow_2::workers::workspace_instance_worker::{self};
 use rust_workflow_2::workflows::{TxState, workflow_0::Workflow0};
@@ -91,7 +95,9 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
     feature = "active_step_worker",
     feature = "new_instance_worker",
     feature = "next_step_worker",
-    feature = "new_event_worker"
+    feature = "new_event_worker",
+    feature = "completed_step_worker",
+    feature = "failed_step_worker"
 ))]
 async fn main_handler<W: Workflow>(
     #[cfg(feature = "active_step_worker")] wf: W,
@@ -108,6 +114,10 @@ async fn main_handler<W: Workflow>(
         next_step_worker::main::<W, AzureServiceBusNextStepWorkerDependencies<W>>(),
         #[cfg(feature = "new_event_worker")]
         new_event_worker::main::<W, AzureServiceBusNewEventWorkerDependencies<W>>(),
+        #[cfg(feature = "completed_step_worker")]
+        completed_step_worker::main::<W, AzureServiceBusCompletedStepWorkerDependencies<W>>(),
+        #[cfg(feature = "failed_step_worker")]
+        failed_step_worker::main::<W, AzureServiceBusFailedStepWorkerDependencies<W>>(),
     )?;
 
     Ok(())

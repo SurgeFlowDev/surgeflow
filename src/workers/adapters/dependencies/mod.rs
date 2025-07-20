@@ -3,6 +3,8 @@ pub mod control_server;
 pub mod new_event_worker;
 pub mod next_step_worker;
 pub mod workspace_instance_worker;
+pub mod completed_step_worker;
+pub mod failed_step_worker;
 
 // pub trait Dependencies<W: Workflow>: Sized {
 //     type WorkspaceInstanceWorkerDependenciesT: WorkspaceInstanceWorkerContext<W>;

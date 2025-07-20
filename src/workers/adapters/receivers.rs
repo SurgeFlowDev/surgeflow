@@ -13,7 +13,10 @@ pub trait NextStepReceiver<W: Workflow>: Sized {
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error>> + Send;
-    fn accept(&mut self, handle: Self::Handle) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn accept(
+        &mut self,
+        handle: Self::Handle,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 pub trait ActiveStepReceiver<W: Workflow>: Sized {
@@ -22,7 +25,34 @@ pub trait ActiveStepReceiver<W: Workflow>: Sized {
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error>> + Send;
-    fn accept(&mut self, handle: Self::Handle) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn accept(
+        &mut self,
+        handle: Self::Handle,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+}
+
+pub trait CompletedStepReceiver<W: Workflow>: Sized {
+    type Error: Error + Send + Sync + 'static;
+    type Handle;
+    fn receive(
+        &mut self,
+    ) -> impl Future<Output = Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error>> + Send;
+    fn accept(
+        &mut self,
+        handle: Self::Handle,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+}
+
+pub trait FailedStepReceiver<W: Workflow>: Sized {
+    type Error: Error + Send + Sync + 'static;
+    type Handle;
+    fn receive(
+        &mut self,
+    ) -> impl Future<Output = Result<(FullyQualifiedStep<W::Step>, Self::Handle), Self::Error>> + Send;
+    fn accept(
+        &mut self,
+        handle: Self::Handle,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 // Events
@@ -33,7 +63,10 @@ pub trait EventReceiver<W: Workflow>: Sized {
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(InstanceEvent<W>, Self::Handle), Self::Error>> + Send;
-    fn accept(&mut self, handle: Self::Handle) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn accept(
+        &mut self,
+        handle: Self::Handle,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 // Instances
@@ -44,7 +77,10 @@ pub trait NewInstanceReceiver<W: Workflow>: Sized {
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(WorkflowInstance, Self::Handle), Self::Error>> + Send;
-    fn accept(&mut self, handle: Self::Handle) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn accept(
+        &mut self,
+        handle: Self::Handle,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 pub trait CompletedInstanceReceiver<W: Workflow>: Sized {
@@ -53,7 +89,10 @@ pub trait CompletedInstanceReceiver<W: Workflow>: Sized {
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(WorkflowInstance, Self::Handle), Self::Error>> + Send;
-    fn accept(&mut self, handle: Self::Handle) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn accept(
+        &mut self,
+        handle: Self::Handle,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 pub trait FailedInstanceReceiver<W: Workflow>: Sized {
@@ -62,5 +101,8 @@ pub trait FailedInstanceReceiver<W: Workflow>: Sized {
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(WorkflowInstance, Self::Handle), Self::Error>> + Send;
-    fn accept(&mut self, handle: Self::Handle) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn accept(
+        &mut self,
+        handle: Self::Handle,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }

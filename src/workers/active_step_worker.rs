@@ -26,7 +26,7 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
         UPDATE workflow_steps SET "status" = $1
         WHERE "external_id" = $2
         "#,
-        4,
+        3,
         Uuid::from(step.step_id)
     )
     .execute(conn)
@@ -57,9 +57,7 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
             tracing::info!("Retrying step. Retry count: {}", step.retry_count);
             active_step_sender.send(step).await?;
         } else {
-            tracing::info!("Max retries reached for step: {:?}", step.step);
-            // TODO: push into "step failed" queue.
-            // TODO: and maybe "workflow failed" queue. though this could be done in the "step failed" queue consumer
+            tracing::info!("Max retries reached for step: {}", step.step_id);
             failed_step_sender.send(step).await?;
         }
     }

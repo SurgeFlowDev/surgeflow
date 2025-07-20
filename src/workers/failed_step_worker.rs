@@ -1,0 +1,75 @@
+use crate::{
+    event::Immediate,
+    step::{FullyQualifiedStep, WorkflowStep},
+    workers::adapters::{
+        dependencies::failed_step_worker::FailedStepWorkerContext,
+        managers::StepsAwaitingEventManager, receivers::FailedStepReceiver,
+        senders::ActiveStepSender,
+    },
+    workflows::Workflow,
+};
+use derive_more::Debug;
+use sqlx::{PgConnection, PgPool, query};
+use uuid::Uuid;
+
+pub async fn main<W: Workflow, D: FailedStepWorkerContext<W>>() -> anyhow::Result<()> {
+    let dependencies = D::dependencies().await?;
+
+    let mut failed_step_receiver = dependencies.failed_step_receiver;
+
+    let connection_string =
+        std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
+    let mut pool = PgPool::connect(&connection_string).await?;
+
+    loop {
+        if let Err(err) = receive_and_process::<W, D>(&mut failed_step_receiver, &mut pool).await
+        {
+            tracing::error!("Error processing failed step: {:?}", err);
+        }
+    }
+}
+
+async fn receive_and_process<W: Workflow, D: FailedStepWorkerContext<W>>(
+    failed_step_receiver: &mut D::FailedStepReceiver,
+    pool: &mut PgPool,
+) -> anyhow::Result<()> {
+    let (step, handle) = failed_step_receiver.receive().await?;
+    let mut tx = pool.begin().await?;
+
+    if let Err(err) = process::<W, D>(&mut tx, step).await {
+        tracing::error!("Error processing failed step: {:?}", err);
+    }
+
+    tx.commit().await?;
+    failed_step_receiver.accept(handle).await?;
+
+    Ok(())
+}
+
+#[derive(thiserror::Error, Debug)]
+enum FailedStepWorkerError
+// <W: Workflow, D: FailedStepWorkerContext<W>>
+{
+    #[error("Database error occurred")]
+    DatabaseError(#[from] sqlx::Error),
+}
+
+async fn process<W: Workflow, D: FailedStepWorkerContext<W>>(
+    conn: &mut PgConnection,
+    step: FullyQualifiedStep<W::Step>,
+) -> Result<(), FailedStepWorkerError> {
+    tracing::info!("received failed step for instance: {}", step.instance_id);
+
+        query!(
+        r#"
+        UPDATE workflow_steps SET "status" = $1
+        WHERE "external_id" = $2
+        "#,
+        5,
+        Uuid::from(step.step_id)
+    )
+    .execute(conn)
+    .await?;
+
+    Ok(())
+}
