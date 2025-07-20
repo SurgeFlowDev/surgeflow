@@ -26,7 +26,7 @@ impl Step for Workflow0Step {
         &self,
         wf: Self::Workflow,
         event: Option<Workflow0Event>,
-    ) -> Result<Option<StepWithSettings<Self>>, StepError> {
+    ) -> Result<Option<StepWithSettings<Self::Workflow>>, StepError> {
         match self {
             Workflow0Step::Step0(step) => Step::run_raw(step, wf, event).await,
             Workflow0Step::Step1(step) => Step::run_raw(step, wf, event).await,
@@ -57,7 +57,7 @@ impl From<Event0> for Option<<Workflow0 as Workflow>::Event> {
     }
 }
 
-impl From<Step1> for Option<StepWithSettings<<<Step1 as Step>::Workflow as Workflow>::Step>> {
+impl From<Step1> for Option<StepWithSettings<<Step1 as Step>::Workflow>> {
     fn from(step: Step1) -> Self {
         Some(StepWithSettings {
             step: step.into(),
@@ -83,7 +83,7 @@ impl Workflow for Workflow0 {
     type Step = Workflow0Step;
     const NAME: &'static str = "workflow_0";
 
-    fn entrypoint() -> StepWithSettings<Self::Step> {
+    fn entrypoint() -> StepWithSettings<Self> {
         StepWithSettings {
             step: Step0 {}.into(),
             settings: StepSettings { max_retries: 1 },

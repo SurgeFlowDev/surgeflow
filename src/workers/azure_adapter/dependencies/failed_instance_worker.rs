@@ -34,9 +34,11 @@ impl<W: Workflow> FailedInstanceWorkerContext<W>
 
         let failed_instances_queue = format!("{}-failed-instances", W::NAME);
 
-        let instance_receiver =
-            AzureServiceBusFailedInstanceReceiver::new(&mut service_bus_client, &failed_instances_queue)
-                .await?;
+        let instance_receiver = AzureServiceBusFailedInstanceReceiver::new(
+            &mut service_bus_client,
+            &failed_instances_queue,
+        )
+        .await?;
 
         Ok(FailedInstanceWorkerDependencies::new(
             instance_receiver,

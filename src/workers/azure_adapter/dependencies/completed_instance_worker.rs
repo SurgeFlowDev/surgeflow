@@ -34,9 +34,11 @@ impl<W: Workflow> CompletedInstanceWorkerContext<W>
 
         let completed_instance_queue = format!("{}-completed-instances", W::NAME);
 
-        let instance_receiver =
-            AzureServiceBusCompletedInstanceReceiver::new(&mut service_bus_client, &completed_instance_queue)
-                .await?;
+        let instance_receiver = AzureServiceBusCompletedInstanceReceiver::new(
+            &mut service_bus_client,
+            &completed_instance_queue,
+        )
+        .await?;
 
         Ok(CompletedInstanceWorkerDependencies::new(
             instance_receiver,

@@ -11,7 +11,8 @@ use crate::{
         adapters::{
             managers::WorkflowInstance,
             senders::{
-                ActiveStepSender, CompletedInstanceSender, CompletedStepSender, EventSender, FailedInstanceSender, FailedStepSender, NewInstanceSender, NextStepSender
+                ActiveStepSender, CompletedInstanceSender, CompletedStepSender, EventSender,
+                FailedInstanceSender, FailedStepSender, NewInstanceSender, NextStepSender,
             },
         },
         azure_adapter::AzureAdapterError,
@@ -29,10 +30,7 @@ pub struct AzureServiceBusNextStepSender<W: Workflow> {
 impl<W: Workflow> NextStepSender<W> for AzureServiceBusNextStepSender<W> {
     type Error = AzureAdapterError;
 
-    async fn send(
-        &mut self,
-        step: FullyQualifiedStep<W>,
-    ) -> Result<(), Self::Error> {
+    async fn send(&mut self, step: FullyQualifiedStep<W>) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message(serde_json::to_vec(&step).map_err(AzureAdapterError::SerializeError)?)
@@ -66,10 +64,7 @@ pub struct AzureServiceBusActiveStepSender<W: Workflow> {
 
 impl<W: Workflow> ActiveStepSender<W> for AzureServiceBusActiveStepSender<W> {
     type Error = AzureAdapterError;
-    async fn send(
-        &mut self,
-        step: FullyQualifiedStep<W>,
-    ) -> Result<(), Self::Error> {
+    async fn send(&mut self, step: FullyQualifiedStep<W>) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message(serde_json::to_vec(&step).map_err(AzureAdapterError::SerializeError)?)
@@ -105,10 +100,7 @@ pub struct AzureServiceBusFailedStepSender<W: Workflow> {
 impl<W: Workflow> FailedStepSender<W> for AzureServiceBusFailedStepSender<W> {
     type Error = AzureAdapterError;
 
-    async fn send(
-        &mut self,
-        step: FullyQualifiedStep<W>,
-    ) -> Result<(), Self::Error> {
+    async fn send(&mut self, step: FullyQualifiedStep<W>) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message(serde_json::to_vec(&step).map_err(AzureAdapterError::SerializeError)?)
@@ -306,10 +298,7 @@ pub struct AzureServiceBusCompletedStepSender<W: Workflow> {
 impl<W: Workflow> CompletedStepSender<W> for AzureServiceBusCompletedStepSender<W> {
     type Error = AzureAdapterError;
 
-    async fn send(
-        &mut self,
-        step: FullyQualifiedStep<W>,
-    ) -> Result<(), Self::Error> {
+    async fn send(&mut self, step: FullyQualifiedStep<W>) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message(serde_json::to_vec(&step).map_err(AzureAdapterError::SerializeError)?)

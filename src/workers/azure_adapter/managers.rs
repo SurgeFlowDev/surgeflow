@@ -39,8 +39,7 @@ impl<W: Workflow> StepsAwaitingEventManager<W> for AzureServiceBusStepsAwaitingE
         instance_id: WorkflowInstanceId,
     ) -> Result<Option<FullyQualifiedStep<W>>, Self::Error> {
         let id = Self::make_key(instance_id);
-        let item =
-            CosmosItem::<FullyQualifiedStep<W>>::read(&self.container_client, id).await?;
+        let item = CosmosItem::<FullyQualifiedStep<W>>::read(&self.container_client, id).await?;
 
         Ok(item.map(|item| item.data))
     }

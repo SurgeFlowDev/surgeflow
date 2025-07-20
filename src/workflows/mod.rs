@@ -93,7 +93,7 @@ pub trait Workflow: Clone + Send + Sync + 'static {
     type Step: Step<Workflow = Self, Event = Self::Event> + WorkflowStep;
     const NAME: &'static str;
 
-    fn entrypoint() -> StepWithSettings<Self::Step>;
+    fn entrypoint() -> StepWithSettings<Self>;
 }
 
 pub trait WorkflowExt: Workflow {

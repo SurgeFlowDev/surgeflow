@@ -264,9 +264,7 @@ pub struct AzureServiceBusNextStepReceiver<W: Workflow> {
 impl<W: Workflow> NextStepReceiver<W> for AzureServiceBusNextStepReceiver<W> {
     type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(
-        &mut self,
-    ) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -327,9 +325,7 @@ pub struct AzureServiceBusCompletedStepReceiver<W: Workflow> {
 impl<W: Workflow> CompletedStepReceiver<W> for AzureServiceBusCompletedStepReceiver<W> {
     type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(
-        &mut self,
-    ) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -390,9 +386,7 @@ pub struct AzureServiceBusFailedStepReceiver<W: Workflow> {
 impl<W: Workflow> FailedStepReceiver<W> for AzureServiceBusFailedStepReceiver<W> {
     type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(
-        &mut self,
-    ) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -453,9 +447,7 @@ pub struct AzureServiceBusActiveStepReceiver<W: Workflow> {
 impl<W: Workflow> ActiveStepReceiver<W> for AzureServiceBusActiveStepReceiver<W> {
     type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(
-        &mut self,
-    ) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()

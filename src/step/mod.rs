@@ -1,6 +1,6 @@
 use fe2o3_amqp::{Receiver, Sender, session::SessionHandle};
 use serde::{Deserialize, Serialize};
-use std::{any::TypeId, fmt::Debug, marker::PhantomData};
+use std::{any::TypeId, fmt, marker::PhantomData};
 use uuid::Uuid;
 
 use crate::{
@@ -8,13 +8,14 @@ use crate::{
     workers::adapters::managers::WorkflowInstance,
     workflows::{StepId, Workflow, WorkflowInstanceId},
 };
+use derive_more::Debug;
 
-pub type StepResult<W> = Result<Option<StepWithSettings<<W as Workflow>::Step>>, StepError>;
+pub type StepResult<W> = Result<Option<StepWithSettings<W>>, StepError>;
 
 pub trait Step:
     Serialize
     + for<'a> Deserialize<'a>
-    + Debug
+    + fmt::Debug
     + Into<<Self::Workflow as Workflow>::Step>
     + Send
     + Clone
@@ -29,7 +30,7 @@ pub trait Step:
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
     ) -> impl std::future::Future<
-        Output = Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Step>>, StepError>,
+        Output = Result<Option<StepWithSettings<Self::Workflow>>, StepError>,
     > + Send;
 }
 
@@ -47,9 +48,9 @@ pub enum StepError {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct StepWithSettings<S: Debug + Step + for<'a> Deserialize<'a>> {
+pub struct StepWithSettings<W: Workflow> {
     #[serde(bound = "")]
-    pub step: S,
+    pub step: W::Step,
     pub settings: StepSettings,
 }
 
@@ -66,7 +67,7 @@ pub struct FullyQualifiedStep<W: Workflow> {
     pub instance: WorkflowInstance,
     pub step_id: StepId,
     #[serde(bound = "")]
-    pub step: StepWithSettings<W::Step>,
+    pub step: StepWithSettings<W>,
     pub event: Option<W::Event>,
     pub retry_count: u32,
 }
