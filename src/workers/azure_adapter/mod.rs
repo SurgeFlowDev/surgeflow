@@ -13,10 +13,12 @@ pub enum AzureAdapterError {
     CosmosDbError(#[source] typespec::Error),
     #[error("Failed to serialize step")]
     SerializeError(#[source] serde_json::Error),
-     #[error("Failed to deserialize step")]
-     DeserializeError(#[source] serde_json::Error),
+    #[error("Failed to deserialize step")]
+    DeserializeError(#[source] serde_json::Error),
     #[error("AMQP message error")]
     AmqpMessageError(#[source] RawAmqpMessageError),
     #[error("Database error")]
     DatabaseError(#[source] sqlx::Error),
+    #[error("Error converting DB record to model")]
+    DbConversionError,
 }

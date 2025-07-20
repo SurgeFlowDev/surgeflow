@@ -11,8 +11,7 @@ use crate::{
         adapters::{
             managers::WorkflowInstance,
             senders::{
-                ActiveStepSender, CompletedStepSender, EventSender, FailedStepSender,
-                NewInstanceSender, NextStepSender,
+                ActiveStepSender, CompletedInstanceSender, CompletedStepSender, EventSender, FailedInstanceSender, FailedStepSender, NewInstanceSender, NextStepSender
             },
         },
         azure_adapter::AzureAdapterError,
@@ -174,12 +173,12 @@ impl<W: Workflow> AzureServiceBusEventSender<W> {
 }
 
 #[derive(Debug)]
-pub struct AzureServiceBusInstanceSender<W: Workflow> {
+pub struct AzureServiceBusNewInstanceSender<W: Workflow> {
     sender: Mutex<ServiceBusSender>,
     _marker: PhantomData<W>,
 }
 
-impl<W: Workflow> NewInstanceSender<W> for AzureServiceBusInstanceSender<W> {
+impl<W: Workflow> NewInstanceSender<W> for AzureServiceBusNewInstanceSender<W> {
     type Error = AzureAdapterError;
 
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
@@ -195,7 +194,7 @@ impl<W: Workflow> NewInstanceSender<W> for AzureServiceBusInstanceSender<W> {
     }
 }
 
-impl<W: Workflow> AzureServiceBusInstanceSender<W> {
+impl<W: Workflow> AzureServiceBusNewInstanceSender<W> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -211,7 +210,93 @@ impl<W: Workflow> AzureServiceBusInstanceSender<W> {
     }
 }
 
-// TODO: fields should not be pub?
+////////////////////////////////////////
+////////////////////////////////////////
+////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct AzureServiceBusFailedInstanceSender<W: Workflow> {
+    sender: Mutex<ServiceBusSender>,
+    _marker: PhantomData<W>,
+}
+
+impl<W: Workflow> FailedInstanceSender<W> for AzureServiceBusFailedInstanceSender<W> {
+    type Error = AzureAdapterError;
+
+    async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
+        // TODO: using json, could use bincode in production
+        self.sender
+            .lock()
+            .await
+            .send_message(serde_json::to_vec(step).map_err(AzureAdapterError::SerializeError)?)
+            .await
+            .map_err(AzureAdapterError::ServiceBusError)?;
+
+        Ok(())
+    }
+}
+
+impl<W: Workflow> AzureServiceBusFailedInstanceSender<W> {
+    pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
+        service_bus_client: &mut ServiceBusClient<RP>,
+        queue_name: &str,
+    ) -> anyhow::Result<Self> {
+        let sender = service_bus_client
+            .create_sender(queue_name, ServiceBusSenderOptions::default())
+            .await?;
+
+        Ok(Self {
+            sender: Mutex::new(sender),
+            _marker: PhantomData,
+        })
+    }
+}
+
+////////////////////////////////////////
+////////////////////////////////////////
+////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct AzureServiceBusCompletedInstanceSender<W: Workflow> {
+    sender: Mutex<ServiceBusSender>,
+    _marker: PhantomData<W>,
+}
+
+impl<W: Workflow> CompletedInstanceSender<W> for AzureServiceBusCompletedInstanceSender<W> {
+    type Error = AzureAdapterError;
+
+    async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
+        // TODO: using json, could use bincode in production
+        self.sender
+            .lock()
+            .await
+            .send_message(serde_json::to_vec(step).map_err(AzureAdapterError::SerializeError)?)
+            .await
+            .map_err(AzureAdapterError::ServiceBusError)?;
+
+        Ok(())
+    }
+}
+
+impl<W: Workflow> AzureServiceBusCompletedInstanceSender<W> {
+    pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
+        service_bus_client: &mut ServiceBusClient<RP>,
+        queue_name: &str,
+    ) -> anyhow::Result<Self> {
+        let sender = service_bus_client
+            .create_sender(queue_name, ServiceBusSenderOptions::default())
+            .await?;
+
+        Ok(Self {
+            sender: Mutex::new(sender),
+            _marker: PhantomData,
+        })
+    }
+}
+
+////////////////////////////////////////
+////////////////////////////////////////
+////////////////////////////////////////
 #[derive(Debug)]
 pub struct AzureServiceBusCompletedStepSender<W: Workflow> {
     sender: ServiceBusSender,

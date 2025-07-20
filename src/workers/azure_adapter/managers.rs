@@ -50,7 +50,7 @@ impl<W: Workflow> StepsAwaitingEventManager<W> for AzureServiceBusStepsAwaitingE
         Ok(())
     }
     async fn put_step(&mut self, step: FullyQualifiedStep<W::Step>) -> Result<(), Self::Error> {
-        let id = Self::make_key(step.instance_id);
+        let id = Self::make_key(step.instance.external_id);
         let item = CosmosItem::new(step, id);
         item.create(&self.container_client).await?;
         Ok(())
@@ -145,7 +145,7 @@ mod workflow_instance_manager {
                 managers::{WorkflowInstance, WorkflowInstanceManager},
                 senders::NewInstanceSender,
             },
-            azure_adapter::{AzureAdapterError, senders::AzureServiceBusInstanceSender},
+            azure_adapter::{AzureAdapterError, senders::AzureServiceBusNewInstanceSender},
         },
         workflows::Workflow,
     };
@@ -153,7 +153,7 @@ mod workflow_instance_manager {
     // must be thread-safe
     #[derive(Debug)]
     pub struct AzureServiceBusWorkflowInstanceManager<W: Workflow> {
-        sender: AzureServiceBusInstanceSender<W>,
+        sender: AzureServiceBusNewInstanceSender<W>,
         _marker: PhantomData<W>,
     }
     impl<W: Workflow> AzureServiceBusWorkflowInstanceManager<W> {
@@ -162,7 +162,7 @@ mod workflow_instance_manager {
             instance_queue_name: &str,
         ) -> anyhow::Result<Self> {
             let sender =
-                AzureServiceBusInstanceSender::<W>::new(service_bus_client, instance_queue_name)
+                AzureServiceBusNewInstanceSender::<W>::new(service_bus_client, instance_queue_name)
                     .await?;
             Ok(Self {
                 sender,
@@ -204,7 +204,9 @@ mod workflow_instance_manager {
                 res.external_id
             );
 
-            let res: WorkflowInstance = res.try_into().expect("TODO: handle conversion error");
+            let res: WorkflowInstance = res
+                .try_into()
+                .map_err(|_| AzureAdapterError::DbConversionError)?;
 
             tracing::info!(
                 "Sending workflow instance: {} with id: {} to Azure Service Bus",

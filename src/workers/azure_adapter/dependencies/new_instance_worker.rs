@@ -1,10 +1,10 @@
 use crate::{
     workers::{
         adapters::dependencies::new_instance_worker::{
-            WorkspaceInstanceWorkerContext, WorkspaceInstanceWorkerDependencies,
+            NewInstanceWorkerContext, NewInstanceWorkerDependencies,
         },
         azure_adapter::{
-            receivers::AzureServiceBusInstanceReceiver, senders::AzureServiceBusNextStepSender,
+            receivers::AzureServiceBusNewInstanceReceiver, senders::AzureServiceBusNextStepSender,
         },
     },
     workflows::Workflow,
@@ -12,18 +12,16 @@ use crate::{
 use azservicebus::{ServiceBusClient, ServiceBusClientOptions, core::BasicRetryPolicy};
 use std::marker::PhantomData;
 
-pub struct AzureServiceBusWorkspaceInstanceWorkerDependencies<W: Workflow> {
+pub struct AzureServiceBusNewInstanceWorkerDependencies<W: Workflow> {
     #[expect(dead_code)]
     service_bus_client: ServiceBusClient<BasicRetryPolicy>,
     phantom: PhantomData<W>,
 }
 
-impl<W: Workflow> WorkspaceInstanceWorkerContext<W>
-    for AzureServiceBusWorkspaceInstanceWorkerDependencies<W>
-{
+impl<W: Workflow> NewInstanceWorkerContext<W> for AzureServiceBusNewInstanceWorkerDependencies<W> {
     type NextStepSender = AzureServiceBusNextStepSender<W>;
-    type InstanceReceiver = AzureServiceBusInstanceReceiver<W>;
-    async fn dependencies() -> anyhow::Result<WorkspaceInstanceWorkerDependencies<W, Self>> {
+    type InstanceReceiver = AzureServiceBusNewInstanceReceiver<W>;
+    async fn dependencies() -> anyhow::Result<NewInstanceWorkerDependencies<W, Self>> {
         let azure_service_bus_connection_string =
             std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
                 .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set");
@@ -42,9 +40,10 @@ impl<W: Workflow> WorkspaceInstanceWorkerContext<W>
             AzureServiceBusNextStepSender::new(&mut service_bus_client, &next_steps_queue).await?;
 
         let instance_receiver =
-            AzureServiceBusInstanceReceiver::new(&mut service_bus_client, &instance_queue).await?;
+            AzureServiceBusNewInstanceReceiver::new(&mut service_bus_client, &instance_queue)
+                .await?;
 
-        Ok(WorkspaceInstanceWorkerDependencies::new(
+        Ok(NewInstanceWorkerDependencies::new(
             next_step_sender,
             instance_receiver,
             Self {

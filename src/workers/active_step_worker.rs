@@ -19,7 +19,7 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
     conn: &mut PgConnection,
     mut step: FullyQualifiedStep<W::Step>,
 ) -> anyhow::Result<()> {
-    let instance_id = step.instance_id;
+    let instance = step.instance.clone();
     tracing::info!("Received new step");
     query!(
         r#"
@@ -39,7 +39,7 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
         if let Some(next_step) = next_step {
             next_step_sender
                 .send(FullyQualifiedStep {
-                    instance_id,
+                    instance,
                     step: next_step,
                     event: None,
                     retry_count: 0,
@@ -48,7 +48,7 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
                 .await?;
         } else {
             // TODO: push to instance completed queue ?
-            tracing::info!("Instance {instance_id} completed");
+            tracing::info!("Instance {} completed", instance.external_id);
         }
     } else {
         tracing::info!("Failed to run step: {:?}", step.step);

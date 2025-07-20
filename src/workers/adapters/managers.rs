@@ -31,7 +31,7 @@ mod workflow_instance_manager {
 
     use crate::workflows::{Workflow, WorkflowId, WorkflowInstanceId};
 
-    #[derive(Debug, Deserialize, Serialize, JsonSchema)]
+    #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
     pub struct WorkflowInstance {
         pub external_id: WorkflowInstanceId,
         pub workflow_id: WorkflowId,

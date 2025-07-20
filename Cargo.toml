@@ -56,6 +56,8 @@ uuid = { version = "1.16.0", features = ["serde", "v4"] }
 [features]
 default = [
     "new_instance_worker",
+    "failed_instance_worker",
+    "completed_instance_worker",
     "active_step_worker",
     "next_step_worker",
     "new_event_worker",
@@ -64,6 +66,8 @@ default = [
     "control_server",
 ]
 new_instance_worker = []
+failed_instance_worker = []
+completed_instance_worker = []
 active_step_worker = []
 next_step_worker = []
 new_event_worker = []

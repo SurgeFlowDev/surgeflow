@@ -3,19 +3,19 @@ use sqlx::{PgConnection, PgPool};
 use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
-        dependencies::new_instance_worker::WorkspaceInstanceWorkerContext,
-        managers::WorkflowInstance, receivers::NewInstanceReceiver, senders::NextStepSender,
+        dependencies::new_instance_worker::NewInstanceWorkerContext, managers::WorkflowInstance,
+        receivers::NewInstanceReceiver, senders::NextStepSender,
     },
     workflows::{StepId, Workflow},
 };
 
-async fn process<W: Workflow, C: WorkspaceInstanceWorkerContext<W>>(
+async fn process<W: Workflow, C: NewInstanceWorkerContext<W>>(
     next_step_sender: &mut C::NextStepSender,
     conn: &mut PgConnection,
     instance: WorkflowInstance,
 ) -> anyhow::Result<()> {
     let entrypoint = FullyQualifiedStep {
-        instance_id: instance.external_id,
+        instance,
         step: W::entrypoint(),
         event: None,
         retry_count: 0,
@@ -27,7 +27,7 @@ async fn process<W: Workflow, C: WorkspaceInstanceWorkerContext<W>>(
     Ok(())
 }
 
-pub async fn main<W: Workflow, C: WorkspaceInstanceWorkerContext<W>>() -> anyhow::Result<()> {
+pub async fn main<W: Workflow, C: NewInstanceWorkerContext<W>>() -> anyhow::Result<()> {
     let dependencies = C::dependencies().await?;
 
     let mut instance_receiver = dependencies.instance_receiver;

@@ -7,7 +7,10 @@ use crate::{
         adapters::dependencies::failed_step_worker::{
             FailedStepWorkerContext, FailedStepWorkerDependencies,
         },
-        azure_adapter::receivers::AzureServiceBusFailedStepReceiver,
+        azure_adapter::{
+            receivers::AzureServiceBusFailedStepReceiver,
+            senders::AzureServiceBusFailedInstanceSender,
+        },
     },
     workflows::Workflow,
 };
@@ -18,11 +21,9 @@ pub struct AzureServiceBusFailedStepWorkerDependencies<W: Workflow> {
     phantom: PhantomData<W>,
 }
 
-impl<W: Workflow> FailedStepWorkerContext<W>
-    for AzureServiceBusFailedStepWorkerDependencies<W>
-{
+impl<W: Workflow> FailedStepWorkerContext<W> for AzureServiceBusFailedStepWorkerDependencies<W> {
     type FailedStepReceiver = AzureServiceBusFailedStepReceiver<W>;
-
+    type FailedInstanceSender = AzureServiceBusFailedInstanceSender<W>;
     async fn dependencies() -> anyhow::Result<FailedStepWorkerDependencies<W, Self>> {
         let azure_service_bus_connection_string =
             std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
@@ -35,6 +36,7 @@ impl<W: Workflow> FailedStepWorkerContext<W>
         .await?;
 
         let failed_steps_queue = format!("{}-failed-steps", W::NAME);
+        let failed_instances_queue = format!("{}-failed-instances", W::NAME);
 
         let failed_step_receiver = AzureServiceBusFailedStepReceiver::<W>::new(
             &mut service_bus_client,
@@ -42,8 +44,15 @@ impl<W: Workflow> FailedStepWorkerContext<W>
         )
         .await?;
 
+        let failed_instance_sender = AzureServiceBusFailedInstanceSender::<W>::new(
+            &mut service_bus_client,
+            &failed_instances_queue,
+        )
+        .await?;
+
         Ok(FailedStepWorkerDependencies::new(
             failed_step_receiver,
+            failed_instance_sender,
             Self {
                 service_bus_client,
                 phantom: PhantomData,

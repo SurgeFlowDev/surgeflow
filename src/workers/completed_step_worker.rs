@@ -37,7 +37,7 @@ async fn receive_and_process<W: Workflow, D: CompletedStepWorkerContext<W>>(
     let (step, handle) = completed_step_receiver.receive().await?;
     let mut tx = pool.begin().await?;
 
-    if let Err(err) = process::<W, D>(&mut tx, step).await {
+    if let Err(err) = process::<W>(&mut tx, step).await {
         tracing::error!("Error processing completed step: {:?}", err);
     }
 
@@ -48,20 +48,18 @@ async fn receive_and_process<W: Workflow, D: CompletedStepWorkerContext<W>>(
 }
 
 #[derive(thiserror::Error, Debug)]
-enum CompletedStepWorkerError
-// <W: Workflow, D: CompletedStepWorkerContext<W>>
-{
+enum CompletedStepWorkerError {
     #[error("Database error occurred")]
     DatabaseError(#[from] sqlx::Error),
 }
 
-async fn process<W: Workflow, D: CompletedStepWorkerContext<W>>(
+async fn process<W: Workflow>(
     conn: &mut PgConnection,
     step: FullyQualifiedStep<W::Step>,
 ) -> Result<(), CompletedStepWorkerError> {
-    tracing::info!("received completed step for instance: {}", step.instance_id);
+    tracing::info!("received completed step for instance: {}", step.instance.external_id);
 
-        query!(
+    query!(
         r#"
         UPDATE workflow_steps SET "status" = $1
         WHERE "external_id" = $2

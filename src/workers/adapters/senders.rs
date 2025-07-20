@@ -52,7 +52,7 @@ pub trait EventSender<W: Workflow>: Sized {
 
 // Instances
 
-pub trait NewInstanceSender<InstanceSenderW: Workflow>: Sized {
+pub trait NewInstanceSender<W: Workflow>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,
@@ -60,7 +60,7 @@ pub trait NewInstanceSender<InstanceSenderW: Workflow>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait CompletedInstanceSender<InstanceSenderW: Workflow>: Sized {
+pub trait CompletedInstanceSender<W: Workflow>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,
@@ -68,7 +68,7 @@ pub trait CompletedInstanceSender<InstanceSenderW: Workflow>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait InstanceSender<InstanceSenderW: Workflow>: Sized {
+pub trait FailedInstanceSender<W: Workflow>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,

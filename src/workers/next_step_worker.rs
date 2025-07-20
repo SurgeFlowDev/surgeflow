@@ -71,7 +71,9 @@ enum NextStepWorkerError<W: Workflow, D: NextStepWorkerContext<W>> {
     #[error("Failed to send active step")]
     SendActiveStepError(#[source] <D::ActiveStepSender as ActiveStepSender<W>>::Error),
     #[error("Failed to put step in awaiting event manager")]
-    AwaitEventError(#[source] <D::StepsAwaitingEventManager as StepsAwaitingEventManager<W>>::Error),
+    AwaitEventError(
+        #[source] <D::StepsAwaitingEventManager as StepsAwaitingEventManager<W>>::Error,
+    ),
 }
 
 async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
@@ -80,14 +82,17 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
     conn: &mut PgConnection,
     step: FullyQualifiedStep<W::Step>,
 ) -> Result<(), NextStepWorkerError<W, D>> {
-    tracing::info!("received next step for instance: {}", step.instance_id);
+    tracing::info!(
+        "received next step for instance: {}",
+        step.instance.external_id
+    );
 
     query!(
         r#"
         INSERT INTO workflow_steps ("workflow_instance_external_id", "external_id")
         VALUES ($1, $2)
         "#,
-        Uuid::from(step.instance_id),
+        Uuid::from(step.instance.external_id),
         Uuid::from(step.step_id)
     )
     .execute(conn)
@@ -96,7 +101,7 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
     if step.step.step.variant_event_type_id() == TypeId::of::<Immediate<W>>() {
         active_step_sender
             .send(FullyQualifiedStep {
-                instance_id: step.instance_id,
+                instance: step.instance,
                 step: step.step,
                 event: None,
                 retry_count: 0,
@@ -107,7 +112,7 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
     } else {
         steps_awaiting_event_manager
             .put_step(FullyQualifiedStep {
-                instance_id: step.instance_id,
+                instance: step.instance,
                 step: step.step,
                 event: None,
                 retry_count: 0,
