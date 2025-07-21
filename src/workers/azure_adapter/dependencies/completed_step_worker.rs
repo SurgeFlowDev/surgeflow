@@ -7,7 +7,7 @@ use crate::{
         adapters::dependencies::completed_step_worker::{
             CompletedStepWorkerContext, CompletedStepWorkerDependencies,
         },
-        azure_adapter::receivers::AzureServiceBusCompletedStepReceiver,
+        azure_adapter::{receivers::AzureServiceBusCompletedStepReceiver, senders::AzureServiceBusNextStepSender},
     },
     workflows::Workflow,
 };
@@ -22,6 +22,7 @@ impl<W: Workflow> CompletedStepWorkerContext<W>
     for AzureServiceBusCompletedStepWorkerDependencies<W>
 {
     type CompletedStepReceiver = AzureServiceBusCompletedStepReceiver<W>;
+    type NextStepSender = AzureServiceBusNextStepSender<W>;
 
     async fn dependencies() -> anyhow::Result<CompletedStepWorkerDependencies<W, Self>> {
         let azure_service_bus_connection_string =
@@ -35,6 +36,7 @@ impl<W: Workflow> CompletedStepWorkerContext<W>
         .await?;
 
         let completed_steps_queue = format!("{}-completed-steps", W::NAME);
+        let next_steps_queue = format!("{}-next-steps", W::NAME);
 
         let completed_step_receiver = AzureServiceBusCompletedStepReceiver::<W>::new(
             &mut service_bus_client,
@@ -42,8 +44,15 @@ impl<W: Workflow> CompletedStepWorkerContext<W>
         )
         .await?;
 
+        let next_step_sender = AzureServiceBusNextStepSender::<W>::new(
+            &mut service_bus_client,
+            &next_steps_queue,
+        )
+        .await?;
+
         Ok(CompletedStepWorkerDependencies::new(
             completed_step_receiver,
+            next_step_sender,
             Self {
                 service_bus_client,
                 phantom: PhantomData,

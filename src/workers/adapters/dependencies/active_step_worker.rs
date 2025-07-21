@@ -9,7 +9,6 @@ use crate::{
 pub struct ActiveStepWorkerDependencies<W: Workflow, C: ActiveStepWorkerContext<W>> {
     pub active_step_receiver: C::ActiveStepReceiver,
     pub active_step_sender: C::ActiveStepSender,
-    pub next_step_sender: C::NextStepSender,
     pub failed_step_sender: C::FailedStepSender,
     pub completed_step_sender: C::CompletedStepSender,
     #[expect(dead_code)]
@@ -20,7 +19,6 @@ impl<W: Workflow, C: ActiveStepWorkerContext<W>> ActiveStepWorkerDependencies<W,
     pub fn new(
         active_step_receiver: C::ActiveStepReceiver,
         active_step_sender: C::ActiveStepSender,
-        next_step_sender: C::NextStepSender,
         failed_step_sender: C::FailedStepSender,
         completed_step_sender: C::CompletedStepSender,
         context: C,
@@ -28,7 +26,6 @@ impl<W: Workflow, C: ActiveStepWorkerContext<W>> ActiveStepWorkerDependencies<W,
         Self {
             active_step_receiver,
             active_step_sender,
-            next_step_sender,
             failed_step_sender,
             completed_step_sender,
             context,

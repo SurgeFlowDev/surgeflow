@@ -17,9 +17,11 @@ async fn process<W: Workflow, C: NewInstanceWorkerContext<W>>(
     let entrypoint = FullyQualifiedStep {
         instance,
         step: W::entrypoint(),
-        event: None,
         retry_count: 0,
         step_id: StepId::new(),
+        event: None,
+        previous_step_id: None,
+        next_step: None,
     };
 
     next_step_sender.send(entrypoint).await?;

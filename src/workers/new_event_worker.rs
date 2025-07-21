@@ -64,11 +64,8 @@ async fn process<W: Workflow, C: NewEventWorkerContext<W>>(
     }
     active_step_sender
         .send(FullyQualifiedStep {
-            instance: step.instance,
-            step_id: step.step_id,
-            step: step.step,
             event: Some(event),
-            retry_count: 0,
+            ..step
         })
         .await?;
 

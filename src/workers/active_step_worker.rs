@@ -3,9 +3,9 @@ use crate::{
     workers::adapters::{
         dependencies::active_step_worker::ActiveStepWorkerContext,
         receivers::ActiveStepReceiver,
-        senders::{ActiveStepSender, CompletedStepSender, FailedStepSender, NextStepSender},
+        senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
     },
-    workflows::{StepId, Workflow},
+    workflows::Workflow,
 };
 use sqlx::{PgConnection, query};
 use uuid::Uuid;
@@ -13,7 +13,6 @@ use uuid::Uuid;
 async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
     wf: W,
     active_step_sender: &mut D::ActiveStepSender,
-    next_step_sender: &mut D::NextStepSender,
     failed_step_sender: &mut D::FailedStepSender,
     completed_step_sender: &mut D::CompletedStepSender,
     conn: &mut PgConnection,
@@ -35,21 +34,9 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
     let next_step = step.step.step.run_raw(wf.clone(), step.event.clone()).await;
     step.retry_count += 1;
     if let Ok(next_step) = next_step {
-        completed_step_sender.send(step).await?;
-        if let Some(next_step) = next_step {
-            next_step_sender
-                .send(FullyQualifiedStep {
-                    instance,
-                    step: next_step,
-                    event: None,
-                    retry_count: 0,
-                    step_id: StepId::new(),
-                })
-                .await?;
-        } else {
-            // TODO: push to instance completed queue ?
-            tracing::info!("Instance {} completed", instance.external_id);
-        }
+        completed_step_sender
+            .send(FullyQualifiedStep { next_step, ..step })
+            .await?;
     } else {
         tracing::info!("Failed to run step: {:?}", step.step);
 
@@ -71,7 +58,6 @@ pub async fn main<W: Workflow, D: ActiveStepWorkerContext<W>>(wf: W) -> anyhow::
 
     let mut active_step_receiver = dependencies.active_step_receiver;
     let mut active_step_sender = dependencies.active_step_sender;
-    let mut next_step_sender = dependencies.next_step_sender;
     let mut failed_step_sender = dependencies.failed_step_sender;
     let mut completed_step_sender = dependencies.completed_step_sender;
 
@@ -89,7 +75,6 @@ pub async fn main<W: Workflow, D: ActiveStepWorkerContext<W>>(wf: W) -> anyhow::
         if let Err(err) = process::<W, D>(
             wf.clone(),
             &mut active_step_sender,
-            &mut next_step_sender,
             &mut failed_step_sender,
             &mut completed_step_sender,
             &mut tx,

@@ -49,7 +49,6 @@ pub enum StepError {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct StepWithSettings<W: Workflow> {
-    #[serde(bound = "")]
     pub step: W::Step,
     pub settings: StepSettings,
 }
@@ -64,10 +63,17 @@ pub struct StepSettings {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FullyQualifiedStep<W: Workflow> {
+    // TODO: should probably just be a WorkflowInstanceId
     pub instance: WorkflowInstance,
     pub step_id: StepId,
     #[serde(bound = "")]
     pub step: StepWithSettings<W>,
+
+    /// Eventful steps can be initialized without an event, but it will be set when the step is triggered.
     pub event: Option<W::Event>,
     pub retry_count: u32,
+
+    pub previous_step_id: Option<StepId>,
+    #[serde(bound = "")]
+    pub next_step: Option<StepWithSettings<W>>,
 }

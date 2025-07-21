@@ -3,10 +3,11 @@ use crate::{
     step::{FullyQualifiedStep, WorkflowStep},
     workers::adapters::{
         dependencies::completed_step_worker::CompletedStepWorkerContext,
-        managers::StepsAwaitingEventManager, receivers::CompletedStepReceiver,
-        senders::ActiveStepSender,
+        managers::StepsAwaitingEventManager,
+        receivers::CompletedStepReceiver,
+        senders::{ActiveStepSender, NextStepSender},
     },
-    workflows::Workflow,
+    workflows::{StepId, Workflow},
 };
 use derive_more::Debug;
 use sqlx::{PgConnection, PgPool, query};
@@ -17,13 +18,19 @@ pub async fn main<W: Workflow, D: CompletedStepWorkerContext<W>>() -> anyhow::Re
     let dependencies = D::dependencies().await?;
 
     let mut completed_step_receiver = dependencies.completed_step_receiver;
+    let mut next_step_sender = dependencies.next_step_sender;
 
     let connection_string =
         std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
     let mut pool = PgPool::connect(&connection_string).await?;
 
     loop {
-        if let Err(err) = receive_and_process::<W, D>(&mut completed_step_receiver, &mut pool).await
+        if let Err(err) = receive_and_process::<W, D>(
+            &mut completed_step_receiver,
+            &mut next_step_sender,
+            &mut pool,
+        )
+        .await
         {
             tracing::error!("Error processing completed step: {:?}", err);
         }
@@ -32,12 +39,13 @@ pub async fn main<W: Workflow, D: CompletedStepWorkerContext<W>>() -> anyhow::Re
 
 async fn receive_and_process<W: Workflow, D: CompletedStepWorkerContext<W>>(
     completed_step_receiver: &mut D::CompletedStepReceiver,
+    next_step_sender: &mut D::NextStepSender,
     pool: &mut PgPool,
 ) -> anyhow::Result<()> {
     let (step, handle) = completed_step_receiver.receive().await?;
     let mut tx = pool.begin().await?;
 
-    if let Err(err) = process::<W>(&mut tx, step).await {
+    if let Err(err) = process::<W, D>(next_step_sender, &mut tx, step).await {
         tracing::error!("Error processing completed step: {:?}", err);
     }
 
@@ -48,15 +56,18 @@ async fn receive_and_process<W: Workflow, D: CompletedStepWorkerContext<W>>(
 }
 
 #[derive(thiserror::Error, Debug)]
-enum CompletedStepWorkerError {
+enum CompletedStepWorkerError<W: Workflow, D: CompletedStepWorkerContext<W>> {
     #[error("Database error occurred")]
     DatabaseError(#[from] sqlx::Error),
+    #[error("Failed to send next step")]
+    SendNextStepError(#[source] <D::NextStepSender as NextStepSender<W>>::Error),
 }
 
-async fn process<W: Workflow>(
+async fn process<W: Workflow, D: CompletedStepWorkerContext<W>>(
+    next_step_sender: &mut D::NextStepSender,
     conn: &mut PgConnection,
     step: FullyQualifiedStep<W>,
-) -> Result<(), CompletedStepWorkerError> {
+) -> Result<(), CompletedStepWorkerError<W, D>> {
     tracing::info!(
         "received completed step for instance: {}",
         step.instance.external_id
@@ -72,6 +83,26 @@ async fn process<W: Workflow>(
     )
     .execute(conn)
     .await?;
+
+    let next_step = step.next_step;
+
+    if let Some(next_step) = next_step {
+        next_step_sender
+            .send(FullyQualifiedStep {
+                instance: step.instance,
+                step_id: StepId::new(),
+                step: next_step,
+                event: None,
+                retry_count: 0,
+                previous_step_id: None,
+                next_step: None,
+            })
+            .await
+            .map_err(CompletedStepWorkerError::SendNextStepError)?;
+    } else {
+        // TODO: push to instance completed queue ?
+        tracing::info!("Instance {} completed", step.instance.external_id);
+    }
 
     Ok(())
 }

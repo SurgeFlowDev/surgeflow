@@ -41,7 +41,6 @@ impl<W: Workflow> ActiveStepWorkerContext<W> for AzureServiceBusActiveStepWorker
         .await?;
 
         let active_steps_queue = format!("{}-active-steps", W::NAME);
-        let next_steps_queue = format!("{}-next-steps", W::NAME);
         let failed_steps_queue = format!("{}-failed-steps", W::NAME);
         let completed_steps_queue = format!("{}-completed-steps", W::NAME);
 
@@ -54,9 +53,6 @@ impl<W: Workflow> ActiveStepWorkerContext<W> for AzureServiceBusActiveStepWorker
             &active_steps_queue,
         )
         .await?;
-        let next_step_sender =
-            AzureServiceBusNextStepSender::<W>::new(&mut service_bus_client, &next_steps_queue)
-                .await?;
 
         let failed_step_sender =
             AzureServiceBusFailedStepSender::<W>::new(&mut service_bus_client, &failed_steps_queue)
@@ -70,7 +66,6 @@ impl<W: Workflow> ActiveStepWorkerContext<W> for AzureServiceBusActiveStepWorker
         Ok(ActiveStepWorkerDependencies::new(
             active_step_receiver,
             active_step_sender,
-            next_step_sender,
             failed_step_sender,
             completed_step_sender,
             Self {

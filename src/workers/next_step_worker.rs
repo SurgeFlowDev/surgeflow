@@ -100,24 +100,12 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
 
     if step.step.step.variant_event_type_id() == TypeId::of::<Immediate<W>>() {
         active_step_sender
-            .send(FullyQualifiedStep {
-                instance: step.instance,
-                step: step.step,
-                event: None,
-                retry_count: 0,
-                step_id: step.step_id,
-            })
+            .send(step)
             .await
             .map_err(NextStepWorkerError::SendActiveStepError)?;
     } else {
         steps_awaiting_event_manager
-            .put_step(FullyQualifiedStep {
-                instance: step.instance,
-                step: step.step,
-                event: None,
-                retry_count: 0,
-                step_id: step.step_id,
-            })
+            .put_step(step)
             .await
             .map_err(NextStepWorkerError::AwaitEventError)?;
     }
