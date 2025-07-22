@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO workflow_step_outputs (\"workflow_step_id\", \"output\")\n            VALUES ((SELECT id FROM workflow_steps WHERE external_id = $1), NULL)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d4dd6e0036886fef5d454c8f7f3a995f95645923ccba687745f791cd20312d83"
+}

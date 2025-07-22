@@ -37,6 +37,7 @@ serde_json = { version = "1.0.140", features = ["raw_value"] }
 sqlx = { version = "0.8.6", default-features = false, features = [
     "postgres",
     "macros",
+    "json",
     "runtime-tokio",
     "tls-rustls",
     "uuid",

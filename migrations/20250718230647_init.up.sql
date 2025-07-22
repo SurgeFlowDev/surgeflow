@@ -34,6 +34,7 @@ CREATE TABLE
     workflow_steps_base (
         "id" INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         "external_id" UUID NOT NULL UNIQUE,
+        "step" JSONB NOT NULL,
         "workflow_instance_id" INTEGER NOT NULL REFERENCES workflow_instances ("id")
     );
 
@@ -46,10 +47,19 @@ CREATE TABLE
         "version" INTEGER NOT NULL DEFAULT 1
     );
 
+CREATE TABLE
+    workflow_step_outputs (
+        "id" INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        "workflow_step_id" INTEGER NOT NULL UNIQUE REFERENCES workflow_steps_base ("id"),
+        "output" JSONB
+    );
+
+
 CREATE VIEW workflow_steps AS
     SELECT 
         wsb.id AS "id",
         wsb.external_id AS "external_id",
+        wsb.step AS "step",
         wi.external_id AS "workflow_instance_external_id",
         wsv.status AS "status",
         wsv.version AS "version",
@@ -79,9 +89,9 @@ BEGIN
     SELECT id INTO instance_id
     FROM workflow_instances
     WHERE external_id = NEW."workflow_instance_external_id";
-    
-    INSERT INTO workflow_steps_base ("workflow_instance_id", "external_id")
-    VALUES (instance_id, NEW."external_id")
+
+    INSERT INTO workflow_steps_base ("workflow_instance_id", "external_id", "step")
+    VALUES (instance_id, NEW."external_id", NEW."step")
     RETURNING id INTO new_step_id;
     
     INSERT INTO workflow_step_versions ("workflow_step_id", "status", "version")

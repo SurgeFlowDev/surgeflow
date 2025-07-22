@@ -87,13 +87,17 @@ async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
         step.instance.external_id
     );
 
+    let json_step =
+        serde_json::to_value(&step.step.step).expect("TODO: handle serialization error");
+
     query!(
         r#"
-        INSERT INTO workflow_steps ("workflow_instance_external_id", "external_id")
-        VALUES ($1, $2)
+        INSERT INTO workflow_steps ("workflow_instance_external_id", "external_id", "step")
+        VALUES ($1, $2, $3)
         "#,
         Uuid::from(step.instance.external_id),
-        Uuid::from(step.step_id)
+        Uuid::from(step.step_id),
+        json_step
     )
     .execute(conn)
     .await?;

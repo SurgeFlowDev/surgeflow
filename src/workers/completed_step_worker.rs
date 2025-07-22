@@ -81,12 +81,15 @@ async fn process<W: Workflow, D: CompletedStepWorkerContext<W>>(
         4,
         Uuid::from(step.step_id)
     )
-    .execute(conn)
+    .execute(conn.as_mut())
     .await?;
 
     let next_step = step.next_step;
 
     if let Some(next_step) = next_step {
+        let json_step =
+            serde_json::to_value(&next_step.step).expect("TODO: handle serialization error");
+
         next_step_sender
             .send(FullyQualifiedStep {
                 instance: step.instance,
@@ -94,14 +97,36 @@ async fn process<W: Workflow, D: CompletedStepWorkerContext<W>>(
                 step: next_step,
                 event: None,
                 retry_count: 0,
-                previous_step_id: None,
+                previous_step_id: Some(step.step_id),
                 next_step: None,
             })
             .await
             .map_err(CompletedStepWorkerError::SendNextStepError)?;
+
+        query!(
+            r#"
+            INSERT INTO workflow_step_outputs ("workflow_step_id", "output")
+            VALUES ((SELECT id FROM workflow_steps WHERE external_id = $1), $2)
+            "#,
+            Uuid::from(step.step_id),
+            json_step
+        )
+        .execute(conn)
+        .await?;
     } else {
         // TODO: push to instance completed queue ?
         tracing::info!("Instance {} completed", step.instance.external_id);
+
+        query!(
+            r#"
+            INSERT INTO workflow_step_outputs ("workflow_step_id", "output")
+            VALUES ((SELECT id FROM workflow_steps WHERE external_id = $1), NULL)
+            "#,
+            Uuid::from(step.step_id),
+        )
+        .execute(conn)
+        .await?;
+
     }
 
     Ok(())

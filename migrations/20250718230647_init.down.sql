@@ -11,6 +11,7 @@ DROP FUNCTION insert_latest_workflow_step();
 DROP VIEW workflow_steps;
 
 -- Drop tables (in reverse order to handle dependencies)
+DROP TABLE workflow_step_outputs;
 DROP TABLE workflow_step_versions;
 DROP TABLE workflow_steps_base;
 DROP TABLE lu_workflow_step_status;
