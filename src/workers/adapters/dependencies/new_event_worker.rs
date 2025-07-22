@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::{
     workers::adapters::{
         managers::StepsAwaitingEventManager, receivers::EventReceiver, senders::ActiveStepSender,
@@ -5,36 +7,41 @@ use crate::{
     workflows::Workflow,
 };
 
-pub struct NewEventWorkerDependencies<W: Workflow, C: NewEventWorkerContext<W>> {
-    pub active_step_sender: C::ActiveStepSender,
-    pub event_receiver: C::EventReceiver,
-    pub steps_awaiting_event_manager: C::StepsAwaitingEventManager,
-    #[expect(dead_code)]
-    context: C,
+pub struct NewEventWorkerDependencies<
+    W,
+    ActiveStepSenderT,
+    EventReceiverT,
+    StepsAwaitingEventManagerT,
+> where
+    W: Workflow,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    EventReceiverT: EventReceiver<W>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+{
+    pub active_step_sender: ActiveStepSenderT,
+    pub event_receiver: EventReceiverT,
+    pub steps_awaiting_event_manager: StepsAwaitingEventManagerT,
+    marker: PhantomData<W>,
 }
 
-impl<W: Workflow, C: NewEventWorkerContext<W>> NewEventWorkerDependencies<W, C> {
+impl<W, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>
+    NewEventWorkerDependencies<W, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>
+where
+    W: Workflow,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    EventReceiverT: EventReceiver<W>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+{
     pub fn new(
-        active_step_sender: C::ActiveStepSender,
-        event_receiver: C::EventReceiver,
-        steps_awaiting_event_manager: C::StepsAwaitingEventManager,
-        context: C,
+        active_step_sender: ActiveStepSenderT,
+        event_receiver: EventReceiverT,
+        steps_awaiting_event_manager: StepsAwaitingEventManagerT,
     ) -> Self {
         Self {
             active_step_sender,
             event_receiver,
             steps_awaiting_event_manager,
-            context,
+            marker: PhantomData,
         }
     }
-}
-
-pub trait NewEventWorkerContext<W: Workflow>: Sized {
-    type ActiveStepSender: ActiveStepSender<W>;
-    //
-    type EventReceiver: EventReceiver<W>;
-    //
-    type StepsAwaitingEventManager: StepsAwaitingEventManager<W>;
-    fn dependencies()
-    -> impl Future<Output = anyhow::Result<NewEventWorkerDependencies<W, Self>>> + Send;
 }

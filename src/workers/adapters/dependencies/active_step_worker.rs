@@ -1,49 +1,60 @@
+use std::marker::PhantomData;
+
 use crate::{
     workers::adapters::{
         receivers::ActiveStepReceiver,
-        senders::{ActiveStepSender, CompletedStepSender, FailedStepSender, NextStepSender},
+        senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
     },
     workflows::Workflow,
 };
 
-pub struct ActiveStepWorkerDependencies<W: Workflow, C: ActiveStepWorkerContext<W>> {
-    pub active_step_receiver: C::ActiveStepReceiver,
-    pub active_step_sender: C::ActiveStepSender,
-    pub failed_step_sender: C::FailedStepSender,
-    pub completed_step_sender: C::CompletedStepSender,
-    #[expect(dead_code)]
-    context: C,
+pub struct ActiveStepWorkerDependencies<
+    W,
+    ActiveStepReceiverT,
+    ActiveStepSenderT,
+    FailedStepSenderT,
+    CompletedStepSenderT,
+> where
+    W: Workflow,
+    ActiveStepReceiverT: ActiveStepReceiver<W>,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    FailedStepSenderT: FailedStepSender<W>,
+    CompletedStepSenderT: CompletedStepSender<W>,
+{
+    pub active_step_receiver: ActiveStepReceiverT,
+    pub active_step_sender: ActiveStepSenderT,
+    pub failed_step_sender: FailedStepSenderT,
+    pub completed_step_sender: CompletedStepSenderT,
+    _marker: PhantomData<W>,
 }
 
-impl<W: Workflow, C: ActiveStepWorkerContext<W>> ActiveStepWorkerDependencies<W, C> {
+impl<W, ActiveStepReceiverT, ActiveStepSenderT, FailedStepSenderT, CompletedStepSenderT>
+    ActiveStepWorkerDependencies<
+        W,
+        ActiveStepReceiverT,
+        ActiveStepSenderT,
+        FailedStepSenderT,
+        CompletedStepSenderT,
+    >
+where
+    W: Workflow,
+    ActiveStepReceiverT: ActiveStepReceiver<W>,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    FailedStepSenderT: FailedStepSender<W>,
+    CompletedStepSenderT: CompletedStepSender<W>,
+{
     pub fn new(
-        active_step_receiver: C::ActiveStepReceiver,
-        active_step_sender: C::ActiveStepSender,
-        failed_step_sender: C::FailedStepSender,
-        completed_step_sender: C::CompletedStepSender,
-        context: C,
+        active_step_receiver: ActiveStepReceiverT,
+        active_step_sender: ActiveStepSenderT,
+        failed_step_sender: FailedStepSenderT,
+        completed_step_sender: CompletedStepSenderT,
     ) -> Self {
         Self {
             active_step_receiver,
             active_step_sender,
             failed_step_sender,
             completed_step_sender,
-            context,
+            _marker: PhantomData,
         }
     }
-}
-
-pub trait ActiveStepWorkerContext<W: Workflow>: Sized {
-    type ActiveStepReceiver: ActiveStepReceiver<W>;
-    //
-    type ActiveStepSender: ActiveStepSender<W>;
-    //
-    type NextStepSender: NextStepSender<W>;
-    //
-    type FailedStepSender: FailedStepSender<W>;
-    //
-    type CompletedStepSender: CompletedStepSender<W>;
-    //
-    fn dependencies()
-    -> impl Future<Output = anyhow::Result<ActiveStepWorkerDependencies<W, Self>>> + Send;
 }

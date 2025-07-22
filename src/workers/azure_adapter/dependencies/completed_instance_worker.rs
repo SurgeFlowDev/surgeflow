@@ -1,7 +1,7 @@
 use crate::{
     workers::{
         adapters::dependencies::completed_instance_worker::{
-            CompletedInstanceWorkerContext, CompletedInstanceWorkerDependencies,
+             CompletedInstanceWorkerDependencies,
         },
         azure_adapter::receivers::AzureServiceBusCompletedInstanceReceiver,
     },
@@ -10,42 +10,42 @@ use crate::{
 use azservicebus::{ServiceBusClient, ServiceBusClientOptions, core::BasicRetryPolicy};
 use std::marker::PhantomData;
 
-pub struct AzureServiceBusCompletedInstanceWorkerDependencies<W: Workflow> {
-    #[expect(dead_code)]
-    service_bus_client: ServiceBusClient<BasicRetryPolicy>,
-    phantom: PhantomData<W>,
-}
+// pub struct AzureServiceBusCompletedInstanceWorkerDependencies<W: Workflow> {
+//     #[expect(dead_code)]
+//     service_bus_client: ServiceBusClient<BasicRetryPolicy>,
+//     phantom: PhantomData<W>,
+// }
 
-impl<W: Workflow> CompletedInstanceWorkerContext<W>
-    for AzureServiceBusCompletedInstanceWorkerDependencies<W>
-{
-    type CompletedInstanceReceiver = AzureServiceBusCompletedInstanceReceiver<W>;
+// impl<W: Workflow> CompletedInstanceWorkerContext<W>
+//     for AzureServiceBusCompletedInstanceWorkerDependencies<W>
+// {
+//     type CompletedInstanceReceiver = AzureServiceBusCompletedInstanceReceiver<W>;
 
-    async fn dependencies() -> anyhow::Result<CompletedInstanceWorkerDependencies<W, Self>> {
-        let azure_service_bus_connection_string =
-            std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
-                .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set");
+//     async fn dependencies() -> anyhow::Result<CompletedInstanceWorkerDependencies<W, Self>> {
+//         let azure_service_bus_connection_string =
+//             std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
+//                 .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set");
 
-        let mut service_bus_client = ServiceBusClient::new_from_connection_string(
-            azure_service_bus_connection_string,
-            ServiceBusClientOptions::default(),
-        )
-        .await?;
+//         let mut service_bus_client = ServiceBusClient::new_from_connection_string(
+//             azure_service_bus_connection_string,
+//             ServiceBusClientOptions::default(),
+//         )
+//         .await?;
 
-        let completed_instance_queue = format!("{}-completed-instances", W::NAME);
+//         let completed_instance_queue = format!("{}-completed-instances", W::NAME);
 
-        let instance_receiver = AzureServiceBusCompletedInstanceReceiver::new(
-            &mut service_bus_client,
-            &completed_instance_queue,
-        )
-        .await?;
+//         let instance_receiver = AzureServiceBusCompletedInstanceReceiver::new(
+//             &mut service_bus_client,
+//             &completed_instance_queue,
+//         )
+//         .await?;
 
-        Ok(CompletedInstanceWorkerDependencies::new(
-            instance_receiver,
-            Self {
-                service_bus_client,
-                phantom: PhantomData,
-            },
-        ))
-    }
-}
+//         Ok(CompletedInstanceWorkerDependencies::new(
+//             instance_receiver,
+//             Self {
+//                 service_bus_client,
+//                 phantom: PhantomData,
+//             },
+//         ))
+//     }
+// }

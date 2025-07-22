@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::{
     workers::adapters::{
         managers::StepsAwaitingEventManager, receivers::NextStepReceiver, senders::ActiveStepSender,
@@ -5,37 +7,40 @@ use crate::{
     workflows::Workflow,
 };
 
-pub struct NextStepWorkerDependencies<W: Workflow, C: NextStepWorkerContext<W>> {
-    pub next_step_receiver: C::NextStepReceiver,
-    pub active_step_sender: C::ActiveStepSender,
-    pub steps_awaiting_event_manager: C::StepsAwaitingEventManager,
-    #[expect(dead_code)]
-    context: C,
+pub struct NextStepWorkerDependencies<
+    W,
+    NextStepReceiverT,
+    ActiveStepSenderT,
+    StepsAwaitingEventManagerT,
+> where
+    W: Workflow,
+    NextStepReceiverT: NextStepReceiver<W>,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+{
+    pub next_step_receiver: NextStepReceiverT,
+    pub active_step_sender: ActiveStepSenderT,
+    pub steps_awaiting_event_manager: StepsAwaitingEventManagerT,
+    marker: PhantomData<W>,
 }
 
-impl<W: Workflow, C: NextStepWorkerContext<W>> NextStepWorkerDependencies<W, C> {
+impl<W: Workflow, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT>
+    NextStepWorkerDependencies<W, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT>
+where
+    NextStepReceiverT: NextStepReceiver<W>,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+{
     pub fn new(
-        next_step_receiver: C::NextStepReceiver,
-        active_step_sender: C::ActiveStepSender,
-        steps_awaiting_event_manager: C::StepsAwaitingEventManager,
-        context: C,
+        next_step_receiver: NextStepReceiverT,
+        active_step_sender: ActiveStepSenderT,
+        steps_awaiting_event_manager: StepsAwaitingEventManagerT,
     ) -> Self {
         Self {
             next_step_receiver,
             active_step_sender,
             steps_awaiting_event_manager,
-            context,
+            marker: PhantomData,
         }
     }
-}
-
-pub trait NextStepWorkerContext<W: Workflow>: Sized {
-    type NextStepReceiver: NextStepReceiver<W>;
-    //
-    type ActiveStepSender: ActiveStepSender<W>;
-    //
-    type StepsAwaitingEventManager: StepsAwaitingEventManager<W>;
-    //
-    fn dependencies()
-    -> impl Future<Output = anyhow::Result<NextStepWorkerDependencies<W, Self>>> + Send;
 }

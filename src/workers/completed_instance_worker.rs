@@ -1,12 +1,14 @@
 use sqlx::{PgConnection, PgPool};
 
 use crate::{
-    step::FullyQualifiedStep,
     workers::adapters::{
-        dependencies::completed_instance_worker::CompletedInstanceWorkerContext,
-        managers::WorkflowInstance, receivers::CompletedInstanceReceiver,
+        dependencies::completed_instance_worker::{
+            CompletedInstanceWorkerContext, CompletedInstanceWorkerDependencies,
+        },
+        managers::WorkflowInstance,
+        receivers::CompletedInstanceReceiver,
     },
-    workflows::{StepId, Workflow},
+    workflows::Workflow,
 };
 
 async fn process(conn: &mut PgConnection, instance: WorkflowInstance) -> anyhow::Result<()> {
@@ -15,10 +17,12 @@ async fn process(conn: &mut PgConnection, instance: WorkflowInstance) -> anyhow:
     Ok(())
 }
 
-pub async fn main<W: Workflow, C: CompletedInstanceWorkerContext<W>>() -> anyhow::Result<()> {
-    let dependencies = C::dependencies().await?;
+pub async fn main<W: Workflow, C: CompletedInstanceWorkerContext<W>>(
+    dependencies: CompletedInstanceWorkerDependencies<W, C>,
+) -> anyhow::Result<()> {
+    // let dependencies = C::dependencies().await?;
 
-    let mut completed_instance_receiver = dependencies.instance_receiver;
+    let mut completed_instance_receiver = dependencies.completed_instance_receiver;
 
     let connection_string =
         std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");

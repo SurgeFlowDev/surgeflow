@@ -18,7 +18,6 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
     conn: &mut PgConnection,
     mut step: FullyQualifiedStep<W>,
 ) -> anyhow::Result<()> {
-    let instance = step.instance.clone();
     tracing::info!("Received new step");
     query!(
         r#"

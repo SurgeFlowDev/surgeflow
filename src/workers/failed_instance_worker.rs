@@ -18,7 +18,7 @@ async fn process(conn: &mut PgConnection, instance: WorkflowInstance) -> anyhow:
 pub async fn main<W: Workflow, C: FailedInstanceWorkerContext<W>>() -> anyhow::Result<()> {
     let dependencies = C::dependencies().await?;
 
-    let mut failed_instance_receiver = dependencies.instance_receiver;
+    let mut failed_instance_receiver = dependencies.failed_instance_receiver;
 
     let connection_string =
         std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");

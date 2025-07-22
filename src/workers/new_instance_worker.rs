@@ -32,7 +32,7 @@ async fn process<W: Workflow, C: NewInstanceWorkerContext<W>>(
 pub async fn main<W: Workflow, C: NewInstanceWorkerContext<W>>() -> anyhow::Result<()> {
     let dependencies = C::dependencies().await?;
 
-    let mut instance_receiver = dependencies.instance_receiver;
+    let mut instance_receiver = dependencies.new_instance_receiver;
     let mut next_step_sender = dependencies.next_step_sender;
 
     let connection_string =

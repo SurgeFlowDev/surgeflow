@@ -1,21 +1,22 @@
 use crate::{
-    event::Immediate,
-    step::{FullyQualifiedStep, WorkflowStep},
+    step::FullyQualifiedStep,
     workers::adapters::{
-        dependencies::completed_step_worker::CompletedStepWorkerContext,
-        managers::StepsAwaitingEventManager,
+        dependencies::completed_step_worker::{
+            CompletedStepWorkerContext, CompletedStepWorkerDependencies,
+        },
         receivers::CompletedStepReceiver,
-        senders::{ActiveStepSender, NextStepSender},
+        senders::NextStepSender,
     },
     workflows::{StepId, Workflow},
 };
 use derive_more::Debug;
 use sqlx::{PgConnection, PgPool, query};
-use std::any::TypeId;
 use uuid::Uuid;
 
-pub async fn main<W: Workflow, D: CompletedStepWorkerContext<W>>() -> anyhow::Result<()> {
-    let dependencies = D::dependencies().await?;
+pub async fn main<W: Workflow, D: CompletedStepWorkerContext<W>>(
+    dependencies: CompletedStepWorkerDependencies<W, D>,
+) -> anyhow::Result<()> {
+    // let dependencies = D::dependencies().await?;
 
     let mut completed_step_receiver = dependencies.completed_step_receiver;
     let mut next_step_sender = dependencies.next_step_sender;
@@ -126,7 +127,6 @@ async fn process<W: Workflow, D: CompletedStepWorkerContext<W>>(
         )
         .execute(conn)
         .await?;
-
     }
 
     Ok(())

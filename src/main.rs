@@ -108,7 +108,11 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
 async fn main_handler<W: Workflow>(
     #[cfg(feature = "active_step_worker")] wf: W,
 ) -> anyhow::Result<()> {
-    use rust_workflow_2::workers::new_event_worker;
+    use rust_workflow_2::workers::{
+        azure_adapter::dependencies::AzureDependencyManager, new_event_worker,
+    };
+
+    let mut dependency_manager = AzureDependencyManager::default();
 
     try_join!(
         #[cfg(feature = "active_step_worker")]
@@ -119,14 +123,27 @@ async fn main_handler<W: Workflow>(
         next_step_worker::main::<W, AzureServiceBusNextStepWorkerDependencies<W>>(),
         #[cfg(feature = "new_event_worker")]
         new_event_worker::main::<W, AzureServiceBusNewEventWorkerDependencies<W>>(),
+        // #[cfg(feature = "completed_step_worker")]
+        // completed_step_worker::main::<W, AzureServiceBusCompletedStepWorkerDependencies<W>>(),
         #[cfg(feature = "completed_step_worker")]
-        completed_step_worker::main::<W, AzureServiceBusCompletedStepWorkerDependencies<W>>(),
+        completed_step_worker::main::<W, ()>(
+            dependency_manager
+                .completed_step_worker_dependencies::<W>()
+                .await
+                .expect("TODO: handle error")
+        ),
         #[cfg(feature = "failed_step_worker")]
         failed_step_worker::main::<W, AzureServiceBusFailedStepWorkerDependencies<W>>(),
         #[cfg(feature = "failed_instance_worker")]
         failed_instance_worker::main::<W, AzureServiceBusFailedInstanceWorkerDependencies<W>>(),
+        // #[cfg(feature = "completed_instance_worker")]
+        // completed_instance_worker::main::<W, AzureServiceBusCompletedInstanceWorkerDependencies<W>>(),
         #[cfg(feature = "completed_instance_worker")]
-        completed_instance_worker::main::<W, AzureServiceBusCompletedInstanceWorkerDependencies<W>>(
+        completed_instance_worker::main::<W, ()>(
+            dependency_manager
+                .completed_instance_worker_dependencies::<W>()
+                .await
+                .expect("TODO: handle error")
         ),
     )?;
 

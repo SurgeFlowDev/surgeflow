@@ -1,34 +1,36 @@
+use std::marker::PhantomData;
+
 use crate::{
     workers::adapters::{receivers::NewInstanceReceiver, senders::NextStepSender},
     workflows::Workflow,
 };
 
-pub struct NewInstanceWorkerDependencies<W: Workflow, C: NewInstanceWorkerContext<W>> {
-    pub next_step_sender: C::NextStepSender,
-    pub instance_receiver: C::InstanceReceiver,
-    #[expect(dead_code)]
-    context: C,
+pub struct NewInstanceWorkerDependencies<W, NextStepSenderT, NewInstanceReceiverT>
+where
+    W: Workflow,
+    NextStepSenderT: NextStepSender<W>,
+    NewInstanceReceiverT: NewInstanceReceiver<W>,
+{
+    pub next_step_sender: NextStepSenderT,
+    pub new_instance_receiver: NewInstanceReceiverT,
+    marker: PhantomData<W>,
 }
 
-impl<W: Workflow, C: NewInstanceWorkerContext<W>> NewInstanceWorkerDependencies<W, C> {
+impl<W, NextStepSenderT, NewInstanceReceiverT>
+    NewInstanceWorkerDependencies<W, NextStepSenderT, NewInstanceReceiverT>
+where
+    W: Workflow,
+    NextStepSenderT: NextStepSender<W>,
+    NewInstanceReceiverT: NewInstanceReceiver<W>,
+{
     pub fn new(
-        next_step_sender: C::NextStepSender,
-        instance_receiver: C::InstanceReceiver,
-        context: C,
+        next_step_sender: NextStepSenderT,
+        new_instance_receiver: NewInstanceReceiverT,
     ) -> Self {
         Self {
             next_step_sender,
-            instance_receiver,
-            context,
+            new_instance_receiver,
+            marker: PhantomData,
         }
     }
-}
-
-pub trait NewInstanceWorkerContext<W: Workflow>: Sized {
-    type NextStepSender: NextStepSender<W>;
-    //
-    type InstanceReceiver: NewInstanceReceiver<W>;
-    //
-    fn dependencies()
-    -> impl Future<Output = anyhow::Result<NewInstanceWorkerDependencies<W, Self>>> + Send;
 }

@@ -1,23 +1,26 @@
+use std::marker::PhantomData;
+
 use crate::{workers::adapters::receivers::CompletedInstanceReceiver, workflows::Workflow};
 
-pub struct CompletedInstanceWorkerDependencies<W: Workflow, C: CompletedInstanceWorkerContext<W>> {
-    pub instance_receiver: C::CompletedInstanceReceiver,
-    #[expect(dead_code)]
-    context: C,
+pub struct CompletedInstanceWorkerDependencies<W, CompletedInstanceReceiverT>
+where
+    W: Workflow,
+    CompletedInstanceReceiverT: CompletedInstanceReceiver<W>,
+{
+    pub completed_instance_receiver: CompletedInstanceReceiverT,
+    marker: PhantomData<W>,
 }
 
-impl<W: Workflow, C: CompletedInstanceWorkerContext<W>> CompletedInstanceWorkerDependencies<W, C> {
-    pub fn new(instance_receiver: C::CompletedInstanceReceiver, context: C) -> Self {
+impl<W, CompletedInstanceReceiverT>
+    CompletedInstanceWorkerDependencies<W, CompletedInstanceReceiverT>
+where
+    W: Workflow,
+    CompletedInstanceReceiverT: CompletedInstanceReceiver<W>,
+{
+    pub fn new(completed_instance_receiver: CompletedInstanceReceiverT) -> Self {
         Self {
-            instance_receiver,
-            context,
+            completed_instance_receiver,
+            marker: PhantomData,
         }
     }
-}
-
-pub trait CompletedInstanceWorkerContext<W: Workflow>: Sized {
-    type CompletedInstanceReceiver: CompletedInstanceReceiver<W>;
-    //
-    fn dependencies()
-    -> impl Future<Output = anyhow::Result<CompletedInstanceWorkerDependencies<W, Self>>> + Send;
 }

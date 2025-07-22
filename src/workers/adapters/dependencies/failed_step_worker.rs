@@ -1,34 +1,36 @@
+use std::marker::PhantomData;
+
 use crate::{
     workers::adapters::{receivers::FailedStepReceiver, senders::FailedInstanceSender},
     workflows::Workflow,
 };
 
-pub struct FailedStepWorkerDependencies<W: Workflow, C: FailedStepWorkerContext<W>> {
-    pub failed_step_receiver: C::FailedStepReceiver,
-    pub failed_instance_sender: C::FailedInstanceSender,
-    #[expect(dead_code)]
-    context: C,
+pub struct FailedStepWorkerDependencies<W, FailedStepReceiverT, FailedInstanceSenderT>
+where
+    W: Workflow,
+    FailedStepReceiverT: FailedStepReceiver<W>,
+    FailedInstanceSenderT: FailedInstanceSender<W>,
+{
+    pub failed_step_receiver: FailedStepReceiverT,
+    pub failed_instance_sender: FailedInstanceSenderT,
+    marker: PhantomData<W>,
 }
 
-impl<W: Workflow, C: FailedStepWorkerContext<W>> FailedStepWorkerDependencies<W, C> {
+impl<W, FailedStepReceiverT, FailedInstanceSenderT>
+    FailedStepWorkerDependencies<W, FailedStepReceiverT, FailedInstanceSenderT>
+where
+    W: Workflow,
+    FailedStepReceiverT: FailedStepReceiver<W>,
+    FailedInstanceSenderT: FailedInstanceSender<W>,
+{
     pub fn new(
-        failed_step_receiver: C::FailedStepReceiver,
-        failed_instance_sender: C::FailedInstanceSender,
-        context: C,
+        failed_step_receiver: FailedStepReceiverT,
+        failed_instance_sender: FailedInstanceSenderT,
     ) -> Self {
         Self {
             failed_step_receiver,
             failed_instance_sender,
-            context,
+            marker: PhantomData,
         }
     }
-}
-
-pub trait FailedStepWorkerContext<W: Workflow>: Sized {
-    type FailedStepReceiver: FailedStepReceiver<W>;
-    //
-    type FailedInstanceSender: FailedInstanceSender<W>;
-    //
-    fn dependencies()
-    -> impl Future<Output = anyhow::Result<FailedStepWorkerDependencies<W, Self>>> + Send;
 }
