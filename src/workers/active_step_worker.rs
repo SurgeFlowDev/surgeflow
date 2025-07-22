@@ -9,7 +9,13 @@ use crate::{
     workflows::Workflow,
 };
 
-async fn process<W, ActiveStepSenderT, FailedStepSenderT, CompletedStepSenderT, PersistentStepManagerT>(
+async fn process<
+    W,
+    ActiveStepSenderT,
+    FailedStepSenderT,
+    CompletedStepSenderT,
+    PersistentStepManagerT,
+>(
     wf: W,
     active_step_sender: &mut ActiveStepSenderT,
     failed_step_sender: &mut FailedStepSenderT,
@@ -91,7 +97,13 @@ where
             continue;
         };
 
-        if let Err(err) = process::<W, ActiveStepSenderT, FailedStepSenderT, CompletedStepSenderT, PersistentStepManagerT>(
+        if let Err(err) = process::<
+            W,
+            ActiveStepSenderT,
+            FailedStepSenderT,
+            CompletedStepSenderT,
+            PersistentStepManagerT,
+        >(
             wf.clone(),
             &mut active_step_sender,
             &mut failed_step_sender,

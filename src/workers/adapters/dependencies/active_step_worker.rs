@@ -32,7 +32,14 @@ pub struct ActiveStepWorkerDependencies<
     _marker: PhantomData<W>,
 }
 
-impl<W, ActiveStepReceiverT, ActiveStepSenderT, FailedStepSenderT, CompletedStepSenderT, PersistentStepManagerT>
+impl<
+    W,
+    ActiveStepReceiverT,
+    ActiveStepSenderT,
+    FailedStepSenderT,
+    CompletedStepSenderT,
+    PersistentStepManagerT,
+>
     ActiveStepWorkerDependencies<
         W,
         ActiveStepReceiverT,

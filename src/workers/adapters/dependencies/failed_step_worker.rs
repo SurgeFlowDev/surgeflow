@@ -2,15 +2,18 @@ use std::marker::PhantomData;
 
 use crate::{
     workers::adapters::{
-        managers::PersistentStepManager,
-        receivers::FailedStepReceiver, 
-        senders::FailedInstanceSender
+        managers::PersistentStepManager, receivers::FailedStepReceiver,
+        senders::FailedInstanceSender,
     },
     workflows::Workflow,
 };
 
-pub struct FailedStepWorkerDependencies<W, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>
-where
+pub struct FailedStepWorkerDependencies<
+    W,
+    FailedStepReceiverT,
+    FailedInstanceSenderT,
+    PersistentStepManagerT,
+> where
     W: Workflow,
     FailedStepReceiverT: FailedStepReceiver<W>,
     FailedInstanceSenderT: FailedInstanceSender<W>,
@@ -23,7 +26,12 @@ where
 }
 
 impl<W, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>
-    FailedStepWorkerDependencies<W, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>
+    FailedStepWorkerDependencies<
+        W,
+        FailedStepReceiverT,
+        FailedInstanceSenderT,
+        PersistentStepManagerT,
+    >
 where
     W: Workflow,
     FailedStepReceiverT: FailedStepReceiver<W>,

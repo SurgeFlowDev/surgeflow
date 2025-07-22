@@ -2,8 +2,8 @@ use std::marker::PhantomData;
 
 use crate::{
     workers::adapters::{
-        managers::{PersistentStepManager, StepsAwaitingEventManager}, 
-        receivers::NextStepReceiver, 
+        managers::{PersistentStepManager, StepsAwaitingEventManager},
+        receivers::NextStepReceiver,
         senders::ActiveStepSender,
     },
     workflows::Workflow,
@@ -29,8 +29,20 @@ pub struct NextStepWorkerDependencies<
     marker: PhantomData<W>,
 }
 
-impl<W: Workflow, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>
-    NextStepWorkerDependencies<W, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>
+impl<
+    W: Workflow,
+    NextStepReceiverT,
+    ActiveStepSenderT,
+    StepsAwaitingEventManagerT,
+    PersistentStepManagerT,
+>
+    NextStepWorkerDependencies<
+        W,
+        NextStepReceiverT,
+        ActiveStepSenderT,
+        StepsAwaitingEventManagerT,
+        PersistentStepManagerT,
+    >
 where
     NextStepReceiverT: NextStepReceiver<W>,
     ActiveStepSenderT: ActiveStepSender<W>,

@@ -3,7 +3,7 @@ use crate::{
     step::{FullyQualifiedStep, WorkflowStep},
     workers::adapters::{
         dependencies::next_step_worker::NextStepWorkerDependencies,
-        managers::{PersistentStepManager, StepsAwaitingEventManager}, 
+        managers::{PersistentStepManager, StepsAwaitingEventManager},
         receivers::NextStepReceiver,
         senders::ActiveStepSender,
     },
@@ -12,7 +12,13 @@ use crate::{
 use derive_more::Debug;
 use std::any::TypeId;
 
-pub async fn main<W, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>(
+pub async fn main<
+    W,
+    NextStepReceiverT,
+    ActiveStepSenderT,
+    StepsAwaitingEventManagerT,
+    PersistentStepManagerT,
+>(
     dependencies: NextStepWorkerDependencies<
         W,
         NextStepReceiverT,
@@ -53,7 +59,13 @@ where
     }
 }
 
-async fn receive_and_process<W, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>(
+async fn receive_and_process<
+    W,
+    NextStepReceiverT,
+    ActiveStepSenderT,
+    StepsAwaitingEventManagerT,
+    PersistentStepManagerT,
+>(
     next_step_receiver: &mut NextStepReceiverT,
     active_step_sender: &mut ActiveStepSenderT,
     steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
@@ -68,13 +80,14 @@ where
 {
     let (step, handle) = next_step_receiver.receive().await?;
 
-    if let Err(err) = process::<W, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>(
-        active_step_sender,
-        steps_awaiting_event_manager,
-        persistent_step_manager,
-        step,
-    )
-    .await
+    if let Err(err) =
+        process::<W, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>(
+            active_step_sender,
+            steps_awaiting_event_manager,
+            persistent_step_manager,
+            step,
+        )
+        .await
     {
         tracing::error!("Error processing next step: {:?}", err);
     }
@@ -105,7 +118,10 @@ async fn process<W, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentSte
     steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
     persistent_step_manager: &mut PersistentStepManagerT,
     step: FullyQualifiedStep<W>,
-) -> Result<(), NextStepWorkerError<W, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>>
+) -> Result<
+    (),
+    NextStepWorkerError<W, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>,
+>
 where
     W: Workflow,
     ActiveStepSenderT: ActiveStepSender<W>,

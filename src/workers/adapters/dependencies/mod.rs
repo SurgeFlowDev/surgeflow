@@ -83,7 +83,12 @@ pub trait CompletedStepWorkerDependencyProvider<W: Workflow> {
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            CompletedStepWorkerDependencies<W, Self::CompletedStepReceiver, Self::NextStepSender, Self::PersistentStepManager>,
+            CompletedStepWorkerDependencies<
+                W,
+                Self::CompletedStepReceiver,
+                Self::NextStepSender,
+                Self::PersistentStepManager,
+            >,
             Self::Error,
         >,
     > + Send;
@@ -113,7 +118,12 @@ pub trait FailedStepWorkerDependencyProvider<W: Workflow> {
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            FailedStepWorkerDependencies<W, Self::FailedStepReceiver, Self::FailedInstanceSender, Self::PersistentStepManager>,
+            FailedStepWorkerDependencies<
+                W,
+                Self::FailedStepReceiver,
+                Self::FailedInstanceSender,
+                Self::PersistentStepManager,
+            >,
             Self::Error,
         >,
     > + Send;

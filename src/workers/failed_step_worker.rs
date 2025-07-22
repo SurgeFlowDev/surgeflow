@@ -2,8 +2,7 @@ use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
         dependencies::failed_step_worker::FailedStepWorkerDependencies,
-        managers::PersistentStepManager,
-        receivers::FailedStepReceiver,
+        managers::PersistentStepManager, receivers::FailedStepReceiver,
         senders::FailedInstanceSender,
     },
     workflows::Workflow,
@@ -11,7 +10,12 @@ use crate::{
 use derive_more::Debug;
 
 pub async fn main<W, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>(
-    dependencies: FailedStepWorkerDependencies<W, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>,
+    dependencies: FailedStepWorkerDependencies<
+        W,
+        FailedStepReceiverT,
+        FailedInstanceSenderT,
+        PersistentStepManagerT,
+    >,
 ) -> anyhow::Result<()>
 where
     W: Workflow,
@@ -24,7 +28,12 @@ where
     let mut persistent_step_manager = dependencies.persistent_step_manager;
 
     loop {
-        if let Err(err) = receive_and_process::<W, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>(
+        if let Err(err) = receive_and_process::<
+            W,
+            FailedStepReceiverT,
+            FailedInstanceSenderT,
+            PersistentStepManagerT,
+        >(
             &mut failed_step_receiver,
             &mut failed_instance_sender,
             &mut persistent_step_manager,
@@ -36,7 +45,12 @@ where
     }
 }
 
-async fn receive_and_process<W, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>(
+async fn receive_and_process<
+    W,
+    FailedStepReceiverT,
+    FailedInstanceSenderT,
+    PersistentStepManagerT,
+>(
     failed_step_receiver: &mut FailedStepReceiverT,
     failed_instance_sender: &mut FailedInstanceSenderT,
     persistent_step_manager: &mut PersistentStepManagerT,
@@ -49,8 +63,12 @@ where
 {
     let (step, handle) = failed_step_receiver.receive().await?;
 
-    if let Err(err) =
-        process::<W, FailedInstanceSenderT, PersistentStepManagerT>(failed_instance_sender, persistent_step_manager, step).await
+    if let Err(err) = process::<W, FailedInstanceSenderT, PersistentStepManagerT>(
+        failed_instance_sender,
+        persistent_step_manager,
+        step,
+    )
+    .await
     {
         tracing::error!("Error processing failed step: {:?}", err);
     }

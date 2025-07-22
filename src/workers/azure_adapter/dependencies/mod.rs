@@ -237,7 +237,8 @@ impl<W: Workflow> ActiveStepWorkerDependencyProvider<W> for AzureDependencyManag
         )
         .await?;
 
-        let persistent_step_manager = AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
+        let persistent_step_manager =
+            AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::active_step_worker::ActiveStepWorkerDependencies::new(
             active_step_receiver,
@@ -306,7 +307,8 @@ impl<W: Workflow> FailedStepWorkerDependencyProvider<W> for AzureDependencyManag
         )
         .await?;
 
-        let persistent_step_manager = AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
+        let persistent_step_manager =
+            AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::failed_step_worker::FailedStepWorkerDependencies::new(
             failed_step_receiver,
@@ -426,7 +428,8 @@ impl<W: Workflow> NextStepWorkerDependencyProvider<W> for AzureDependencyManager
         let steps_awaiting_event_manager =
             AzureServiceBusStepsAwaitingEventManager::<W>::new(cosmos_client);
 
-        let persistent_step_manager = AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
+        let persistent_step_manager =
+            AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::next_step_worker::NextStepWorkerDependencies::new(
             next_step_receiver,
