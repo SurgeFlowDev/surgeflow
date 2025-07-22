@@ -1,3 +1,6 @@
+use std::any;
+
+use crate::workers::adapters::managers::PersistentStepManager;
 use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
@@ -7,28 +10,29 @@ use crate::{
     workflows::{StepId, Workflow},
 };
 use derive_more::Debug;
-use sqlx::{PgConnection, PgPool, query};
-use uuid::Uuid;
 
-pub async fn main<W: Workflow, CompletedStepReceiverT, NextStepSenderT>(
-    dependencies: CompletedStepWorkerDependencies<W, CompletedStepReceiverT, NextStepSenderT>,
+pub async fn main<W: Workflow, CompletedStepReceiverT, NextStepSenderT, PersistentStepManagerT>(
+    dependencies: CompletedStepWorkerDependencies<
+        W,
+        CompletedStepReceiverT,
+        NextStepSenderT,
+        PersistentStepManagerT,
+    >,
 ) -> anyhow::Result<()>
 where
     CompletedStepReceiverT: CompletedStepReceiver<W>,
     NextStepSenderT: NextStepSender<W>,
+    PersistentStepManagerT: PersistentStepManager,
 {
     let mut completed_step_receiver = dependencies.completed_step_receiver;
     let mut next_step_sender = dependencies.next_step_sender;
-
-    let connection_string =
-        std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
-    let mut pool = PgPool::connect(&connection_string).await?;
+    let mut persistent_step_manager = dependencies.persistent_step_manager;
 
     loop {
-        if let Err(err) = receive_and_process::<W, CompletedStepReceiverT, NextStepSenderT>(
+        if let Err(err) = receive_and_process(
             &mut completed_step_receiver,
             &mut next_step_sender,
-            &mut pool,
+            &mut persistent_step_manager,
         )
         .await
         {
@@ -37,23 +41,27 @@ where
     }
 }
 
-async fn receive_and_process<W: Workflow, CompletedStepReceiverT, NextStepSenderT>(
+async fn receive_and_process<
+    W: Workflow,
+    CompletedStepReceiverT,
+    NextStepSenderT,
+    PersistentStepManagerT,
+>(
     completed_step_receiver: &mut CompletedStepReceiverT,
     next_step_sender: &mut NextStepSenderT,
-    pool: &mut PgPool,
+    persistent_step_manager: &mut PersistentStepManagerT,
 ) -> anyhow::Result<()>
 where
     CompletedStepReceiverT: CompletedStepReceiver<W>,
     NextStepSenderT: NextStepSender<W>,
+    PersistentStepManagerT: PersistentStepManager,
 {
     let (step, handle) = completed_step_receiver.receive().await?;
-    let mut tx = pool.begin().await?;
 
-    if let Err(err) = process::<W, NextStepSenderT>(next_step_sender, &mut tx, step).await {
+    if let Err(err) = process(next_step_sender, persistent_step_manager, step).await {
         tracing::error!("Error processing completed step: {:?}", err);
     }
 
-    tx.commit().await?;
     completed_step_receiver.accept(handle).await?;
 
     Ok(())
@@ -67,35 +75,43 @@ enum CompletedStepWorkerError<W: Workflow, NextStepSenderT: NextStepSender<W>> {
     SendNextStepError(#[source] <NextStepSenderT as NextStepSender<W>>::Error),
 }
 
-async fn process<W: Workflow, NextStepSenderT>(
+async fn process<W, NextStepSenderT, PersistentStepManagerT>(
     next_step_sender: &mut NextStepSenderT,
-    conn: &mut PgConnection,
+    persistent_step_manager: &mut PersistentStepManagerT,
     step: FullyQualifiedStep<W>,
 ) -> Result<(), CompletedStepWorkerError<W, NextStepSenderT>>
 where
+    W: Workflow,
     NextStepSenderT: NextStepSender<W>,
+    PersistentStepManagerT: PersistentStepManager,
 {
     tracing::info!(
         "received completed step for instance: {}",
         step.instance.external_id
     );
 
-    query!(
-        r#"
-        UPDATE workflow_steps SET "status" = $1
-        WHERE "external_id" = $2
-        "#,
-        4,
-        Uuid::from(step.step_id)
-    )
-    .execute(conn.as_mut())
-    .await?;
+    persistent_step_manager
+        .set_step_status(step.step_id, 4)
+        .await
+        .expect("TODO: handle error");
+    // query!(
+    //     r#"
+    //     UPDATE workflow_steps SET "status" = $1
+    //     WHERE "external_id" = $2
+    //     "#,
+    //     4,
+    //     Uuid::from(step.step_id)
+    // )
+    // .execute(conn.as_mut())
+    // .await?;
 
     let next_step = step.next_step;
 
     if let Some(next_step) = next_step {
-        let json_step =
-            serde_json::to_value(&next_step.step).expect("TODO: handle serialization error");
+        persistent_step_manager
+            .insert_step_output::<W>(step.step_id, Some(&next_step.step))
+            .await
+            .expect("TODO: handle error");
 
         next_step_sender
             .send(FullyQualifiedStep {
@@ -109,30 +125,14 @@ where
             })
             .await
             .map_err(CompletedStepWorkerError::SendNextStepError)?;
-
-        query!(
-            r#"
-            INSERT INTO workflow_step_outputs ("workflow_step_id", "output")
-            VALUES ((SELECT id FROM workflow_steps WHERE external_id = $1), $2)
-            "#,
-            Uuid::from(step.step_id),
-            json_step
-        )
-        .execute(conn)
-        .await?;
     } else {
         // TODO: push to instance completed queue ?
         tracing::info!("Instance {} completed", step.instance.external_id);
 
-        query!(
-            r#"
-            INSERT INTO workflow_step_outputs ("workflow_step_id", "output")
-            VALUES ((SELECT id FROM workflow_steps WHERE external_id = $1), NULL)
-            "#,
-            Uuid::from(step.step_id),
-        )
-        .execute(conn)
-        .await?;
+        persistent_step_manager
+            .insert_step_output::<W>(step.step_id, None)
+            .await
+            .expect("TODO: handle error");
     }
 
     Ok(())

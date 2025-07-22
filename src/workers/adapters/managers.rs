@@ -10,17 +10,41 @@ pub trait StepsAwaitingEventManager<W: Workflow>: Sized {
     fn get_step(
         &mut self,
         instance_id: WorkflowInstanceId,
-    ) -> impl std::future::Future<Output = Result<Option<FullyQualifiedStep<W>>, Self::Error>> + Send;
+    ) -> impl Future<Output = Result<Option<FullyQualifiedStep<W>>, Self::Error>> + Send;
     fn delete_step(
         &mut self,
         instance_id: WorkflowInstanceId,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
     fn put_step(
         &mut self,
         step: FullyQualifiedStep<W>,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
+
+mod persistent_step_manager {
+    use std::fmt::{Debug, Display};
+
+    use crate::workflows::{StepId, Workflow};
+
+    pub trait PersistentStepManager {
+        type Error: Send + Sync + 'static + Debug + Display;
+        fn set_step_status(
+            &self,
+            step_id: StepId,
+            status: i32,
+        ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+        fn insert_step_output<W: Workflow>(
+            &self,
+            step_id: StepId,
+            output: Option<&W::Step>,
+        ) -> impl Future<Output = Result<(), Self::Error>> + Send
+        ;
+    }
+}
+
+pub use persistent_step_manager::PersistentStepManager;
 
 mod workflow_instance_manager {
     use std::error::Error;

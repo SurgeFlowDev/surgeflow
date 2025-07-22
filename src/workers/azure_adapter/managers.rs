@@ -129,6 +129,63 @@ where
     }
 }
 
+mod persistent_step_manager {
+    use sqlx::{PgPool, query};
+    use uuid::Uuid;
+
+    use crate::{
+        workers::adapters::managers::PersistentStepManager,
+        workflows::{StepId, Workflow},
+    };
+
+    pub struct AzurePersistentStepManager {
+        sqlx_pool: PgPool,
+    }
+    impl AzurePersistentStepManager {
+        pub fn new(sqlx_pool: PgPool) -> Self {
+            Self { sqlx_pool }
+        }
+    }
+    impl PersistentStepManager for AzurePersistentStepManager {
+        type Error = anyhow::Error;
+        async fn set_step_status(&self, step_id: StepId, status: i32) -> Result<(), anyhow::Error> {
+            query!(
+                r#"
+        UPDATE workflow_steps SET "status" = $1
+        WHERE "external_id" = $2
+        "#,
+                status,
+                Uuid::from(step_id)
+            )
+            .execute(&self.sqlx_pool)
+            .await?;
+
+            Ok(())
+        }
+
+        async fn insert_step_output<W: Workflow>(
+            &self,
+            step_id: StepId,
+            output: Option<&W::Step>,
+        ) -> Result<(), anyhow::Error> {
+            let output = serde_json::to_value(output).expect("TODO: handle serialization error");
+            query!(
+                r#"
+            INSERT INTO workflow_step_outputs ("workflow_step_id", "output")
+            VALUES ((SELECT id FROM workflow_steps WHERE external_id = $1), $2)
+            "#,
+                Uuid::from(step_id),
+                output
+            )
+            .execute(&self.sqlx_pool)
+            .await?;
+
+            Ok(())
+        }
+    }
+}
+pub use persistent_step_manager::AzurePersistentStepManager;
+
 mod workflow_instance_manager {
     use std::marker::PhantomData;
 

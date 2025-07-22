@@ -1,5 +1,6 @@
 use azservicebus::{ServiceBusClient, ServiceBusClientOptions, core::BasicRetryPolicy};
 use azure_data_cosmos::CosmosClient;
+use sqlx::PgPool;
 
 use crate::{
     workers::{
@@ -13,7 +14,7 @@ use crate::{
             completed_step_worker::CompletedStepWorkerDependencies,
         },
         azure_adapter::{
-            managers::AzureServiceBusStepsAwaitingEventManager,
+            managers::{AzurePersistentStepManager, AzureServiceBusStepsAwaitingEventManager},
             receivers::{
                 AzureServiceBusActiveStepReceiver, AzureServiceBusCompletedInstanceReceiver,
                 AzureServiceBusCompletedStepReceiver, AzureServiceBusEventReceiver,
@@ -66,6 +67,7 @@ pub struct AzureAdapterConfig {
 pub struct AzureDependencyManager {
     service_bus_client: Option<ServiceBusClient<BasicRetryPolicy>>,
     cosmos_client: Option<CosmosClient>,
+    sqlx_pool: Option<PgPool>,
     config: AzureAdapterConfig,
 }
 
@@ -74,6 +76,7 @@ impl AzureDependencyManager {
         Self {
             service_bus_client: None,
             cosmos_client: None,
+            sqlx_pool: None,
             config,
         }
     }
@@ -110,6 +113,21 @@ impl AzureDependencyManager {
             .as_ref()
             .expect("TODO: handle error properly")
     }
+
+    async fn sqlx_pool(&mut self) -> &mut PgPool {
+        if self.sqlx_pool.is_none() {
+            let connection_string =
+                std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
+            self.sqlx_pool = Some(
+                PgPool::connect(&connection_string)
+                    .await
+                    .expect("TODO: handle error properly"),
+            );
+        }
+        self.sqlx_pool
+            .as_mut()
+            .expect("TODO: handle error properly")
+    }
 }
 
 impl<W: Workflow> CompletedInstanceWorkerDependencyProvider<W> for AzureDependencyManager {
@@ -135,12 +153,18 @@ impl<W: Workflow> CompletedInstanceWorkerDependencyProvider<W> for AzureDependen
 impl<W: Workflow> CompletedStepWorkerDependencyProvider<W> for AzureDependencyManager {
     type CompletedStepReceiver = AzureServiceBusCompletedStepReceiver<W>;
     type NextStepSender = AzureServiceBusNextStepSender<W>;
+    type PersistentStepManager = AzurePersistentStepManager;
     type Error = anyhow::Error;
 
     async fn completed_step_worker_dependencies(
         &mut self,
     ) -> anyhow::Result<
-        CompletedStepWorkerDependencies<W, Self::CompletedStepReceiver, Self::NextStepSender>,
+        CompletedStepWorkerDependencies<
+            W,
+            Self::CompletedStepReceiver,
+            Self::NextStepSender,
+            Self::PersistentStepManager,
+        >,
     > {
         let completed_steps_queue = format!("{}-completed-steps", W::NAME);
         let next_steps_queue = format!("{}-next-steps", W::NAME);
@@ -157,9 +181,13 @@ impl<W: Workflow> CompletedStepWorkerDependencyProvider<W> for AzureDependencyMa
         )
         .await?;
 
+        let persistent_step_manager =
+            AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
+
         Ok(CompletedStepWorkerDependencies::new(
             completed_step_receiver,
             next_step_sender,
+            persistent_step_manager,
         ))
     }
 }

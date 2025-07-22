@@ -10,7 +10,7 @@ use crate::{
             new_instance_worker::NewInstanceWorkerDependencies,
             next_step_worker::NextStepWorkerDependencies,
         },
-        managers::StepsAwaitingEventManager,
+        managers::{PersistentStepManager, StepsAwaitingEventManager},
         receivers::{
             ActiveStepReceiver, CompletedInstanceReceiver, CompletedStepReceiver, EventReceiver,
             FailedInstanceReceiver, FailedStepReceiver, NewInstanceReceiver, NextStepReceiver,
@@ -74,13 +74,14 @@ pub trait CompletedInstanceWorkerDependencyProvider<W: Workflow> {
 pub trait CompletedStepWorkerDependencyProvider<W: Workflow> {
     type CompletedStepReceiver: CompletedStepReceiver<W>;
     type NextStepSender: NextStepSender<W>;
+    type PersistentStepManager: PersistentStepManager;
     type Error: Send + Sync + 'static;
 
     fn completed_step_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            CompletedStepWorkerDependencies<W, Self::CompletedStepReceiver, Self::NextStepSender>,
+            CompletedStepWorkerDependencies<W, Self::CompletedStepReceiver, Self::NextStepSender, Self::PersistentStepManager>,
             Self::Error,
         >,
     > + Send;

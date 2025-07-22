@@ -160,7 +160,7 @@ async fn main_handler<W: Workflow>(
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "completed_step_worker")]
-        completed_step_worker::main::<W, _, _>(
+        completed_step_worker::main::<W, _, _, _>(
             dependency_manager
                 .completed_step_worker_dependencies()
                 .await

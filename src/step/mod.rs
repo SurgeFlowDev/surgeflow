@@ -34,7 +34,7 @@ pub trait Step:
     > + Send;
 }
 
-pub trait WorkflowStep: Step {
+pub trait WorkflowStep: Step + Sync {
     /// Returns the TypeId of the event type associated with this step.
     fn variant_event_type_id(&self) -> TypeId;
 }
