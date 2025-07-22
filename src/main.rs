@@ -9,18 +9,11 @@ use axum::{
 };
 use macros::my_main;
 use rust_workflow_2::workers::active_step_worker;
-use rust_workflow_2::workers::azure_adapter::dependencies::active_step_worker::AzureServiceBusActiveStepWorkerDependencies;
-use rust_workflow_2::workers::azure_adapter::dependencies::completed_instance_worker::AzureServiceBusCompletedInstanceWorkerDependencies;
-use rust_workflow_2::workers::azure_adapter::dependencies::completed_step_worker::AzureServiceBusCompletedStepWorkerDependencies;
-use rust_workflow_2::workers::azure_adapter::dependencies::failed_instance_worker::AzureServiceBusFailedInstanceWorkerDependencies;
-use rust_workflow_2::workers::azure_adapter::dependencies::failed_step_worker::AzureServiceBusFailedStepWorkerDependencies;
-use rust_workflow_2::workers::azure_adapter::dependencies::new_event_worker::AzureServiceBusNewEventWorkerDependencies;
-use rust_workflow_2::workers::azure_adapter::dependencies::new_instance_worker::AzureServiceBusNewInstanceWorkerDependencies;
-use rust_workflow_2::workers::azure_adapter::dependencies::next_step_worker::AzureServiceBusNextStepWorkerDependencies;
 use rust_workflow_2::workers::completed_instance_worker;
 use rust_workflow_2::workers::completed_step_worker;
 use rust_workflow_2::workers::failed_instance_worker;
 use rust_workflow_2::workers::failed_step_worker;
+use rust_workflow_2::workers::new_event_worker;
 use rust_workflow_2::workers::new_instance_worker;
 use rust_workflow_2::workers::next_step_worker;
 use rust_workflow_2::workflows::{TxState, workflow_0::Workflow0};
@@ -108,40 +101,89 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
 async fn main_handler<W: Workflow>(
     #[cfg(feature = "active_step_worker")] wf: W,
 ) -> anyhow::Result<()> {
-    use rust_workflow_2::workers::{
-        azure_adapter::dependencies::AzureDependencyManager, new_event_worker,
+    use rust_workflow_2::workers::adapters::dependencies::ActiveStepWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::CompletedInstanceWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::CompletedStepWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::FailedInstanceWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::FailedStepWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::NewEventWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::NewInstanceWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::NextStepWorkerDependencyProvider;
+    use rust_workflow_2::workers::azure_adapter::dependencies::{
+        AzureAdapterConfig, AzureDependencyManager,
     };
 
-    let mut dependency_manager = AzureDependencyManager::default();
+    let mut dependency_manager: AzureDependencyManager =
+        AzureDependencyManager::new(AzureAdapterConfig {
+            service_bus_connection_string: std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
+                .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set"),
+            cosmos_connection_string: std::env::var("COSMOS_CONNECTION_STRING")
+                .expect("COSMOS_CONNECTION_STRING must be set"),
+            new_instance_queue_suffix: "-instance".into(),
+            next_step_queue_suffix: "-next-steps".into(),
+            completed_instance_queue_suffix: "-completed-instances".into(),
+            completed_step_queue_suffix: "-completed-steps".into(),
+            active_step_queue_suffix: "-active-steps".into(),
+            failed_instance_queue_suffix: "-failed-instances".into(),
+            failed_step_queue_suffix: "-failed-steps".into(),
+            new_event_queue_suffix: "-events".into(),
+        });
 
     try_join!(
         #[cfg(feature = "active_step_worker")]
-        active_step_worker::main::<W, AzureServiceBusActiveStepWorkerDependencies<W>>(wf),
-        #[cfg(feature = "new_instance_worker")]
-        new_instance_worker::main::<W, AzureServiceBusNewInstanceWorkerDependencies<W>>(),
-        #[cfg(feature = "next_step_worker")]
-        next_step_worker::main::<W, AzureServiceBusNextStepWorkerDependencies<W>>(),
-        #[cfg(feature = "new_event_worker")]
-        new_event_worker::main::<W, AzureServiceBusNewEventWorkerDependencies<W>>(),
-        // #[cfg(feature = "completed_step_worker")]
-        // completed_step_worker::main::<W, AzureServiceBusCompletedStepWorkerDependencies<W>>(),
-        #[cfg(feature = "completed_step_worker")]
-        completed_step_worker::main::<W, ()>(
+        active_step_worker::main::<W, _, _, _, _>(
             dependency_manager
-                .completed_step_worker_dependencies::<W>()
+                .active_step_worker_dependencies()
+                .await
+                .expect("TODO: handle error"),
+            wf,
+        ),
+        #[cfg(feature = "new_instance_worker")]
+        new_instance_worker::main::<W, _, _>(
+            dependency_manager
+                .new_instance_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "next_step_worker")]
+        next_step_worker::main::<W, _, _, _>(
+            dependency_manager
+                .next_step_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "new_event_worker")]
+        new_event_worker::main::<W, _, _, _>(
+            dependency_manager
+                .new_event_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "completed_step_worker")]
+        completed_step_worker::main::<W, _, _>(
+            dependency_manager
+                .completed_step_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "failed_step_worker")]
-        failed_step_worker::main::<W, AzureServiceBusFailedStepWorkerDependencies<W>>(),
-        #[cfg(feature = "failed_instance_worker")]
-        failed_instance_worker::main::<W, AzureServiceBusFailedInstanceWorkerDependencies<W>>(),
-        // #[cfg(feature = "completed_instance_worker")]
-        // completed_instance_worker::main::<W, AzureServiceBusCompletedInstanceWorkerDependencies<W>>(),
-        #[cfg(feature = "completed_instance_worker")]
-        completed_instance_worker::main::<W, ()>(
+        failed_step_worker::main::<W, _, _>(
             dependency_manager
-                .completed_instance_worker_dependencies::<W>()
+                .failed_step_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "failed_instance_worker")]
+        failed_instance_worker::main::<W, _>(
+            dependency_manager
+                .failed_instance_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "completed_instance_worker")]
+        completed_instance_worker::main::<W, _>(
+            dependency_manager
+                .completed_instance_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),

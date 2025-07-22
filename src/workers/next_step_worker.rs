@@ -2,8 +2,9 @@ use crate::{
     event::Immediate,
     step::{FullyQualifiedStep, WorkflowStep},
     workers::adapters::{
-        dependencies::next_step_worker::NextStepWorkerContext, managers::StepsAwaitingEventManager,
-        receivers::NextStepReceiver, senders::ActiveStepSender,
+        dependencies::next_step_worker::NextStepWorkerDependencies,
+        managers::StepsAwaitingEventManager, receivers::NextStepReceiver,
+        senders::ActiveStepSender,
     },
     workflows::Workflow,
 };
@@ -12,12 +13,22 @@ use sqlx::{PgConnection, PgPool, query};
 use std::any::TypeId;
 use uuid::Uuid;
 
-pub async fn main<W: Workflow, D: NextStepWorkerContext<W>>() -> anyhow::Result<()> {
-    let dependencies = D::dependencies().await?;
-
+pub async fn main<W, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT>(
+    dependencies: NextStepWorkerDependencies<
+        W,
+        NextStepReceiverT,
+        ActiveStepSenderT,
+        StepsAwaitingEventManagerT,
+    >,
+) -> anyhow::Result<()>
+where
+    W: Workflow,
+    NextStepReceiverT: NextStepReceiver<W>,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+{
     let mut next_step_receiver = dependencies.next_step_receiver;
     let mut active_step_sender = dependencies.active_step_sender;
-
     let mut steps_awaiting_event_manager = dependencies.steps_awaiting_event_manager;
 
     let connection_string =
@@ -25,7 +36,12 @@ pub async fn main<W: Workflow, D: NextStepWorkerContext<W>>() -> anyhow::Result<
     let mut pool = PgPool::connect(&connection_string).await?;
 
     loop {
-        if let Err(err) = receive_and_process::<W, D>(
+        if let Err(err) = receive_and_process::<
+            W,
+            NextStepReceiverT,
+            ActiveStepSenderT,
+            StepsAwaitingEventManagerT,
+        >(
             &mut next_step_receiver,
             &mut active_step_sender,
             &mut steps_awaiting_event_manager,
@@ -38,16 +54,22 @@ pub async fn main<W: Workflow, D: NextStepWorkerContext<W>>() -> anyhow::Result<
     }
 }
 
-async fn receive_and_process<W: Workflow, D: NextStepWorkerContext<W>>(
-    next_step_receiver: &mut D::NextStepReceiver,
-    active_step_sender: &mut D::ActiveStepSender,
-    steps_awaiting_event_manager: &mut D::StepsAwaitingEventManager,
+async fn receive_and_process<W, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT>(
+    next_step_receiver: &mut NextStepReceiverT,
+    active_step_sender: &mut ActiveStepSenderT,
+    steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
     pool: &mut PgPool,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    W: Workflow,
+    NextStepReceiverT: NextStepReceiver<W>,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+{
     let (step, handle) = next_step_receiver.receive().await?;
     let mut tx = pool.begin().await?;
 
-    if let Err(err) = process::<W, D>(
+    if let Err(err) = process::<W, ActiveStepSenderT, StepsAwaitingEventManagerT>(
         active_step_sender,
         steps_awaiting_event_manager,
         &mut tx,
@@ -65,23 +87,31 @@ async fn receive_and_process<W: Workflow, D: NextStepWorkerContext<W>>(
 }
 
 #[derive(thiserror::Error, Debug)]
-enum NextStepWorkerError<W: Workflow, D: NextStepWorkerContext<W>> {
+enum NextStepWorkerError<W, ActiveStepSenderT, StepsAwaitingEventManagerT>
+where
+    W: Workflow,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+{
     #[error("Database error occurred")]
     DatabaseError(#[from] sqlx::Error),
     #[error("Failed to send active step")]
-    SendActiveStepError(#[source] <D::ActiveStepSender as ActiveStepSender<W>>::Error),
+    SendActiveStepError(#[source] <ActiveStepSenderT as ActiveStepSender<W>>::Error),
     #[error("Failed to put step in awaiting event manager")]
-    AwaitEventError(
-        #[source] <D::StepsAwaitingEventManager as StepsAwaitingEventManager<W>>::Error,
-    ),
+    AwaitEventError(#[source] <StepsAwaitingEventManagerT as StepsAwaitingEventManager<W>>::Error),
 }
 
-async fn process<W: Workflow, D: NextStepWorkerContext<W>>(
-    active_step_sender: &mut D::ActiveStepSender,
-    steps_awaiting_event_manager: &mut D::StepsAwaitingEventManager,
+async fn process<W, ActiveStepSenderT, StepsAwaitingEventManagerT>(
+    active_step_sender: &mut ActiveStepSenderT,
+    steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
     conn: &mut PgConnection,
     step: FullyQualifiedStep<W>,
-) -> Result<(), NextStepWorkerError<W, D>> {
+) -> Result<(), NextStepWorkerError<W, ActiveStepSenderT, StepsAwaitingEventManagerT>>
+where
+    W: Workflow,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+{
     tracing::info!(
         "received next step for instance: {}",
         step.instance.external_id

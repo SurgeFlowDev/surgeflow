@@ -1,7 +1,7 @@
 use crate::{
     step::{FullyQualifiedStep, Step},
     workers::adapters::{
-        dependencies::active_step_worker::ActiveStepWorkerContext,
+        dependencies::active_step_worker::ActiveStepWorkerDependencies,
         receivers::ActiveStepReceiver,
         senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
     },
@@ -10,14 +10,20 @@ use crate::{
 use sqlx::{PgConnection, query};
 use uuid::Uuid;
 
-async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
+async fn process<W, ActiveStepSenderT, FailedStepSenderT, CompletedStepSenderT>(
     wf: W,
-    active_step_sender: &mut D::ActiveStepSender,
-    failed_step_sender: &mut D::FailedStepSender,
-    completed_step_sender: &mut D::CompletedStepSender,
+    active_step_sender: &mut ActiveStepSenderT,
+    failed_step_sender: &mut FailedStepSenderT,
+    completed_step_sender: &mut CompletedStepSenderT,
     conn: &mut PgConnection,
     mut step: FullyQualifiedStep<W>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    W: Workflow,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    FailedStepSenderT: FailedStepSender<W>,
+    CompletedStepSenderT: CompletedStepSender<W>,
+{
     tracing::info!("Received new step");
     query!(
         r#"
@@ -51,9 +57,30 @@ async fn process<W: Workflow, D: ActiveStepWorkerContext<W>>(
     Ok(())
 }
 
-pub async fn main<W: Workflow, D: ActiveStepWorkerContext<W>>(wf: W) -> anyhow::Result<()> {
+pub async fn main<
+    W,
+    ActiveStepReceiverT,
+    ActiveStepSenderT,
+    FailedStepSenderT,
+    CompletedStepSenderT,
+>(
+    dependencies: ActiveStepWorkerDependencies<
+        W,
+        ActiveStepReceiverT,
+        ActiveStepSenderT,
+        FailedStepSenderT,
+        CompletedStepSenderT,
+    >,
+    wf: W,
+) -> anyhow::Result<()>
+where
+    W: Workflow,
+    ActiveStepReceiverT: ActiveStepReceiver<W>,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    FailedStepSenderT: FailedStepSender<W>,
+    CompletedStepSenderT: CompletedStepSender<W>,
+{
     tracing::info!("Active Step Worker started for workflow: {}", W::NAME);
-    let dependencies = D::dependencies().await?;
 
     let mut active_step_receiver = dependencies.active_step_receiver;
     let mut active_step_sender = dependencies.active_step_sender;
@@ -71,7 +98,7 @@ pub async fn main<W: Workflow, D: ActiveStepWorkerContext<W>>(wf: W) -> anyhow::
         };
         let mut tx = pool.begin().await?;
 
-        if let Err(err) = process::<W, D>(
+        if let Err(err) = process::<W, ActiveStepSenderT, FailedStepSenderT, CompletedStepSenderT>(
             wf.clone(),
             &mut active_step_sender,
             &mut failed_step_sender,

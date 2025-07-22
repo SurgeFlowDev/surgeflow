@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use crate::{
     workers::adapters::{
         dependencies::{
@@ -95,7 +93,10 @@ pub trait FailedInstanceWorkerDependencyProvider<W: Workflow> {
     fn failed_instance_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
-        Output = Result<FailedInstanceWorkerDependencies<W, Self::FailedInstanceReceiver>, Self::Error>,
+        Output = Result<
+            FailedInstanceWorkerDependencies<W, Self::FailedInstanceReceiver>,
+            Self::Error,
+        >,
     > + Send;
 }
 
@@ -171,7 +172,8 @@ pub trait NextStepWorkerDependencyProvider<W: Workflow> {
     > + Send;
 }
 
-pub trait DependencyManager<W: Workflow>: Sized
+pub trait DependencyManager<W: Workflow>:
+    Sized
     + ActiveStepWorkerDependencyProvider<W>
     + CompletedInstanceWorkerDependencyProvider<W>
     + CompletedStepWorkerDependencyProvider<W>

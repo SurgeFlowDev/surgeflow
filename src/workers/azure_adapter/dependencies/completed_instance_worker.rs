@@ -1,8 +1,6 @@
 use crate::{
     workers::{
-        adapters::dependencies::completed_instance_worker::{
-             CompletedInstanceWorkerDependencies,
-        },
+        adapters::dependencies::completed_instance_worker::CompletedInstanceWorkerDependencies,
         azure_adapter::receivers::AzureServiceBusCompletedInstanceReceiver,
     },
     workflows::Workflow,

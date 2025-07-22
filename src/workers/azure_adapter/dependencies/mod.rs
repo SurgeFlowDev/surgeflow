@@ -40,39 +40,75 @@ pub mod new_event_worker;
 pub mod new_instance_worker;
 pub mod next_step_worker;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
+pub struct AzureAdapterConfig {
+    pub service_bus_connection_string: String,
+    pub cosmos_connection_string: String,
+    /// The suffix for the new instance queue
+    pub new_instance_queue_suffix: String,
+    /// The suffix for the next step queue
+    pub next_step_queue_suffix: String,
+    /// The suffix for the completed instance queue
+    pub completed_instance_queue_suffix: String,
+    /// The suffix for the completed step queue
+    pub completed_step_queue_suffix: String,
+    /// The suffix for the active step queue
+    pub active_step_queue_suffix: String,
+    /// The suffix for the failed instance queue
+    pub failed_instance_queue_suffix: String,
+    /// The suffix for the failed step queue
+    pub failed_step_queue_suffix: String,
+    /// The suffix for the new event queue
+    pub new_event_queue_suffix: String,
+}
+
+#[derive(Debug)]
 pub struct AzureDependencyManager {
     service_bus_client: Option<ServiceBusClient<BasicRetryPolicy>>,
     cosmos_client: Option<CosmosClient>,
+    config: AzureAdapterConfig,
+}
+
+impl AzureDependencyManager {
+    pub fn new(config: AzureAdapterConfig) -> Self {
+        Self {
+            service_bus_client: None,
+            cosmos_client: None,
+            config,
+        }
+    }
 }
 
 impl AzureDependencyManager {
     async fn service_bus_client(&mut self) -> &mut ServiceBusClient<BasicRetryPolicy> {
         if self.service_bus_client.is_none() {
-            let connection_string = std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
-                .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set");
             self.service_bus_client = Some(
                 ServiceBusClient::new_from_connection_string(
-                    connection_string,
+                    self.config.service_bus_connection_string.clone(),
                     ServiceBusClientOptions::default(),
                 )
                 .await
-                .expect("Failed to create Service Bus client"),
+                .expect("TODO: handle error properly"),
             );
         }
-        self.service_bus_client.as_mut().unwrap()
+        self.service_bus_client
+            .as_mut()
+            .expect("TODO: handle error properly")
     }
 
     fn cosmos_client(&mut self) -> &CosmosClient {
         if self.cosmos_client.is_none() {
-            let connection_string = std::env::var("COSMOS_CONNECTION_STRING")
-                .expect("COSMOS_CONNECTION_STRING must be set");
             self.cosmos_client = Some(
-                CosmosClient::with_connection_string(connection_string.into(), None)
-                    .expect("Failed to create Cosmos client"),
+                CosmosClient::with_connection_string(
+                    self.config.cosmos_connection_string.clone().into(),
+                    None,
+                )
+                .expect("TODO: handle error properly"),
             );
         }
-        self.cosmos_client.as_ref().unwrap()
+        self.cosmos_client
+            .as_ref()
+            .expect("TODO: handle error properly")
     }
 }
 
@@ -147,7 +183,36 @@ impl<W: Workflow> ActiveStepWorkerDependencyProvider<W> for AzureDependencyManag
         >,
         Self::Error,
     > {
-        todo!()
+        let active_steps_queue = format!("{}{}", W::NAME, self.config.active_step_queue_suffix);
+        let failed_steps_queue = format!("{}{}", W::NAME, self.config.failed_step_queue_suffix);
+        let completed_steps_queue =
+            format!("{}{}", W::NAME, self.config.completed_step_queue_suffix);
+        let service_bus_client = self.service_bus_client().await;
+
+        let active_step_receiver =
+            AzureServiceBusActiveStepReceiver::<W>::new(service_bus_client, &active_steps_queue)
+                .await?;
+
+        let active_step_sender =
+            AzureServiceBusActiveStepSender::<W>::new(service_bus_client, &active_steps_queue)
+                .await?;
+
+        let failed_step_sender =
+            AzureServiceBusFailedStepSender::<W>::new(service_bus_client, &failed_steps_queue)
+                .await?;
+
+        let completed_step_sender = AzureServiceBusCompletedStepSender::<W>::new(
+            service_bus_client,
+            &completed_steps_queue,
+        )
+        .await?;
+
+        Ok(crate::workers::adapters::dependencies::active_step_worker::ActiveStepWorkerDependencies::new(
+            active_step_receiver,
+            active_step_sender,
+            failed_step_sender,
+            completed_step_sender,
+        ))
     }
 }
 
@@ -161,7 +226,18 @@ impl<W: Workflow> FailedInstanceWorkerDependencyProvider<W> for AzureDependencyM
         crate::workers::adapters::dependencies::failed_instance_worker::FailedInstanceWorkerDependencies<W, Self::FailedInstanceReceiver>,
         Self::Error,
     >{
-        todo!()
+        let failed_instances_queue =
+            format!("{}{}", W::NAME, self.config.failed_instance_queue_suffix);
+
+        let failed_instance_receiver = AzureServiceBusFailedInstanceReceiver::<W>::new(
+            self.service_bus_client().await,
+            &failed_instances_queue,
+        )
+        .await?;
+
+        Ok(crate::workers::adapters::dependencies::failed_instance_worker::FailedInstanceWorkerDependencies::new(
+            failed_instance_receiver,
+        ))
     }
 }
 
@@ -180,7 +256,25 @@ impl<W: Workflow> FailedStepWorkerDependencyProvider<W> for AzureDependencyManag
         >,
         Self::Error,
     > {
-        todo!()
+        let failed_steps_queue = format!("{}{}", W::NAME, self.config.failed_step_queue_suffix);
+        let failed_instances_queue =
+            format!("{}{}", W::NAME, self.config.failed_instance_queue_suffix);
+        let service_bus_client = self.service_bus_client().await;
+
+        let failed_step_receiver =
+            AzureServiceBusFailedStepReceiver::<W>::new(service_bus_client, &failed_steps_queue)
+                .await?;
+
+        let failed_instance_sender = AzureServiceBusFailedInstanceSender::<W>::new(
+            service_bus_client,
+            &failed_instances_queue,
+        )
+        .await?;
+
+        Ok(crate::workers::adapters::dependencies::failed_step_worker::FailedStepWorkerDependencies::new(
+            failed_step_receiver,
+            failed_instance_sender,
+        ))
     }
 }
 
@@ -201,7 +295,27 @@ impl<W: Workflow> NewEventWorkerDependencyProvider<W> for AzureDependencyManager
         >,
         Self::Error,
     > {
-        todo!()
+        let new_event_queue = format!("{}{}", W::NAME, self.config.new_event_queue_suffix);
+        let active_steps_queue = format!("{}{}", W::NAME, self.config.active_step_queue_suffix);
+        let service_bus_client = self.service_bus_client().await;
+
+        let event_receiver =
+            AzureServiceBusEventReceiver::<W>::new(service_bus_client, &new_event_queue).await?;
+
+        let active_step_sender =
+            AzureServiceBusActiveStepSender::<W>::new(service_bus_client, &active_steps_queue)
+                .await?;
+
+        let cosmos_client = self.cosmos_client();
+
+        let steps_awaiting_event_manager =
+            AzureServiceBusStepsAwaitingEventManager::<W>::new(cosmos_client);
+
+        Ok(crate::workers::adapters::dependencies::new_event_worker::NewEventWorkerDependencies::new(
+            active_step_sender,
+            event_receiver,
+            steps_awaiting_event_manager,
+        ))
     }
 }
 
@@ -220,7 +334,21 @@ impl<W: Workflow> NewInstanceWorkerDependencyProvider<W> for AzureDependencyMana
         >,
         Self::Error,
     > {
-        todo!()
+        let new_instance_queue = format!("{}{}", W::NAME, self.config.new_instance_queue_suffix);
+        let next_steps_queue = format!("{}{}", W::NAME, self.config.next_step_queue_suffix);
+        let service_bus_client = self.service_bus_client().await;
+
+        let new_instance_receiver =
+            AzureServiceBusNewInstanceReceiver::<W>::new(service_bus_client, &new_instance_queue)
+                .await?;
+
+        let next_step_sender =
+            AzureServiceBusNextStepSender::<W>::new(service_bus_client, &next_steps_queue).await?;
+
+        Ok(crate::workers::adapters::dependencies::new_instance_worker::NewInstanceWorkerDependencies::new(
+            next_step_sender,
+            new_instance_receiver,
+        ))
     }
 }
 
@@ -241,7 +369,28 @@ impl<W: Workflow> NextStepWorkerDependencyProvider<W> for AzureDependencyManager
         >,
         Self::Error,
     > {
-        todo!()
+        let next_steps_queue = format!("{}{}", W::NAME, self.config.next_step_queue_suffix);
+        let active_steps_queue = format!("{}{}", W::NAME, self.config.active_step_queue_suffix);
+        let service_bus_client = self.service_bus_client().await;
+
+        let next_step_receiver =
+            AzureServiceBusNextStepReceiver::<W>::new(service_bus_client, &next_steps_queue)
+                .await?;
+
+        let active_step_sender =
+            AzureServiceBusActiveStepSender::<W>::new(service_bus_client, &active_steps_queue)
+                .await?;
+
+        let cosmos_client = self.cosmos_client();
+
+        let steps_awaiting_event_manager =
+            AzureServiceBusStepsAwaitingEventManager::<W>::new(cosmos_client);
+
+        Ok(crate::workers::adapters::dependencies::next_step_worker::NextStepWorkerDependencies::new(
+            next_step_receiver,
+            active_step_sender,
+            steps_awaiting_event_manager,
+        ))
     }
 }
 

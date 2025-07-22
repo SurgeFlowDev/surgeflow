@@ -4,15 +4,26 @@ use crate::{
     event::InstanceEvent,
     step::{FullyQualifiedStep, WorkflowStep},
     workers::adapters::{
-        dependencies::new_event_worker::NewEventWorkerContext, managers::StepsAwaitingEventManager,
-        receivers::EventReceiver, senders::ActiveStepSender,
+        dependencies::new_event_worker::NewEventWorkerDependencies,
+        managers::StepsAwaitingEventManager, receivers::EventReceiver, senders::ActiveStepSender,
     },
     workflows::{Workflow, WorkflowEvent},
 };
 
-pub async fn main<W: Workflow, C: NewEventWorkerContext<W>>() -> anyhow::Result<()> {
-    let dependencies = C::dependencies().await?;
-
+pub async fn main<W, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>(
+    dependencies: NewEventWorkerDependencies<
+        W,
+        ActiveStepSenderT,
+        EventReceiverT,
+        StepsAwaitingEventManagerT,
+    >,
+) -> anyhow::Result<()>
+where
+    W: Workflow,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    EventReceiverT: EventReceiver<W>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+{
     let mut active_step_sender = dependencies.active_step_sender;
     let mut event_receiver = dependencies.event_receiver;
     let mut steps_awaiting_event = dependencies.steps_awaiting_event_manager;
@@ -29,7 +40,7 @@ pub async fn main<W: Workflow, C: NewEventWorkerContext<W>>() -> anyhow::Result<
             instance_event.event.variant_type_id(),
             instance_event.instance_id
         );
-        process::<W, C>(
+        process::<W, ActiveStepSenderT, StepsAwaitingEventManagerT>(
             instance_event,
             &mut active_step_sender,
             &mut steps_awaiting_event,
@@ -41,12 +52,17 @@ pub async fn main<W: Workflow, C: NewEventWorkerContext<W>>() -> anyhow::Result<
     }
 }
 
-async fn process<W: Workflow, C: NewEventWorkerContext<W>>(
+async fn process<W, ActiveStepSenderT, StepsAwaitingEventManagerT>(
     InstanceEvent { event, instance_id }: InstanceEvent<W>,
-    active_step_sender: &mut C::ActiveStepSender,
-    steps_awaiting_event: &mut C::StepsAwaitingEventManager,
+    active_step_sender: &mut ActiveStepSenderT,
+    steps_awaiting_event: &mut StepsAwaitingEventManagerT,
     conn: &mut PgConnection,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    W: Workflow,
+    ActiveStepSenderT: ActiveStepSender<W>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+{
     let step = steps_awaiting_event.get_step(instance_id).await?;
     let Some(step) = step else {
         tracing::info!("No step awaiting event for instance {}", instance_id);

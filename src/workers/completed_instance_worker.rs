@@ -2,11 +2,8 @@ use sqlx::{PgConnection, PgPool};
 
 use crate::{
     workers::adapters::{
-        dependencies::completed_instance_worker::{
-            CompletedInstanceWorkerContext, CompletedInstanceWorkerDependencies,
-        },
-        managers::WorkflowInstance,
-        receivers::CompletedInstanceReceiver,
+        dependencies::completed_instance_worker::CompletedInstanceWorkerDependencies,
+        managers::WorkflowInstance, receivers::CompletedInstanceReceiver,
     },
     workflows::Workflow,
 };
@@ -17,11 +14,9 @@ async fn process(conn: &mut PgConnection, instance: WorkflowInstance) -> anyhow:
     Ok(())
 }
 
-pub async fn main<W: Workflow, C: CompletedInstanceWorkerContext<W>>(
-    dependencies: CompletedInstanceWorkerDependencies<W, C>,
+pub async fn main<W: Workflow, CompletedInstanceReceiverT: CompletedInstanceReceiver<W>>(
+    dependencies: CompletedInstanceWorkerDependencies<W, CompletedInstanceReceiverT>,
 ) -> anyhow::Result<()> {
-    // let dependencies = C::dependencies().await?;
-
     let mut completed_instance_receiver = dependencies.completed_instance_receiver;
 
     let connection_string =
