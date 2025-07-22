@@ -61,6 +61,9 @@ pub struct AzureAdapterConfig {
     pub failed_step_queue_suffix: String,
     /// The suffix for the new event queue
     pub new_event_queue_suffix: String,
+    /// The connection string for the PostgreSQL database
+    /// This is used for persistent step management
+    pub pg_connection_string: String,
 }
 
 #[derive(Debug)]
@@ -116,10 +119,9 @@ impl AzureDependencyManager {
 
     async fn sqlx_pool(&mut self) -> &mut PgPool {
         if self.sqlx_pool.is_none() {
-            let connection_string =
-                std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
+            let connection_string = &self.config.pg_connection_string;
             self.sqlx_pool = Some(
-                PgPool::connect(&connection_string)
+                PgPool::connect(connection_string)
                     .await
                     .expect("TODO: handle error properly"),
             );

@@ -1,5 +1,3 @@
-use sqlx::PgConnection;
-
 use crate::{
     event::InstanceEvent,
     step::{FullyQualifiedStep, WorkflowStep},
@@ -28,13 +26,9 @@ where
     let mut event_receiver = dependencies.event_receiver;
     let mut steps_awaiting_event = dependencies.steps_awaiting_event_manager;
 
-    let connection_string =
-        std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
-    let pool = sqlx::PgPool::connect(&connection_string).await?;
-
     loop {
         let (instance_event, handle) = event_receiver.receive().await?;
-        let mut tx = pool.begin().await?;
+
         tracing::debug!(
             "Received event {:?} for instance {}",
             instance_event.event.variant_type_id(),
@@ -44,10 +38,9 @@ where
             instance_event,
             &mut active_step_sender,
             &mut steps_awaiting_event,
-            &mut tx,
         )
         .await?;
-        tx.commit().await?;
+
         event_receiver.accept(handle).await?;
     }
 }
@@ -56,7 +49,6 @@ async fn process<W, ActiveStepSenderT, StepsAwaitingEventManagerT>(
     InstanceEvent { event, instance_id }: InstanceEvent<W>,
     active_step_sender: &mut ActiveStepSenderT,
     steps_awaiting_event: &mut StepsAwaitingEventManagerT,
-    conn: &mut PgConnection,
 ) -> anyhow::Result<()>
 where
     W: Workflow,

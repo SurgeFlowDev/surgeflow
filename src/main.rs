@@ -127,6 +127,8 @@ async fn main_handler<W: Workflow>(
             failed_instance_queue_suffix: "-failed-instances".into(),
             failed_step_queue_suffix: "-failed-steps".into(),
             new_event_queue_suffix: "-events".into(),
+            pg_connection_string: std::env::var("APP_USER_DATABASE_URL")
+                .expect("APP_USER_DATABASE_URL must be set"),
         });
 
     try_join!(
