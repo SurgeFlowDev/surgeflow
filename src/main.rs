@@ -131,7 +131,7 @@ async fn main_handler<W: Workflow>(
 
     try_join!(
         #[cfg(feature = "active_step_worker")]
-        active_step_worker::main::<W, _, _, _, _>(
+        active_step_worker::main::<W, _, _, _, _, _>(
             dependency_manager
                 .active_step_worker_dependencies()
                 .await
@@ -146,7 +146,7 @@ async fn main_handler<W: Workflow>(
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "next_step_worker")]
-        next_step_worker::main::<W, _, _, _>(
+        next_step_worker::main::<W, _, _, _, _>(
             dependency_manager
                 .next_step_worker_dependencies()
                 .await
@@ -167,7 +167,7 @@ async fn main_handler<W: Workflow>(
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "failed_step_worker")]
-        failed_step_worker::main::<W, _, _>(
+        failed_step_worker::main::<W, _, _, _>(
             dependency_manager
                 .failed_step_worker_dependencies()
                 .await

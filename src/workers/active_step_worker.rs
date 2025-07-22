@@ -2,20 +2,19 @@ use crate::{
     step::{FullyQualifiedStep, Step},
     workers::adapters::{
         dependencies::active_step_worker::ActiveStepWorkerDependencies,
+        managers::PersistentStepManager,
         receivers::ActiveStepReceiver,
         senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
     },
     workflows::Workflow,
 };
-use sqlx::{PgConnection, query};
-use uuid::Uuid;
 
-async fn process<W, ActiveStepSenderT, FailedStepSenderT, CompletedStepSenderT>(
+async fn process<W, ActiveStepSenderT, FailedStepSenderT, CompletedStepSenderT, PersistentStepManagerT>(
     wf: W,
     active_step_sender: &mut ActiveStepSenderT,
     failed_step_sender: &mut FailedStepSenderT,
     completed_step_sender: &mut CompletedStepSenderT,
-    conn: &mut PgConnection,
+    persistent_step_manager: &mut PersistentStepManagerT,
     mut step: FullyQualifiedStep<W>,
 ) -> anyhow::Result<()>
 where
@@ -23,18 +22,13 @@ where
     ActiveStepSenderT: ActiveStepSender<W>,
     FailedStepSenderT: FailedStepSender<W>,
     CompletedStepSenderT: CompletedStepSender<W>,
+    PersistentStepManagerT: PersistentStepManager,
 {
     tracing::info!("Received new step");
-    query!(
-        r#"
-        UPDATE workflow_steps SET "status" = $1
-        WHERE "external_id" = $2
-        "#,
-        3,
-        Uuid::from(step.step_id)
-    )
-    .execute(conn)
-    .await?;
+    persistent_step_manager
+        .set_step_status(step.step_id, 3)
+        .await
+        .expect("TODO: handle error");
 
     let next_step = step.step.step.run_raw(wf.clone(), step.event.clone()).await;
     step.retry_count += 1;
@@ -63,6 +57,7 @@ pub async fn main<
     ActiveStepSenderT,
     FailedStepSenderT,
     CompletedStepSenderT,
+    PersistentStepManagerT,
 >(
     dependencies: ActiveStepWorkerDependencies<
         W,
@@ -70,6 +65,7 @@ pub async fn main<
         ActiveStepSenderT,
         FailedStepSenderT,
         CompletedStepSenderT,
+        PersistentStepManagerT,
     >,
     wf: W,
 ) -> anyhow::Result<()>
@@ -79,6 +75,7 @@ where
     ActiveStepSenderT: ActiveStepSender<W>,
     FailedStepSenderT: FailedStepSender<W>,
     CompletedStepSenderT: CompletedStepSender<W>,
+    PersistentStepManagerT: PersistentStepManager,
 {
     tracing::info!("Active Step Worker started for workflow: {}", W::NAME);
 
@@ -86,24 +83,20 @@ where
     let mut active_step_sender = dependencies.active_step_sender;
     let mut failed_step_sender = dependencies.failed_step_sender;
     let mut completed_step_sender = dependencies.completed_step_sender;
-
-    let connection_string =
-        std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
-    let pool = sqlx::PgPool::connect(&connection_string).await?;
+    let mut persistent_step_manager = dependencies.persistent_step_manager;
 
     loop {
         let Ok((step, handle)) = active_step_receiver.receive().await else {
             tracing::error!("Failed to receive next step");
             continue;
         };
-        let mut tx = pool.begin().await?;
 
-        if let Err(err) = process::<W, ActiveStepSenderT, FailedStepSenderT, CompletedStepSenderT>(
+        if let Err(err) = process::<W, ActiveStepSenderT, FailedStepSenderT, CompletedStepSenderT, PersistentStepManagerT>(
             wf.clone(),
             &mut active_step_sender,
             &mut failed_step_sender,
             &mut completed_step_sender,
-            &mut tx,
+            &mut persistent_step_manager,
             step,
         )
         .await
@@ -111,7 +104,6 @@ where
             tracing::error!("Error processing next step: {:?}", err);
         }
 
-        tx.commit().await?;
         active_step_receiver.accept(handle).await?;
     }
 }

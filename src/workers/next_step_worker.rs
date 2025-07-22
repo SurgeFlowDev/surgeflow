@@ -3,22 +3,22 @@ use crate::{
     step::{FullyQualifiedStep, WorkflowStep},
     workers::adapters::{
         dependencies::next_step_worker::NextStepWorkerDependencies,
-        managers::StepsAwaitingEventManager, receivers::NextStepReceiver,
+        managers::{PersistentStepManager, StepsAwaitingEventManager}, 
+        receivers::NextStepReceiver,
         senders::ActiveStepSender,
     },
     workflows::Workflow,
 };
 use derive_more::Debug;
-use sqlx::{PgConnection, PgPool, query};
 use std::any::TypeId;
-use uuid::Uuid;
 
-pub async fn main<W, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT>(
+pub async fn main<W, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>(
     dependencies: NextStepWorkerDependencies<
         W,
         NextStepReceiverT,
         ActiveStepSenderT,
         StepsAwaitingEventManagerT,
+        PersistentStepManagerT,
     >,
 ) -> anyhow::Result<()>
 where
@@ -26,14 +26,12 @@ where
     NextStepReceiverT: NextStepReceiver<W>,
     ActiveStepSenderT: ActiveStepSender<W>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+    PersistentStepManagerT: PersistentStepManager,
 {
     let mut next_step_receiver = dependencies.next_step_receiver;
     let mut active_step_sender = dependencies.active_step_sender;
     let mut steps_awaiting_event_manager = dependencies.steps_awaiting_event_manager;
-
-    let connection_string =
-        std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
-    let mut pool = PgPool::connect(&connection_string).await?;
+    let mut persistent_step_manager = dependencies.persistent_step_manager;
 
     loop {
         if let Err(err) = receive_and_process::<
@@ -41,11 +39,12 @@ where
             NextStepReceiverT,
             ActiveStepSenderT,
             StepsAwaitingEventManagerT,
+            PersistentStepManagerT,
         >(
             &mut next_step_receiver,
             &mut active_step_sender,
             &mut steps_awaiting_event_manager,
-            &mut pool,
+            &mut persistent_step_manager,
         )
         .await
         {
@@ -54,25 +53,25 @@ where
     }
 }
 
-async fn receive_and_process<W, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT>(
+async fn receive_and_process<W, NextStepReceiverT, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>(
     next_step_receiver: &mut NextStepReceiverT,
     active_step_sender: &mut ActiveStepSenderT,
     steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
-    pool: &mut PgPool,
+    persistent_step_manager: &mut PersistentStepManagerT,
 ) -> anyhow::Result<()>
 where
     W: Workflow,
     NextStepReceiverT: NextStepReceiver<W>,
     ActiveStepSenderT: ActiveStepSender<W>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+    PersistentStepManagerT: PersistentStepManager,
 {
     let (step, handle) = next_step_receiver.receive().await?;
-    let mut tx = pool.begin().await?;
 
-    if let Err(err) = process::<W, ActiveStepSenderT, StepsAwaitingEventManagerT>(
+    if let Err(err) = process::<W, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>(
         active_step_sender,
         steps_awaiting_event_manager,
-        &mut tx,
+        persistent_step_manager,
         step,
     )
     .await
@@ -80,57 +79,48 @@ where
         tracing::error!("Error processing next step: {:?}", err);
     }
 
-    tx.commit().await?;
     next_step_receiver.accept(handle).await?;
 
     Ok(())
 }
 
 #[derive(thiserror::Error, Debug)]
-enum NextStepWorkerError<W, ActiveStepSenderT, StepsAwaitingEventManagerT>
+enum NextStepWorkerError<W, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>
 where
     W: Workflow,
     ActiveStepSenderT: ActiveStepSender<W>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+    PersistentStepManagerT: PersistentStepManager,
 {
     #[error("Database error occurred")]
-    DatabaseError(#[from] sqlx::Error),
+    DatabaseError(#[source] <PersistentStepManagerT as PersistentStepManager>::Error),
     #[error("Failed to send active step")]
     SendActiveStepError(#[source] <ActiveStepSenderT as ActiveStepSender<W>>::Error),
     #[error("Failed to put step in awaiting event manager")]
     AwaitEventError(#[source] <StepsAwaitingEventManagerT as StepsAwaitingEventManager<W>>::Error),
 }
 
-async fn process<W, ActiveStepSenderT, StepsAwaitingEventManagerT>(
+async fn process<W, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>(
     active_step_sender: &mut ActiveStepSenderT,
     steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
-    conn: &mut PgConnection,
+    persistent_step_manager: &mut PersistentStepManagerT,
     step: FullyQualifiedStep<W>,
-) -> Result<(), NextStepWorkerError<W, ActiveStepSenderT, StepsAwaitingEventManagerT>>
+) -> Result<(), NextStepWorkerError<W, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>>
 where
     W: Workflow,
     ActiveStepSenderT: ActiveStepSender<W>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+    PersistentStepManagerT: PersistentStepManager,
 {
     tracing::info!(
         "received next step for instance: {}",
         step.instance.external_id
     );
 
-    let json_step =
-        serde_json::to_value(&step.step.step).expect("TODO: handle serialization error");
-
-    query!(
-        r#"
-        INSERT INTO workflow_steps ("workflow_instance_external_id", "external_id", "step")
-        VALUES ($1, $2, $3)
-        "#,
-        Uuid::from(step.instance.external_id),
-        Uuid::from(step.step_id),
-        json_step
-    )
-    .execute(conn)
-    .await?;
+    persistent_step_manager
+        .insert_step::<W>(step.instance.external_id, step.step_id, &step.step.step)
+        .await
+        .map_err(NextStepWorkerError::DatabaseError)?;
 
     if step.step.step.variant_event_type_id() == TypeId::of::<Immediate<W>>() {
         active_step_sender

@@ -25,7 +25,7 @@ pub trait StepsAwaitingEventManager<W: Workflow>: Sized {
 mod persistent_step_manager {
     use std::fmt::{Debug, Display};
 
-    use crate::workflows::{StepId, Workflow};
+    use crate::workflows::{StepId, Workflow, WorkflowInstanceId};
 
     pub trait PersistentStepManager {
         type Error: Send + Sync + 'static + Debug + Display;
@@ -35,12 +35,18 @@ mod persistent_step_manager {
             status: i32,
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
+        fn insert_step<W: Workflow>(
+            &self,
+            workflow_instance_id: WorkflowInstanceId,
+            step_id: StepId,
+            step: &W::Step,
+        ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
         fn insert_step_output<W: Workflow>(
             &self,
             step_id: StepId,
             output: Option<&W::Step>,
-        ) -> impl Future<Output = Result<(), Self::Error>> + Send
-        ;
+        ) -> impl Future<Output = Result<(), Self::Error>> + Send;
     }
 }
 

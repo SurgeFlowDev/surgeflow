@@ -135,7 +135,7 @@ mod persistent_step_manager {
 
     use crate::{
         workers::adapters::managers::PersistentStepManager,
-        workflows::{StepId, Workflow},
+        workflows::{StepId, Workflow, WorkflowInstanceId},
     };
 
     pub struct AzurePersistentStepManager {
@@ -156,6 +156,28 @@ mod persistent_step_manager {
         "#,
                 status,
                 Uuid::from(step_id)
+            )
+            .execute(&self.sqlx_pool)
+            .await?;
+
+            Ok(())
+        }
+
+        async fn insert_step<W: Workflow>(
+            &self,
+            workflow_instance_id: WorkflowInstanceId,
+            step_id: StepId,
+            step: &W::Step,
+        ) -> Result<(), anyhow::Error> {
+            let json_step = serde_json::to_value(step).expect("TODO: handle serialization error");
+            query!(
+                r#"
+                INSERT INTO workflow_steps ("workflow_instance_external_id", "external_id", "step")
+                VALUES ($1, $2, $3)
+                "#,
+                Uuid::from(workflow_instance_id),
+                Uuid::from(step_id),
+                json_step
             )
             .execute(&self.sqlx_pool)
             .await?;

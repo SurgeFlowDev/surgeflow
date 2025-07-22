@@ -39,6 +39,7 @@ pub trait ActiveStepWorkerDependencyProvider<W: Workflow> {
     type ActiveStepSender: ActiveStepSender<W>;
     type FailedStepSender: FailedStepSender<W>;
     type CompletedStepSender: CompletedStepSender<W>;
+    type PersistentStepManager: PersistentStepManager;
     type Error: Send + Sync + 'static;
 
     fn active_step_worker_dependencies(
@@ -51,6 +52,7 @@ pub trait ActiveStepWorkerDependencyProvider<W: Workflow> {
                 Self::ActiveStepSender,
                 Self::FailedStepSender,
                 Self::CompletedStepSender,
+                Self::PersistentStepManager,
             >,
             Self::Error,
         >,
@@ -104,13 +106,14 @@ pub trait FailedInstanceWorkerDependencyProvider<W: Workflow> {
 pub trait FailedStepWorkerDependencyProvider<W: Workflow> {
     type FailedStepReceiver: FailedStepReceiver<W>;
     type FailedInstanceSender: FailedInstanceSender<W>;
+    type PersistentStepManager: PersistentStepManager;
     type Error: Send + Sync + 'static;
 
     fn failed_step_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            FailedStepWorkerDependencies<W, Self::FailedStepReceiver, Self::FailedInstanceSender>,
+            FailedStepWorkerDependencies<W, Self::FailedStepReceiver, Self::FailedInstanceSender, Self::PersistentStepManager>,
             Self::Error,
         >,
     > + Send;
@@ -156,6 +159,7 @@ pub trait NextStepWorkerDependencyProvider<W: Workflow> {
     type NextStepReceiver: NextStepReceiver<W>;
     type ActiveStepSender: ActiveStepSender<W>;
     type StepsAwaitingEventManager: StepsAwaitingEventManager<W>;
+    type PersistentStepManager: PersistentStepManager;
     type Error: Send + Sync + 'static;
 
     fn next_step_worker_dependencies(
@@ -167,6 +171,7 @@ pub trait NextStepWorkerDependencyProvider<W: Workflow> {
                 Self::NextStepReceiver,
                 Self::ActiveStepSender,
                 Self::StepsAwaitingEventManager,
+                Self::PersistentStepManager,
             >,
             Self::Error,
         >,
