@@ -36,141 +36,150 @@ pub mod new_event_worker;
 pub mod new_instance_worker;
 pub mod next_step_worker;
 
-pub trait DependencyManager: Sized {
-    type Error: /* Error + */ Send + Sync + 'static;
+pub trait ActiveStepWorkerDependencyProvider<W: Workflow> {
+    type ActiveStepReceiver: ActiveStepReceiver<W>;
+    type ActiveStepSender: ActiveStepSender<W>;
+    type FailedStepSender: FailedStepSender<W>;
+    type CompletedStepSender: CompletedStepSender<W>;
+    type Error: Send + Sync + 'static;
 
-    fn active_step_worker_dependencies<
-        W,
-        ActiveStepReceiverT,
-        ActiveStepSenderT,
-        FailedStepSenderT,
-        CompletedStepSenderT,
-    >(
+    fn active_step_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
             ActiveStepWorkerDependencies<
                 W,
-                ActiveStepReceiverT,
-                ActiveStepSenderT,
-                FailedStepSenderT,
-                CompletedStepSenderT,
+                Self::ActiveStepReceiver,
+                Self::ActiveStepSender,
+                Self::FailedStepSender,
+                Self::CompletedStepSender,
             >,
             Self::Error,
         >,
-    > + Send
-    where
-        W: Workflow,
-        ActiveStepReceiverT: ActiveStepReceiver<W>,
-        ActiveStepSenderT: ActiveStepSender<W>,
-        FailedStepSenderT: FailedStepSender<W>,
-        CompletedStepSenderT: CompletedStepSender<W>;
+    > + Send;
+}
 
-    fn completed_instance_worker_dependencies<W, CompletedInstanceReceiverT>(
+pub trait CompletedInstanceWorkerDependencyProvider<W: Workflow> {
+    type CompletedInstanceReceiver: CompletedInstanceReceiver<W>;
+    type Error: Send + Sync + 'static;
+
+    fn completed_instance_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            CompletedInstanceWorkerDependencies<W, CompletedInstanceReceiverT>,
+            CompletedInstanceWorkerDependencies<W, Self::CompletedInstanceReceiver>,
             Self::Error,
         >,
-    > + Send
-    where
-        W: Workflow,
-        CompletedInstanceReceiverT: CompletedInstanceReceiver<W>;
+    > + Send;
+}
 
-    fn completed_step_worker_dependencies<W, CompletedStepReceiverT, NextStepSenderT>(
+pub trait CompletedStepWorkerDependencyProvider<W: Workflow> {
+    type CompletedStepReceiver: CompletedStepReceiver<W>;
+    type NextStepSender: NextStepSender<W>;
+    type Error: Send + Sync + 'static;
+
+    fn completed_step_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            CompletedStepWorkerDependencies<W, CompletedStepReceiverT, NextStepSenderT>,
+            CompletedStepWorkerDependencies<W, Self::CompletedStepReceiver, Self::NextStepSender>,
             Self::Error,
         >,
-    > + Send
-    where
-        W: Workflow,
-        CompletedStepReceiverT: CompletedStepReceiver<W>,
-        NextStepSenderT: NextStepSender<W>;
+    > + Send;
+}
 
-    fn failed_instance_worker_dependencies<W, FailedInstanceReceiverT>(
+pub trait FailedInstanceWorkerDependencyProvider<W: Workflow> {
+    type FailedInstanceReceiver: FailedInstanceReceiver<W>;
+    type Error: Send + Sync + 'static;
+
+    fn failed_instance_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
-        Output = Result<FailedInstanceWorkerDependencies<W, FailedInstanceReceiverT>, Self::Error>,
-    > + Send
-    where
-        W: Workflow,
-        FailedInstanceReceiverT: FailedInstanceReceiver<W>;
+        Output = Result<FailedInstanceWorkerDependencies<W, Self::FailedInstanceReceiver>, Self::Error>,
+    > + Send;
+}
 
-    fn failed_step_worker_dependencies<W, FailedStepReceiverT, FailedInstanceSenderT>(
+pub trait FailedStepWorkerDependencyProvider<W: Workflow> {
+    type FailedStepReceiver: FailedStepReceiver<W>;
+    type FailedInstanceSender: FailedInstanceSender<W>;
+    type Error: Send + Sync + 'static;
+
+    fn failed_step_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            FailedStepWorkerDependencies<W, FailedStepReceiverT, FailedInstanceSenderT>,
+            FailedStepWorkerDependencies<W, Self::FailedStepReceiver, Self::FailedInstanceSender>,
             Self::Error,
         >,
-    > + Send
-    where
-        W: Workflow,
-        FailedStepReceiverT: FailedStepReceiver<W>,
-        FailedInstanceSenderT: FailedInstanceSender<W>;
+    > + Send;
+}
 
-    fn new_event_worker_dependencies<
-        W,
-        ActiveStepSenderT,
-        EventReceiverT,
-        StepsAwaitingEventManagerT,
-    >(
+pub trait NewEventWorkerDependencyProvider<W: Workflow> {
+    type ActiveStepSender: ActiveStepSender<W>;
+    type EventReceiver: EventReceiver<W>;
+    type StepsAwaitingEventManager: StepsAwaitingEventManager<W>;
+    type Error: Send + Sync + 'static;
+
+    fn new_event_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
             NewEventWorkerDependencies<
                 W,
-                ActiveStepSenderT,
-                EventReceiverT,
-                StepsAwaitingEventManagerT,
+                Self::ActiveStepSender,
+                Self::EventReceiver,
+                Self::StepsAwaitingEventManager,
             >,
             Self::Error,
         >,
-    > + Send
-    where
-        W: Workflow,
-        ActiveStepSenderT: ActiveStepSender<W>,
-        EventReceiverT: EventReceiver<W>,
-        StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>;
+    > + Send;
+}
 
-    fn new_instance_worker_dependencies<W, NextStepSenderT, NewInstanceReceiverT>(
+pub trait NewInstanceWorkerDependencyProvider<W: Workflow> {
+    type NextStepSender: NextStepSender<W>;
+    type NewInstanceReceiver: NewInstanceReceiver<W>;
+    type Error: Send + Sync + 'static;
+
+    fn new_instance_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            NewInstanceWorkerDependencies<W, NextStepSenderT, NewInstanceReceiverT>,
+            NewInstanceWorkerDependencies<W, Self::NextStepSender, Self::NewInstanceReceiver>,
             Self::Error,
         >,
-    > + Send
-    where
-        W: Workflow,
-        NextStepSenderT: NextStepSender<W>,
-        NewInstanceReceiverT: NewInstanceReceiver<W>;
+    > + Send;
+}
 
-    fn next_step_worker_dependencies<
-        W,
-        NextStepReceiverT,
-        ActiveStepSenderT,
-        StepsAwaitingEventManagerT,
-    >(
+pub trait NextStepWorkerDependencyProvider<W: Workflow> {
+    type NextStepReceiver: NextStepReceiver<W>;
+    type ActiveStepSender: ActiveStepSender<W>;
+    type StepsAwaitingEventManager: StepsAwaitingEventManager<W>;
+    type Error: Send + Sync + 'static;
+
+    fn next_step_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
             NextStepWorkerDependencies<
                 W,
-                NextStepReceiverT,
-                ActiveStepSenderT,
-                StepsAwaitingEventManagerT,
+                Self::NextStepReceiver,
+                Self::ActiveStepSender,
+                Self::StepsAwaitingEventManager,
             >,
             Self::Error,
         >,
-    > + Send
-    where
-        W: Workflow,
-        NextStepReceiverT: NextStepReceiver<W>,
-        ActiveStepSenderT: ActiveStepSender<W>,
-        StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>;
+    > + Send;
+}
+
+pub trait DependencyManager<W: Workflow>: Sized
+    + ActiveStepWorkerDependencyProvider<W>
+    + CompletedInstanceWorkerDependencyProvider<W>
+    + CompletedStepWorkerDependencyProvider<W>
+    + FailedInstanceWorkerDependencyProvider<W>
+    + FailedStepWorkerDependencyProvider<W>
+    + NewEventWorkerDependencyProvider<W>
+    + NewInstanceWorkerDependencyProvider<W>
+    + NextStepWorkerDependencyProvider<W>
+{
+    type Error: Send + Sync + 'static;
 }

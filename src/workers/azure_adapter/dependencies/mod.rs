@@ -4,14 +4,27 @@ use azure_data_cosmos::CosmosClient;
 use crate::{
     workers::{
         adapters::dependencies::{
-            DependencyManager, completed_instance_worker::CompletedInstanceWorkerDependencies,
+            ActiveStepWorkerDependencyProvider, CompletedInstanceWorkerDependencyProvider,
+            CompletedStepWorkerDependencyProvider, DependencyManager,
+            FailedInstanceWorkerDependencyProvider, FailedStepWorkerDependencyProvider,
+            NewEventWorkerDependencyProvider, NewInstanceWorkerDependencyProvider,
+            NextStepWorkerDependencyProvider,
+            completed_instance_worker::CompletedInstanceWorkerDependencies,
             completed_step_worker::CompletedStepWorkerDependencies,
         },
         azure_adapter::{
+            managers::AzureServiceBusStepsAwaitingEventManager,
             receivers::{
-                AzureServiceBusCompletedInstanceReceiver, AzureServiceBusCompletedStepReceiver,
+                AzureServiceBusActiveStepReceiver, AzureServiceBusCompletedInstanceReceiver,
+                AzureServiceBusCompletedStepReceiver, AzureServiceBusEventReceiver,
+                AzureServiceBusFailedInstanceReceiver, AzureServiceBusFailedStepReceiver,
+                AzureServiceBusNewInstanceReceiver, AzureServiceBusNextStepReceiver,
             },
-            senders::AzureServiceBusNextStepSender,
+            senders::{
+                AzureServiceBusActiveStepSender, AzureServiceBusCompletedStepSender,
+                AzureServiceBusFailedInstanceSender, AzureServiceBusFailedStepSender,
+                AzureServiceBusNextStepSender,
+            },
         },
     },
     workflows::Workflow,
@@ -63,11 +76,14 @@ impl AzureDependencyManager {
     }
 }
 
-impl DependencyManager for AzureDependencyManager {
+impl<W: Workflow> CompletedInstanceWorkerDependencyProvider<W> for AzureDependencyManager {
+    type CompletedInstanceReceiver = AzureServiceBusCompletedInstanceReceiver<W>;
     type Error = anyhow::Error;
-    async fn completed_instance_worker_dependencies<W: Workflow>(
+
+    async fn completed_instance_worker_dependencies(
         &mut self,
-    ) -> anyhow::Result<CompletedInstanceWorkerDependencies<W, ()>> {
+    ) -> anyhow::Result<CompletedInstanceWorkerDependencies<W, Self::CompletedInstanceReceiver>>
+    {
         let completed_instance_queue = format!("{}-completed-instances", W::NAME);
 
         let instance_receiver = AzureServiceBusCompletedInstanceReceiver::new(
@@ -78,9 +94,18 @@ impl DependencyManager for AzureDependencyManager {
 
         Ok(CompletedInstanceWorkerDependencies::new(instance_receiver))
     }
-    async fn completed_step_worker_dependencies<W: Workflow>(
+}
+
+impl<W: Workflow> CompletedStepWorkerDependencyProvider<W> for AzureDependencyManager {
+    type CompletedStepReceiver = AzureServiceBusCompletedStepReceiver<W>;
+    type NextStepSender = AzureServiceBusNextStepSender<W>;
+    type Error = anyhow::Error;
+
+    async fn completed_step_worker_dependencies(
         &mut self,
-    ) -> anyhow::Result<CompletedStepWorkerDependencies<W, ()>> {
+    ) -> anyhow::Result<
+        CompletedStepWorkerDependencies<W, Self::CompletedStepReceiver, Self::NextStepSender>,
+    > {
         let completed_steps_queue = format!("{}-completed-steps", W::NAME);
         let next_steps_queue = format!("{}-next-steps", W::NAME);
 
@@ -103,21 +128,123 @@ impl DependencyManager for AzureDependencyManager {
     }
 }
 
-// impl<W: Workflow> CompletedInstanceWorkerContext<W> for () {
-//     type CompletedInstanceReceiver = AzureServiceBusCompletedInstanceReceiver<W>;
+impl<W: Workflow> ActiveStepWorkerDependencyProvider<W> for AzureDependencyManager {
+    type ActiveStepReceiver = AzureServiceBusActiveStepReceiver<W>;
+    type ActiveStepSender = AzureServiceBusActiveStepSender<W>;
+    type FailedStepSender = AzureServiceBusFailedStepSender<W>;
+    type CompletedStepSender = AzureServiceBusCompletedStepSender<W>;
+    type Error = anyhow::Error;
 
-//     fn dependencies()
-//     -> impl Future<Output = anyhow::Result<CompletedInstanceWorkerDependencies<W, Self>>> + Send
-//     {
-//         async { todo!() }
-//     }
-// }
+    async fn active_step_worker_dependencies(
+        &mut self,
+    ) -> Result<
+        crate::workers::adapters::dependencies::active_step_worker::ActiveStepWorkerDependencies<
+            W,
+            Self::ActiveStepReceiver,
+            Self::ActiveStepSender,
+            Self::FailedStepSender,
+            Self::CompletedStepSender,
+        >,
+        Self::Error,
+    > {
+        todo!()
+    }
+}
 
-// impl<W: Workflow> CompletedStepWorkerContext<W> for () {
-//     type CompletedStepReceiver = AzureServiceBusCompletedStepReceiver<W>;
-//     type NextStepSender = AzureServiceBusNextStepSender<W>;
-//     fn dependencies()
-//     -> impl Future<Output = anyhow::Result<CompletedStepWorkerDependencies<W, Self>>> + Send {
-//         async { todo!() }
-//     }
-// }
+impl<W: Workflow> FailedInstanceWorkerDependencyProvider<W> for AzureDependencyManager {
+    type FailedInstanceReceiver = AzureServiceBusFailedInstanceReceiver<W>;
+    type Error = anyhow::Error;
+
+    async fn failed_instance_worker_dependencies(
+        &mut self,
+    ) -> Result<
+        crate::workers::adapters::dependencies::failed_instance_worker::FailedInstanceWorkerDependencies<W, Self::FailedInstanceReceiver>,
+        Self::Error,
+    >{
+        todo!()
+    }
+}
+
+impl<W: Workflow> FailedStepWorkerDependencyProvider<W> for AzureDependencyManager {
+    type FailedStepReceiver = AzureServiceBusFailedStepReceiver<W>;
+    type FailedInstanceSender = AzureServiceBusFailedInstanceSender<W>;
+    type Error = anyhow::Error;
+
+    async fn failed_step_worker_dependencies(
+        &mut self,
+    ) -> Result<
+        crate::workers::adapters::dependencies::failed_step_worker::FailedStepWorkerDependencies<
+            W,
+            Self::FailedStepReceiver,
+            Self::FailedInstanceSender,
+        >,
+        Self::Error,
+    > {
+        todo!()
+    }
+}
+
+impl<W: Workflow> NewEventWorkerDependencyProvider<W> for AzureDependencyManager {
+    type ActiveStepSender = AzureServiceBusActiveStepSender<W>;
+    type EventReceiver = AzureServiceBusEventReceiver<W>;
+    type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<W>;
+    type Error = anyhow::Error;
+
+    async fn new_event_worker_dependencies(
+        &mut self,
+    ) -> Result<
+        crate::workers::adapters::dependencies::new_event_worker::NewEventWorkerDependencies<
+            W,
+            Self::ActiveStepSender,
+            Self::EventReceiver,
+            Self::StepsAwaitingEventManager,
+        >,
+        Self::Error,
+    > {
+        todo!()
+    }
+}
+
+impl<W: Workflow> NewInstanceWorkerDependencyProvider<W> for AzureDependencyManager {
+    type NextStepSender = AzureServiceBusNextStepSender<W>;
+    type NewInstanceReceiver = AzureServiceBusNewInstanceReceiver<W>;
+    type Error = anyhow::Error;
+
+    async fn new_instance_worker_dependencies(
+        &mut self,
+    ) -> Result<
+        crate::workers::adapters::dependencies::new_instance_worker::NewInstanceWorkerDependencies<
+            W,
+            Self::NextStepSender,
+            Self::NewInstanceReceiver,
+        >,
+        Self::Error,
+    > {
+        todo!()
+    }
+}
+
+impl<W: Workflow> NextStepWorkerDependencyProvider<W> for AzureDependencyManager {
+    type NextStepReceiver = AzureServiceBusNextStepReceiver<W>;
+    type ActiveStepSender = AzureServiceBusActiveStepSender<W>;
+    type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<W>;
+    type Error = anyhow::Error;
+
+    async fn next_step_worker_dependencies(
+        &mut self,
+    ) -> Result<
+        crate::workers::adapters::dependencies::next_step_worker::NextStepWorkerDependencies<
+            W,
+            Self::NextStepReceiver,
+            Self::ActiveStepSender,
+            Self::StepsAwaitingEventManager,
+        >,
+        Self::Error,
+    > {
+        todo!()
+    }
+}
+
+impl<W: Workflow> DependencyManager<W> for AzureDependencyManager {
+    type Error = anyhow::Error;
+}
