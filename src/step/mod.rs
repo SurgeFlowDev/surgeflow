@@ -1,12 +1,10 @@
-use fe2o3_amqp::{Receiver, Sender, session::SessionHandle};
 use serde::{Deserialize, Serialize};
-use std::{any::TypeId, fmt, marker::PhantomData};
-use uuid::Uuid;
+use std::{any::TypeId, fmt};
 
 use crate::{
     event::Event,
     workers::adapters::managers::WorkflowInstance,
-    workflows::{StepId, Workflow, WorkflowInstanceId},
+    workflows::{StepId, Workflow},
 };
 use derive_more::Debug;
 

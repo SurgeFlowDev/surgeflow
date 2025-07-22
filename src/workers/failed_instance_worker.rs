@@ -1,12 +1,11 @@
 use sqlx::{PgConnection, PgPool};
 
 use crate::{
-    step::FullyQualifiedStep,
     workers::adapters::{
         dependencies::failed_instance_worker::FailedInstanceWorkerDependencies,
         managers::WorkflowInstance, receivers::FailedInstanceReceiver,
     },
-    workflows::{StepId, Workflow},
+    workflows::Workflow,
 };
 
 async fn process(conn: &mut PgConnection, instance: WorkflowInstance) -> anyhow::Result<()> {

@@ -22,7 +22,7 @@ use rust_workflow_2::{
     workflows::init_app_state,
 };
 
-use rust_workflow_2::workflows::{Tx, TxLayer, Workflow, WorkflowControl, workflow_1::Workflow1};
+use rust_workflow_2::workflows::{Tx, TxLayer, Workflow, WorkflowControl};
 
 use sqlx::PgPool;
 use tokio::{net::TcpListener, try_join};

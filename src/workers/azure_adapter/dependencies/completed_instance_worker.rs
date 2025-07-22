@@ -1,12 +1,3 @@
-use crate::{
-    workers::{
-        adapters::dependencies::completed_instance_worker::CompletedInstanceWorkerDependencies,
-        azure_adapter::receivers::AzureServiceBusCompletedInstanceReceiver,
-    },
-    workflows::Workflow,
-};
-use azservicebus::{ServiceBusClient, ServiceBusClientOptions, core::BasicRetryPolicy};
-use std::marker::PhantomData;
 
 // pub struct AzureServiceBusCompletedInstanceWorkerDependencies<W: Workflow> {
 //     #[expect(dead_code)]
