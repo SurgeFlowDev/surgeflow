@@ -2,8 +2,8 @@ use crate::workers::adapters::managers::WorkflowInstance;
 use crate::workflows::workflow_0::EventType;
 use crate::{
     AppState, ArcAppState, WorkflowInstanceManager,
-    event::{Event, InstanceEvent},
-    step::{Step, StepWithSettings, WorkflowStep},
+    event::InstanceEvent,
+    step::{StepWithSettings, WorkflowStep},
     workers::adapters::{dependencies::control_server::ControlServerContext, senders::EventSender},
 };
 use aide::{NoApi, OperationIo, axum::ApiRouter};

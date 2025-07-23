@@ -1,16 +1,14 @@
 use crate::{
-    event::Immediate,
-    step::{FullyQualifiedStep, WorkflowStep},
+    step::FullyQualifiedStep,
     workers::adapters::{
         dependencies::next_step_worker::NextStepWorkerDependencies,
         managers::{PersistentStepManager, StepsAwaitingEventManager},
         receivers::NextStepReceiver,
         senders::ActiveStepSender,
     },
-    workflows::{workflow_0::EventType, AsWorkflowEventType, Workflow},
+    workflows::{AsWorkflowEventType, Workflow, workflow_0::EventType},
 };
 use derive_more::Debug;
-use std::any::TypeId;
 
 pub async fn main<
     W,

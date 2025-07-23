@@ -11,19 +11,16 @@ use std::any::TypeId;
 use std::fmt::Debug;
 
 impl WorkflowStep<Workflow0> for Workflow0Step {
-    fn run_raw(
+    async fn run_raw(
         &self,
         wf: Workflow0,
         event: Option<Workflow0Event>,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> impl std::future::Future<Output = Result<Option<StepWithSettings<Workflow0>>, StepError>> + Send
-    {
-        async move {
-            match self {
-                Workflow0Step::Step0(step) => Step::run_raw(step, wf, event).await,
-                Workflow0Step::Step1(step) => Step::run_raw(step, wf, event).await,
-            }
+    ) -> Result<Option<StepWithSettings<Workflow0>>, StepError> {
+        match self {
+            Workflow0Step::Step0(step) => Step::run_raw(step, wf, event).await,
+            Workflow0Step::Step1(step) => Step::run_raw(step, wf, event).await,
         }
     }
 }
@@ -151,7 +148,7 @@ impl Step for Step0 {
     async fn run_raw(
         &self,
         #[expect(unused_variables)] wf: Workflow0,
-        event: Option<Workflow0Event>,
+        _event: Option<Workflow0Event>,
     ) -> StepResult<Workflow0> {
         tracing::error!("Running Step0, Workflow0");
 

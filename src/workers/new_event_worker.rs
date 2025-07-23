@@ -1,11 +1,11 @@
 use crate::{
     event::InstanceEvent,
-    step::{FullyQualifiedStep, WorkflowStep},
+    step::FullyQualifiedStep,
     workers::adapters::{
         dependencies::new_event_worker::NewEventWorkerDependencies,
         managers::StepsAwaitingEventManager, receivers::EventReceiver, senders::ActiveStepSender,
     },
-    workflows::{AsWorkflowEventType, Workflow, WorkflowEvent},
+    workflows::{AsWorkflowEventType, Workflow},
 };
 
 pub async fn main<W, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>(
