@@ -1,4 +1,3 @@
-
 // pub struct AzureServiceBusCompletedInstanceWorkerDependencies<W: Workflow> {
 //     #[expect(dead_code)]
 //     service_bus_client: ServiceBusClient<BasicRetryPolicy>,

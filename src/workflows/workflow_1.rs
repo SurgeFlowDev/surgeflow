@@ -44,13 +44,9 @@ impl WorkflowEvent for Workflow1Event {
     }
 }
 
-impl Event for Workflow1Event {
-    type Workflow = Workflow1;
-}
+impl Event for Workflow1Event {}
 
-impl Event for Event0 {
-    type Workflow = Workflow1;
-}
+impl Event for Event0 {}
 
 impl From<Event0> for Option<<Workflow1 as Workflow>::Event> {
     fn from(val: Event0) -> Self {

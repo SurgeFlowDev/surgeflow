@@ -7,7 +7,7 @@ use crate::{
         receivers::NextStepReceiver,
         senders::ActiveStepSender,
     },
-    workflows::Workflow,
+    workflows::{workflow_0::EventType, AsWorkflowEventType, Workflow},
 };
 use derive_more::Debug;
 use std::any::TypeId;
@@ -138,7 +138,7 @@ where
         .await
         .map_err(NextStepWorkerError::DatabaseError)?;
 
-    if step.step.step.variant_event_type_id() == TypeId::of::<Immediate<W>>() {
+    if step.step.step.as_event_type() == EventType::Immediate {
         active_step_sender
             .send(step)
             .await
@@ -149,6 +149,10 @@ where
             .await
             .map_err(NextStepWorkerError::AwaitEventError)?;
     }
+    // active_step_sender
+    //         .send(step)
+    //         .await
+    //         .map_err(NextStepWorkerError::SendActiveStepError)?;
 
     Ok(())
 }

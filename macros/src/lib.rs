@@ -111,7 +111,7 @@ pub fn step(args: TokenStream, input: TokenStream) -> TokenStream {
             ty.clone(),
         )
     } else {
-        (None, parse_quote!(Immediate<Self::Workflow>))
+        (None, parse_quote!(Immediate))
     };
 
     let wf = if let Some(wf_arg) = wf_arg {

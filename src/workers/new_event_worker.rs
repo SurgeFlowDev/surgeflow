@@ -5,7 +5,7 @@ use crate::{
         dependencies::new_event_worker::NewEventWorkerDependencies,
         managers::StepsAwaitingEventManager, receivers::EventReceiver, senders::ActiveStepSender,
     },
-    workflows::{Workflow, WorkflowEvent},
+    workflows::{AsWorkflowEventType, Workflow, WorkflowEvent},
 };
 
 pub async fn main<W, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>(
@@ -31,7 +31,7 @@ where
 
         tracing::debug!(
             "Received event {:?} for instance {}",
-            instance_event.event.variant_type_id(),
+            instance_event.event.as_event_type(),
             instance_event.instance_id
         );
         process::<W, ActiveStepSenderT, StepsAwaitingEventManagerT>(
@@ -60,13 +60,13 @@ where
         tracing::info!("No step awaiting event for instance {}", instance_id);
         return Ok(());
     };
-    if step.step.step.variant_event_type_id() == event.variant_type_id() {
+    if step.step.step.as_event_type() == event.as_event_type() {
         steps_awaiting_event.delete_step(instance_id).await?;
     } else {
         tracing::info!(
             "Step {:?} is not waiting for event {:?}",
             step.step,
-            event.variant_type_id()
+            event.as_event_type()
         );
         return Ok(());
     }

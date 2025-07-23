@@ -1,21 +1,23 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 
 use crate::workflows::{Workflow, WorkflowInstanceId};
 
-pub trait Event: Serialize + for<'a> Deserialize<'a> + Clone {
-    type Workflow: Workflow;
-}
+pub trait Event: Serialize + for<'a> Deserialize<'a> + Clone {}
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-pub struct Immediate<W: Workflow>(PhantomData<W>);
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, JsonSchema)]
+pub struct Immediate;
 
-impl<W: Workflow> Event for Immediate<W> {
-    type Workflow = W;
-}
+impl Event for Immediate {}
 
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+// impl AsWorkflowEventType for Immediate {
+//     fn as_event_type(&self) -> EventType {
+//         EventType::Immediate
+//     }
+// }
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct InstanceEvent<W: Workflow> {
     #[serde(bound = "")]
     pub event: W::Event,

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{any::TypeId, fmt};
+use std::fmt;
 
 use crate::{
     event::Event,
@@ -18,7 +18,7 @@ pub trait Step:
     + Send
     + Clone
 {
-    type Event: Event<Workflow = Self::Workflow>;
+    type Event: Event + 'static;
     type Workflow: Workflow;
 
     fn run_raw(
@@ -32,9 +32,16 @@ pub trait Step:
     > + Send;
 }
 
-pub trait WorkflowStep: Step + Sync {
-    /// Returns the TypeId of the event type associated with this step.
-    fn variant_event_type_id(&self) -> TypeId;
+pub trait WorkflowStep<W: Workflow<Step = Self>>:
+    Sync + Serialize + for<'de> Deserialize<'de> + Clone + Send + fmt::Debug
+{
+    fn run_raw(
+        &self,
+        wf: W,
+        event: Option<<W as Workflow>::Event>,
+        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
+        // where we can get the WorkflowStep type from
+    ) -> impl std::future::Future<Output = Result<Option<StepWithSettings<W>>, StepError>> + Send;
 }
 
 #[derive(Debug, thiserror::Error)]

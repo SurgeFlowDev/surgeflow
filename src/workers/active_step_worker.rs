@@ -1,5 +1,5 @@
 use crate::{
-    step::{FullyQualifiedStep, Step},
+    step::{FullyQualifiedStep, Step, WorkflowStep},
     workers::adapters::{
         dependencies::active_step_worker::ActiveStepWorkerDependencies,
         managers::PersistentStepManager,
