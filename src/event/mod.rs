@@ -9,7 +9,7 @@ where
     Self: 'static,
 {
     // move to extension trait so it can't be overridden
-    fn matches_type<T: Event + 'static>() -> bool {
+    fn is<T: Event + 'static>() -> bool {
         TypeId::of::<Self>() == TypeId::of::<T>()
     }
 }

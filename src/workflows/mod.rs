@@ -29,7 +29,7 @@ pub trait WorkflowEvent:
     // inner workings of the workflow, but it is useful for API documentation
      + JsonSchema
 {
-    fn matches_type<T: Event + 'static>(&self) -> bool;
+    fn is_event<T: Event + 'static>(&self) -> bool;
 }
 
 #[derive(

@@ -43,8 +43,8 @@ pub trait WorkflowStep<W: Workflow<Step = Self>>:
         // where we can get the WorkflowStep type from
     ) -> impl std::future::Future<Output = Result<Option<StepWithSettings<W>>, StepError>> + Send;
 
-    fn matches_event_type<T: Event + 'static>(&self) -> bool;
-    fn matches_workflow_event_type<T: WorkflowEvent + 'static>(&self, event: &T) -> bool;
+    fn is_event<T: Event + 'static>(&self) -> bool;
+    fn is_workflow_event<T: WorkflowEvent + 'static>(&self, event: &T) -> bool;
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -137,7 +137,7 @@ where
         .await
         .map_err(NextStepWorkerError::DatabaseError)?;
 
-    if step.step.step.matches_event_type::<Immediate>() {
+    if step.step.step.is_event::<Immediate>() {
         active_step_sender
             .send(step)
             .await

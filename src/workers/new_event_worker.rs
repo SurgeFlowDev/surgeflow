@@ -55,7 +55,7 @@ where
         tracing::info!("No step awaiting event for instance {}", instance_id);
         return Ok(());
     };
-    if step.step.step.matches_workflow_event_type(&event) {
+    if step.step.step.is_workflow_event(&event) {
         steps_awaiting_event.delete_step(instance_id).await?;
     } else {
         return Ok(());

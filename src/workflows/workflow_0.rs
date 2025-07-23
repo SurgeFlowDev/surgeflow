@@ -29,17 +29,17 @@ impl WorkflowStep<Workflow0> for Workflow0Step {
         }
     }
 
-    fn matches_event_type<T: Event + 'static>(&self) -> bool {
+    fn is_event<T: Event + 'static>(&self) -> bool {
         match self {
-            Workflow0Step::Step0(_) => <Step0 as Step>::Event::matches_type::<T>(),
-            Workflow0Step::Step1(_) => <Step1 as Step>::Event::matches_type::<T>(),
+            Workflow0Step::Step0(_) => <Step0 as Step>::Event::is::<T>(),
+            Workflow0Step::Step1(_) => <Step1 as Step>::Event::is::<T>(),
         }
     }
 
-    fn matches_workflow_event_type<T: WorkflowEvent + 'static>(&self, workflow_event: &T) -> bool {
+    fn is_workflow_event<T: WorkflowEvent + 'static>(&self, workflow_event: &T) -> bool {
         match self {
-            Workflow0Step::Step0(_) => workflow_event.matches_type::<<Step0 as Step>::Event>(),
-            Workflow0Step::Step1(_) => workflow_event.matches_type::<<Step1 as Step>::Event>(),
+            Workflow0Step::Step0(_) => workflow_event.is_event::<<Step0 as Step>::Event>(),
+            Workflow0Step::Step1(_) => workflow_event.is_event::<<Step1 as Step>::Event>(),
         }
     }
 }
@@ -78,10 +78,10 @@ impl TryFrom<Option<Workflow0Event>> for Immediate {
 }
 
 impl WorkflowEvent for Workflow0Event {
-    fn matches_type<T: Event + 'static>(&self) -> bool {
+    fn is_event<T: Event + 'static>(&self) -> bool {
         match self {
-            Workflow0Event::Event0(_) => Event0::matches_type::<T>(),
-            Workflow0Event::Event1(_) => Event1::matches_type::<T>(),
+            Workflow0Event::Event0(_) => Event0::is::<T>(),
+            Workflow0Event::Event1(_) => Event1::is::<T>(),
         }
     }
 }
