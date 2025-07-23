@@ -24,7 +24,7 @@ use uuid::Uuid;
 pub mod workflow_0;
 // pub mod workflow_1;
 
-pub trait WorkflowEventType: Copy + Eq + PartialEq + Debug {}
+
 
 pub trait AsWorkflowEventType {
     fn as_event_type(&self) -> EventType;
@@ -101,7 +101,6 @@ impl AsRef<str> for WorkflowName {
 
 pub trait Workflow: Clone + Send + Sync + 'static {
     type Event: WorkflowEvent;
-    type EventType: WorkflowEventType;
     type Step: WorkflowStep<Self> + AsWorkflowEventType;
     const NAME: &'static str;
 

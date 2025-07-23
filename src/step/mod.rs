@@ -24,12 +24,16 @@ pub trait Step:
     fn run_raw(
         &self,
         wf: Self::Workflow,
-        event: Option<<Self::Workflow as Workflow>::Event>,
+        event: Self::Event,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
     ) -> impl std::future::Future<
         Output = Result<Option<StepWithSettings<Self::Workflow>>, StepError>,
     > + Send;
+
+    fn try_event(event: <Self::Workflow as Workflow>::Event) -> Result<Self::Event, StepError> {
+        Err(StepError::WrongEventType)
+    }
 }
 
 pub trait WorkflowStep<W: Workflow<Step = Self>>:
