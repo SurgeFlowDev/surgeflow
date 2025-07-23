@@ -4,7 +4,7 @@ use std::fmt;
 use crate::{
     event::Event,
     workers::adapters::managers::WorkflowInstance,
-    workflows::{StepId, Workflow},
+    workflows::{StepId, Workflow, WorkflowEvent},
 };
 use derive_more::Debug;
 
@@ -30,10 +30,6 @@ pub trait Step:
     ) -> impl std::future::Future<
         Output = Result<Option<StepWithSettings<Self::Workflow>>, StepError>,
     > + Send;
-
-    fn try_event(event: <Self::Workflow as Workflow>::Event) -> Result<Self::Event, StepError> {
-        Err(StepError::WrongEventType)
-    }
 }
 
 pub trait WorkflowStep<W: Workflow<Step = Self>>:
@@ -46,6 +42,9 @@ pub trait WorkflowStep<W: Workflow<Step = Self>>:
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
     ) -> impl std::future::Future<Output = Result<Option<StepWithSettings<W>>, StepError>> + Send;
+
+    fn matches_event_type<T: Event + 'static>(&self) -> bool;
+    fn matches_workflow_event_type<T: WorkflowEvent + 'static>(&self, event: &T) -> bool;
 }
 
 #[derive(Debug, thiserror::Error)]

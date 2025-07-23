@@ -1,12 +1,13 @@
 use crate::{
-    step::FullyQualifiedStep,
+    event::Immediate,
+    step::{FullyQualifiedStep, WorkflowStep},
     workers::adapters::{
         dependencies::next_step_worker::NextStepWorkerDependencies,
         managers::{PersistentStepManager, StepsAwaitingEventManager},
         receivers::NextStepReceiver,
         senders::ActiveStepSender,
     },
-    workflows::{AsWorkflowEventType, Workflow, workflow_0::EventType},
+    workflows::Workflow,
 };
 use derive_more::Debug;
 
@@ -136,7 +137,7 @@ where
         .await
         .map_err(NextStepWorkerError::DatabaseError)?;
 
-    if step.step.step.as_event_type() == EventType::Immediate {
+    if step.step.step.matches_event_type::<Immediate>() {
         active_step_sender
             .send(step)
             .await

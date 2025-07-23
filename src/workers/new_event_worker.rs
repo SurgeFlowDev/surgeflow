@@ -1,11 +1,11 @@
 use crate::{
     event::InstanceEvent,
-    step::FullyQualifiedStep,
+    step::{FullyQualifiedStep, WorkflowStep},
     workers::adapters::{
         dependencies::new_event_worker::NewEventWorkerDependencies,
         managers::StepsAwaitingEventManager, receivers::EventReceiver, senders::ActiveStepSender,
     },
-    workflows::{AsWorkflowEventType, Workflow},
+    workflows::Workflow,
 };
 
 pub async fn main<W, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>(
@@ -29,11 +29,6 @@ where
     loop {
         let (instance_event, handle) = event_receiver.receive().await?;
 
-        tracing::debug!(
-            "Received event {:?} for instance {}",
-            instance_event.event.as_event_type(),
-            instance_event.instance_id
-        );
         process::<W, ActiveStepSenderT, StepsAwaitingEventManagerT>(
             instance_event,
             &mut active_step_sender,
@@ -60,14 +55,9 @@ where
         tracing::info!("No step awaiting event for instance {}", instance_id);
         return Ok(());
     };
-    if step.step.step.as_event_type() == event.as_event_type() {
+    if step.step.step.matches_workflow_event_type(&event) {
         steps_awaiting_event.delete_step(instance_id).await?;
     } else {
-        tracing::info!(
-            "Step {:?} is not waiting for event {:?}",
-            step.step,
-            event.as_event_type()
-        );
         return Ok(());
     }
     active_step_sender

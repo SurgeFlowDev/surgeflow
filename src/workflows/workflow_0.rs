@@ -2,11 +2,10 @@ use crate::event::{Event, Immediate};
 use crate::step::StepError;
 use crate::step::{Step, StepWithSettings};
 use crate::step::{StepResult, StepSettings, WorkflowStep};
-use crate::workflows::{AsWorkflowEventType, Workflow, WorkflowEvent};
+use crate::workflows::{Workflow, WorkflowEvent};
 use derive_more::{From, TryInto};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::any::TypeId;
 use std::fmt::Debug;
 
 //////////////////////// #[workflow], or #[derive(Workflow)] generated boilerplate /////////////////////////////
@@ -25,8 +24,22 @@ impl WorkflowStep<Workflow0> for Workflow0Step {
         // where we can get the WorkflowStep type from
     ) -> Result<Option<StepWithSettings<Workflow0>>, StepError> {
         match self {
-            Workflow0Step::Step0(step) => Step::run_raw(step, wf, event.try_into().unwrap()).await,
-            Workflow0Step::Step1(step) => Step::run_raw(step, wf, event.try_into().unwrap()).await,
+            Workflow0Step::Step0(step) => step.run_raw(wf, event.try_into().unwrap()).await,
+            Workflow0Step::Step1(step) => step.run_raw(wf, event.try_into().unwrap()).await,
+        }
+    }
+
+    fn matches_event_type<T: Event + 'static>(&self) -> bool {
+        match self {
+            Workflow0Step::Step0(_) => <Step0 as Step>::Event::matches_type::<T>(),
+            Workflow0Step::Step1(_) => <Step1 as Step>::Event::matches_type::<T>(),
+        }
+    }
+
+    fn matches_workflow_event_type<T: WorkflowEvent + 'static>(&self, event: &T) -> bool {
+        match self {
+            Workflow0Step::Step0(_) => event.matches_type::<<Step0 as Step>::Event>(),
+            Workflow0Step::Step1(_) => event.matches_type::<<Step1 as Step>::Event>(),
         }
     }
 }
@@ -64,22 +77,11 @@ impl TryFrom<Option<Workflow0Event>> for Immediate {
     }
 }
 
-impl WorkflowEvent for Workflow0Event {}
-
-impl AsWorkflowEventType for Workflow0Event {
-    fn as_event_type(&self) -> EventType {
+impl WorkflowEvent for Workflow0Event {
+    fn matches_type<T: Event + 'static>(&self) -> bool {
         match self {
-            Workflow0Event::Event0(_) => EventType::Event(TypeId::of::<Event0>()),
-            Workflow0Event::Event1(_) => EventType::Event(TypeId::of::<Event1>()),
-        }
-    }
-}
-
-impl AsWorkflowEventType for Workflow0Step {
-    fn as_event_type(&self) -> EventType {
-        match self {
-            Workflow0Step::Step0(step) => step.as_event_type(),
-            Workflow0Step::Step1(step) => step.as_event_type(),
+            Workflow0Event::Event0(_) => Event0::matches_type::<T>(),
+            Workflow0Event::Event1(_) => Event1::matches_type::<T>(),
         }
     }
 }
@@ -119,22 +121,6 @@ impl Workflow for Workflow0 {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum EventType {
-    Event(TypeId),
-    Immediate,
-}
-
-impl<T: Step> AsWorkflowEventType for T {
-    fn as_event_type(&self) -> EventType {
-        let raw_event_type = TypeId::of::<<T as Step>::Event>();
-        if raw_event_type == TypeId::of::<Immediate>() {
-            return EventType::Immediate;
-        }
-        EventType::Event(raw_event_type)
-    }
-}
-
 impl Event for Event0 {}
 
 impl From<Step1> for Option<StepWithSettings<<Step1 as Step>::Workflow>> {
@@ -153,6 +139,8 @@ pub struct Event0 {
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
 pub struct Event1 {}
+
+impl Event for Event1 {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Step0 {}

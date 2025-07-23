@@ -1,5 +1,5 @@
+use crate::event::Event;
 use crate::workers::adapters::managers::WorkflowInstance;
-use crate::workflows::workflow_0::EventType;
 use crate::{
     AppState, ArcAppState, WorkflowInstanceManager,
     event::InstanceEvent,
@@ -22,20 +22,14 @@ use std::{marker::PhantomData, sync::Arc};
 use uuid::Uuid;
 
 pub mod workflow_0;
-// pub mod workflow_1;
-
-
-
-pub trait AsWorkflowEventType {
-    fn as_event_type(&self) -> EventType;
-}
 
 pub trait WorkflowEvent:
-    AsWorkflowEventType + Serialize + for<'de> Deserialize<'de> + Debug + Send + Clone
+    Serialize + for<'de> Deserialize<'de> + Debug + Send + Clone
     // JsonSchema should probably be implemented as an extension trait. JsonSchema doesn't matter for the 
     // inner workings of the workflow, but it is useful for API documentation
      + JsonSchema
 {
+    fn matches_type<T: Event + 'static>(&self) -> bool;
 }
 
 #[derive(
@@ -101,7 +95,7 @@ impl AsRef<str> for WorkflowName {
 
 pub trait Workflow: Clone + Send + Sync + 'static {
     type Event: WorkflowEvent;
-    type Step: WorkflowStep<Self> + AsWorkflowEventType;
+    type Step: WorkflowStep<Self>;
     const NAME: &'static str;
 
     fn entrypoint() -> StepWithSettings<Self>;
