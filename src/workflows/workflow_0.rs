@@ -36,10 +36,10 @@ impl WorkflowStep<Workflow0> for Workflow0Step {
         }
     }
 
-    fn matches_workflow_event_type<T: WorkflowEvent + 'static>(&self, event: &T) -> bool {
+    fn matches_workflow_event_type<T: WorkflowEvent + 'static>(&self, workflow_event: &T) -> bool {
         match self {
-            Workflow0Step::Step0(_) => event.matches_type::<<Step0 as Step>::Event>(),
-            Workflow0Step::Step1(_) => event.matches_type::<<Step1 as Step>::Event>(),
+            Workflow0Step::Step0(_) => workflow_event.matches_type::<<Step0 as Step>::Event>(),
+            Workflow0Step::Step1(_) => workflow_event.matches_type::<<Step1 as Step>::Event>(),
         }
     }
 }
