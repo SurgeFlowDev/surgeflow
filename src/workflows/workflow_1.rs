@@ -6,17 +6,24 @@ use crate::workflows::{
     WorkflowStep,
 };
 
+pub struct MyProject {}
+impl Project for MyProject {
+    type Step = MyProjectStep;
+    type Event = MyProjectEvent;
+    type Workflow = MyProjectWorkflow;
+}
+
 #[derive(Clone)]
-pub enum MyProject {
+pub enum MyProjectWorkflow {
     Workflow1(Workflow1),
 }
 
 #[derive(Clone)]
 pub struct Workflow1;
 
-impl From<Workflow1> for MyProject {
+impl From<Workflow1> for MyProjectWorkflow {
     fn from(workflow: Workflow1) -> Self {
-        MyProject::Workflow1(workflow)
+        MyProjectWorkflow::Workflow1(workflow)
     }
 }
 
@@ -34,16 +41,8 @@ impl Workflow for Workflow1 {
     }
 }
 
-impl Project for MyProject {
-    type Step = MyProjectStep;
-
-    type Event = MyProjectEvent;
-
-    type Workflow = Self;
-}
-
-impl ProjectWorkflow for MyProject {
-    type Project = Self;
+impl ProjectWorkflow for MyProjectWorkflow {
+    type Project = MyProject;
 
     fn entrypoint() -> crate::step::StepWithSettings<Self::Project> {
         todo!()
