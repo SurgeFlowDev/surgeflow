@@ -1,11 +1,9 @@
-use serde::{Deserialize, Serialize};
-use std::fmt;
-
 use crate::{
     workers::adapters::managers::WorkflowInstance,
-    workflows::{Project, StepId, Workflow, WorkflowEvent},
+    workflows::{Project, StepId},
 };
 use derive_more::Debug;
+use serde::{Deserialize, Serialize};
 
 pub type StepResult<W> = Result<Option<StepWithSettings<W>>, StepError>;
 

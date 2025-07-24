@@ -1,8 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{any::TypeId, fmt::Debug};
+use std::fmt::Debug;
 
-use crate::workflows::{Event, Project, Workflow, WorkflowInstanceId};
+use crate::workflows::{Event, Project, WorkflowInstanceId};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, JsonSchema)]
 pub struct Immediate;

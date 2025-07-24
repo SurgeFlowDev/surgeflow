@@ -271,7 +271,7 @@ impl TryFrom<MyProjectWorkflow> for Workflow1 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct Event0;
+pub struct Event0 {}
 
 impl From<Event0> for Workflow1Event {
     fn from(event: Event0) -> Self {

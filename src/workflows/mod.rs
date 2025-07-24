@@ -1,5 +1,4 @@
 use crate::step::StepError;
-use crate::workers::adapters::dependencies;
 use crate::workers::adapters::dependencies::control_server::ControlServerDependencies;
 use crate::workers::adapters::managers::WorkflowInstance;
 use crate::workers::adapters::senders::NewInstanceSender;
@@ -7,17 +6,12 @@ use crate::{
     AppState, ArcAppState, event::InstanceEvent, step::StepWithSettings,
     workers::adapters::senders::EventSender,
 };
-use aide::{NoApi, OperationIo, axum::ApiRouter};
-use axum::{
-    Json,
-    extract::{FromRef, State},
-    http::StatusCode,
-};
+use aide::{OperationIo, axum::ApiRouter};
+use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::routing::TypedPath;
 use derive_more::{Display, From, Into};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use sqlx::Postgres;
 use std::any::TypeId;
 use std::fmt::{self, Debug};
 use std::{marker::PhantomData, sync::Arc};

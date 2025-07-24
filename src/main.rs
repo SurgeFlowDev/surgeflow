@@ -7,7 +7,6 @@ use axum::{
     Extension, ServiceExt,
     extract::{Json, Request},
 };
-use macros::my_main;
 use rust_workflow_2::workers::active_step_worker;
 use rust_workflow_2::workers::completed_instance_worker;
 use rust_workflow_2::workers::completed_step_worker;
@@ -16,14 +15,13 @@ use rust_workflow_2::workers::failed_step_worker;
 use rust_workflow_2::workers::new_event_worker;
 use rust_workflow_2::workers::new_instance_worker;
 use rust_workflow_2::workers::next_step_worker;
+use rust_workflow_2::workflows::workflow_1::MyProject;
 use rust_workflow_2::{
     // workers::azure_adapter::dependencies::control_server::AzureServiceBusControlServerDependencies,
     workflows::init_app_state,
 };
 
 use rust_workflow_2::workflows::{Project, WorkflowControl};
-
-use sqlx::PgPool;
 use tokio::{net::TcpListener, try_join};
 use tower_http::normalize_path::NormalizePathLayer;
 use tower_layer::Layer;
@@ -59,8 +57,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Example usage of the updated main_handler with Project-based architecture
     // This demonstrates that the azure_adapter now works with Project trait
-
-    use rust_workflow_2::workflows::workflow_1::{MyProject, MyProjectWorkflow, Workflow1};
+    use rust_workflow_2::workflows::workflow_1::{MyProjectWorkflow, Workflow1};
 
     // NOTE: This would require environment variables to be set:
     // - AZURE_SERVICE_BUS_CONNECTION_STRING
@@ -78,37 +75,7 @@ async fn main() -> anyhow::Result<()> {
     // my_main!(Workflow0, Workflow1);
     // my_main!(Workflow1);
 
-    // #[cfg(feature = "control_server")]
-    // {
-    //     use rust_workflow_2::workers::azure_adapter::{
-    //         dependencies::control_server::AzureServiceBusControlServerDependencies,
-    //         managers::AzureServiceBusWorkflowInstanceManager, senders::AzureServiceBusEventSender,
-    //     };
-
-    //     let (tx_state, tx_layer) = control_server_setup().await?;
-    //     let app_state = init_app_state::<
-    //         MyProject,
-    //         AzureServiceBusControlServerDependencies<MyProject>,
-    //     >(tx_state)
-    //     .await?;
-    //     let router = Workflow1::control_router::<
-    //         AzureServiceBusEventSender<MyProject>,
-    //         AzureServiceBusWorkflowInstanceManager<MyProject>,
-    //     >()
-    //     .await?
-    //     .with_state(app_state);
-
-    //     tokio::spawn(async move {
-    //         if let Err(e) = serve(router, tx_layer).await {
-    //             tracing::error!("Control server error: {}", e);
-    //         }
-    //     });
-    // }
-    main_handler::<MyProject>(
-        "workflow_1".to_string(),
-        MyProjectWorkflow::Workflow1(Workflow1),
-    )
-    .await?;
+    main_handler(MyProjectWorkflow::Workflow1(Workflow1)).await?;
     Ok(())
 }
 
@@ -126,6 +93,8 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
     Json(api)
 }
 
+// TODO: testing with MyProject instead of generic Project
+// async fn main_handler<P: Project>(project_workflow: P::Workflow) -> anyhow::Result<()>
 #[cfg(any(
     feature = "active_step_worker",
     feature = "new_instance_worker",
@@ -136,10 +105,7 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
     feature = "failed_instance_worker",
     feature = "completed_instance_worker"
 ))]
-async fn main_handler<P: Project>(
-    workflow_name: String,
-    project_workflow: P::Workflow,
-) -> anyhow::Result<()> {
+async fn main_handler(project_workflow: <MyProject as Project>::Workflow) -> anyhow::Result<()> {
     use rust_workflow_2::workers::adapters::dependencies::ActiveStepWorkerDependencyProvider;
     use rust_workflow_2::workers::adapters::dependencies::CompletedInstanceWorkerDependencyProvider;
     use rust_workflow_2::workers::adapters::dependencies::CompletedStepWorkerDependencyProvider;
@@ -170,9 +136,46 @@ async fn main_handler<P: Project>(
                 .expect("APP_USER_DATABASE_URL must be set"),
         });
 
+    #[cfg(feature = "control_server")]
+    {
+        use rust_workflow_2::{
+            workers::{
+                adapters::dependencies::ControlServerDependencyProvider,
+                azure_adapter::senders::{
+                    AzureServiceBusEventSender, AzureServiceBusNewInstanceSender,
+                },
+            },
+            workflows::workflow_1::Workflow1,
+        };
+
+        let app_state = init_app_state::<
+            MyProject,
+            AzureServiceBusEventSender<MyProject>,
+            AzureServiceBusNewInstanceSender<MyProject>,
+        >(
+            dependency_manager
+                .control_server_dependencies()
+                .await
+                .expect("TODO: handle error"),
+        )
+        .await?;
+        let router = Workflow1::control_router::<
+            AzureServiceBusEventSender<MyProject>,
+            AzureServiceBusNewInstanceSender<MyProject>,
+        >()
+        .await?
+        .with_state(app_state);
+
+        tokio::spawn(async move {
+            if let Err(e) = serve(router).await {
+                tracing::error!("Control server error: {}", e);
+            }
+        });
+    }
+
     try_join!(
         #[cfg(feature = "active_step_worker")]
-        active_step_worker::main::<P, _, _, _, _, _>(
+        active_step_worker::main::<MyProject, _, _, _, _, _>(
             dependency_manager
                 .active_step_worker_dependencies()
                 .await
@@ -180,49 +183,49 @@ async fn main_handler<P: Project>(
             project_workflow.clone(),
         ),
         #[cfg(feature = "new_instance_worker")]
-        new_instance_worker::main::<P, _, _,_>(
+        new_instance_worker::main::<MyProject, _, _, _>(
             dependency_manager
                 .new_instance_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "next_step_worker")]
-        next_step_worker::main::<P, _, _, _, _>(
+        next_step_worker::main::<MyProject, _, _, _, _>(
             dependency_manager
                 .next_step_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "new_event_worker")]
-        new_event_worker::main::<P, _, _, _>(
+        new_event_worker::main::<MyProject, _, _, _>(
             dependency_manager
                 .new_event_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "completed_step_worker")]
-        completed_step_worker::main::<P, _, _, _>(
+        completed_step_worker::main::<MyProject, _, _, _>(
             dependency_manager
                 .completed_step_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "failed_step_worker")]
-        failed_step_worker::main::<P, _, _, _>(
+        failed_step_worker::main::<MyProject, _, _, _>(
             dependency_manager
                 .failed_step_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "failed_instance_worker")]
-        failed_instance_worker::main::<P, _>(
+        failed_instance_worker::main::<MyProject, _>(
             dependency_manager
                 .failed_instance_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "completed_instance_worker")]
-        completed_instance_worker::main::<P, _>(
+        completed_instance_worker::main::<MyProject, _>(
             dependency_manager
                 .completed_instance_worker_dependencies()
                 .await
