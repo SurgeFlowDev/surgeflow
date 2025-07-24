@@ -177,12 +177,12 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AzureDependencyMan
         )
         .await?;
 
-        let persistent_step_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+        let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(CompletedStepWorkerDependencies::new(
             completed_step_receiver,
             next_step_sender,
-            persistent_step_manager,
+            persistence_manager,
         ))
     }
 }
@@ -231,14 +231,14 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AzureDependencyManage
         )
         .await?;
 
-        let persistent_step_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+        let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::active_step_worker::ActiveStepWorkerDependencies::new(
             active_step_receiver,
             active_step_sender,
             failed_step_sender,
             completed_step_sender,
-            persistent_step_manager,
+            persistence_manager,
         ))
     }
 }
@@ -298,12 +298,12 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AzureDependencyManage
         )
         .await?;
 
-        let persistent_step_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+        let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::failed_step_worker::FailedStepWorkerDependencies::new(
             failed_step_receiver,
             failed_instance_sender,
-            persistent_step_manager,
+            persistence_manager,
         ))
     }
 }
@@ -377,12 +377,12 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AzureDependencyManag
         let next_step_sender =
             AzureServiceBusNextStepSender::<P>::new(service_bus_client, &next_steps_queue).await?;
 
-        let persistent_step_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+        let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::new_instance_worker::NewInstanceWorkerDependencies::new(
             next_step_sender,
             new_instance_receiver,
-            persistent_step_manager,
+            persistence_manager,
         ))
     }
 }
@@ -422,13 +422,13 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager 
         let steps_awaiting_event_manager =
             AzureServiceBusStepsAwaitingEventManager::<P>::new(cosmos_client);
 
-        let persistent_step_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+        let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::next_step_worker::NextStepWorkerDependencies::new(
             next_step_receiver,
             active_step_sender,
             steps_awaiting_event_manager,
-            persistent_step_manager,
+            persistence_manager,
         ))
     }
 }

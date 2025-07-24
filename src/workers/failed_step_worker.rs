@@ -24,7 +24,7 @@ where
 {
     let mut failed_step_receiver = dependencies.failed_step_receiver;
     let mut failed_instance_sender = dependencies.failed_instance_sender;
-    let mut persistent_step_manager = dependencies.persistent_step_manager;
+    let mut persistence_manager = dependencies.persistence_manager;
 
     loop {
         if let Err(err) = receive_and_process::<
@@ -35,7 +35,7 @@ where
         >(
             &mut failed_step_receiver,
             &mut failed_instance_sender,
-            &mut persistent_step_manager,
+            &mut persistence_manager,
         )
         .await
         {
@@ -47,7 +47,7 @@ where
 async fn receive_and_process<P, FailedStepReceiverT, FailedInstanceSenderT, PersistenceManagerT>(
     failed_step_receiver: &mut FailedStepReceiverT,
     failed_instance_sender: &mut FailedInstanceSenderT,
-    persistent_step_manager: &mut PersistenceManagerT,
+    persistence_manager: &mut PersistenceManagerT,
 ) -> anyhow::Result<()>
 where
     P: Project,
@@ -59,7 +59,7 @@ where
 
     if let Err(err) = process::<P, FailedInstanceSenderT, PersistenceManagerT>(
         failed_instance_sender,
-        persistent_step_manager,
+        persistence_manager,
         step,
     )
     .await
@@ -87,7 +87,7 @@ where
 
 async fn process<P, FailedInstanceSenderT, PersistenceManagerT>(
     failed_instance_sender: &mut FailedInstanceSenderT,
-    persistent_step_manager: &mut PersistenceManagerT,
+    persistence_manager: &mut PersistenceManagerT,
     step: FullyQualifiedStep<P>,
 ) -> Result<(), FailedStepWorkerError<P, FailedInstanceSenderT, PersistenceManagerT>>
 where
@@ -100,7 +100,7 @@ where
         step.instance.external_id
     );
 
-    persistent_step_manager
+    persistence_manager
         .set_step_status(step.step_id, 5)
         .await
         .map_err(FailedStepWorkerError::PersistenceManagerError)?;

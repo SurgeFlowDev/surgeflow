@@ -20,7 +20,7 @@ pub struct NewInstanceWorkerDependencies<
 {
     pub next_step_sender: NextStepSenderT,
     pub new_instance_receiver: NewInstanceReceiverT,
-    pub persistent_step_manager: PersistenceManagerT,
+    pub persistence_manager: PersistenceManagerT,
     marker: PhantomData<P>,
 }
 
@@ -35,12 +35,12 @@ where
     pub fn new(
         next_step_sender: NextStepSenderT,
         new_instance_receiver: NewInstanceReceiverT,
-        persistent_step_manager: PersistenceManagerT,
+        persistence_manager: PersistenceManagerT,
     ) -> Self {
         Self {
             next_step_sender,
             new_instance_receiver,
-            persistent_step_manager,
+            persistence_manager,
             marker: PhantomData,
         }
     }

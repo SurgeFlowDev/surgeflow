@@ -11,7 +11,7 @@ use crate::{
 
 async fn process<P, NextStepSenderT, PersistenceManagerT>(
     next_step_sender: &mut NextStepSenderT,
-    persistent_step_manager: &mut PersistenceManagerT,
+    persistence_manager: &mut PersistenceManagerT,
     instance: WorkflowInstance,
 ) -> anyhow::Result<()>
 where
@@ -19,7 +19,7 @@ where
     NextStepSenderT: NextStepSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    persistent_step_manager
+    persistence_manager
         .insert_instance(instance.clone())
         .await
         .expect("TODO: handle error inserting instance");
@@ -55,7 +55,7 @@ where
 {
     let mut instance_receiver = dependencies.new_instance_receiver;
     let mut next_step_sender = dependencies.next_step_sender;
-    let mut persistent_step_manager = dependencies.persistent_step_manager;
+    let mut persistence_manager = dependencies.persistence_manager;
 
     loop {
         let Ok((step, handle)) = instance_receiver.receive().await else {
@@ -63,7 +63,7 @@ where
             continue;
         };
 
-        if let Err(err) = process(&mut next_step_sender, &mut persistent_step_manager, step).await {
+        if let Err(err) = process(&mut next_step_sender, &mut persistence_manager, step).await {
             tracing::error!("Error processing workflow instance: {:?}", err);
         }
 

@@ -15,11 +15,8 @@ use rust_workflow_2::workers::failed_step_worker;
 use rust_workflow_2::workers::new_event_worker;
 use rust_workflow_2::workers::new_instance_worker;
 use rust_workflow_2::workers::next_step_worker;
+use rust_workflow_2::workflows::init_app_state;
 use rust_workflow_2::workflows::workflow_1::MyProject;
-use rust_workflow_2::{
-    // workers::azure_adapter::dependencies::control_server::AzureServiceBusControlServerDependencies,
-    workflows::init_app_state,
-};
 
 use rust_workflow_2::workflows::{Project, WorkflowControl};
 use tokio::{net::TcpListener, try_join};

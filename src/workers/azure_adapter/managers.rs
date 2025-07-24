@@ -129,7 +129,7 @@ where
     }
 }
 
-mod persistent_step_manager {
+mod persistence_manager {
     use sqlx::{PgPool, query};
     use uuid::Uuid;
 
@@ -227,4 +227,4 @@ mod persistent_step_manager {
         }
     }
 }
-pub use persistent_step_manager::AzurePersistenceManager;
+pub use persistence_manager::AzurePersistenceManager;

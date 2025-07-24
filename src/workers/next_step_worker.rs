@@ -36,7 +36,7 @@ where
     let mut next_step_receiver = dependencies.next_step_receiver;
     let mut active_step_sender = dependencies.active_step_sender;
     let mut steps_awaiting_event_manager = dependencies.steps_awaiting_event_manager;
-    let mut persistent_step_manager = dependencies.persistent_step_manager;
+    let mut persistence_manager = dependencies.persistence_manager;
 
     loop {
         if let Err(err) = receive_and_process::<
@@ -49,7 +49,7 @@ where
             &mut next_step_receiver,
             &mut active_step_sender,
             &mut steps_awaiting_event_manager,
-            &mut persistent_step_manager,
+            &mut persistence_manager,
         )
         .await
         {
@@ -68,7 +68,7 @@ async fn receive_and_process<
     next_step_receiver: &mut NextStepReceiverT,
     active_step_sender: &mut ActiveStepSenderT,
     steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
-    persistent_step_manager: &mut PersistenceManagerT,
+    persistence_manager: &mut PersistenceManagerT,
 ) -> anyhow::Result<()>
 where
     P: Project,
@@ -83,7 +83,7 @@ where
         process::<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceManagerT>(
             active_step_sender,
             steps_awaiting_event_manager,
-            persistent_step_manager,
+            persistence_manager,
             step,
         )
         .await
@@ -115,7 +115,7 @@ where
 async fn process<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceManagerT>(
     active_step_sender: &mut ActiveStepSenderT,
     steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
-    persistent_step_manager: &mut PersistenceManagerT,
+    persistence_manager: &mut PersistenceManagerT,
     step: FullyQualifiedStep<P>,
 ) -> Result<
     (),
@@ -132,7 +132,7 @@ where
         step.instance.external_id
     );
 
-    persistent_step_manager
+    persistence_manager
         .insert_step::<P>(step.instance.external_id, step.step_id, &step.step.step)
         .await
         .map_err(NextStepWorkerError::DatabaseError)?;
@@ -148,10 +148,6 @@ where
             .await
             .map_err(NextStepWorkerError::AwaitEventError)?;
     }
-    // active_step_sender
-    //         .send(step)
-    //         .await
-    //         .map_err(NextStepWorkerError::SendActiveStepError)?;
 
     Ok(())
 }

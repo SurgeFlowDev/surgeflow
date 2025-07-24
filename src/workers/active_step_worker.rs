@@ -21,7 +21,7 @@ async fn process<
     active_step_sender: &mut ActiveStepSenderT,
     failed_step_sender: &mut FailedStepSenderT,
     completed_step_sender: &mut CompletedStepSenderT,
-    persistent_step_manager: &mut PersistenceManagerT,
+    persistence_manager: &mut PersistenceManagerT,
     mut step: FullyQualifiedStep<P>,
 ) -> anyhow::Result<()>
 where
@@ -32,7 +32,7 @@ where
     PersistenceManagerT: PersistenceManager,
 {
     tracing::info!("Received new step");
-    persistent_step_manager
+    persistence_manager
         .set_step_status(step.step_id, 3)
         .await
         .expect("TODO: handle error");
@@ -90,7 +90,7 @@ where
     let mut active_step_sender = dependencies.active_step_sender;
     let mut failed_step_sender = dependencies.failed_step_sender;
     let mut completed_step_sender = dependencies.completed_step_sender;
-    let mut persistent_step_manager = dependencies.persistent_step_manager;
+    let mut persistence_manager = dependencies.persistence_manager;
 
     loop {
         let Ok((step, handle)) = active_step_receiver.receive().await else {
@@ -109,7 +109,7 @@ where
             &mut active_step_sender,
             &mut failed_step_sender,
             &mut completed_step_sender,
-            &mut persistent_step_manager,
+            &mut persistence_manager,
             step,
         )
         .await

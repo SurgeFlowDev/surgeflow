@@ -24,7 +24,7 @@ pub trait StepsAwaitingEventManager<P: Project>: Sized {
     
 }
 
-mod persistent_step_manager {
+mod persistence_manager {
     use std::fmt::{Debug, Display};
 
     use crate::{workers::adapters::managers::WorkflowInstance, workflows::{Project, StepId, WorkflowInstanceId}};
@@ -58,7 +58,7 @@ mod persistent_step_manager {
     }
 }
 
-pub use persistent_step_manager::PersistenceManager;
+pub use persistence_manager::PersistenceManager;
 
 // TODO: this should be moved to a more appropriate place
 mod workflow_instance_manager {

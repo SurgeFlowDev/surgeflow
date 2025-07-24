@@ -25,7 +25,7 @@ pub struct NextStepWorkerDependencies<
     pub next_step_receiver: NextStepReceiverT,
     pub active_step_sender: ActiveStepSenderT,
     pub steps_awaiting_event_manager: StepsAwaitingEventManagerT,
-    pub persistent_step_manager: PersistenceManagerT,
+    pub persistence_manager: PersistenceManagerT,
     marker: PhantomData<P>,
 }
 
@@ -53,13 +53,13 @@ where
         next_step_receiver: NextStepReceiverT,
         active_step_sender: ActiveStepSenderT,
         steps_awaiting_event_manager: StepsAwaitingEventManagerT,
-        persistent_step_manager: PersistenceManagerT,
+        persistence_manager: PersistenceManagerT,
     ) -> Self {
         Self {
             next_step_receiver,
             active_step_sender,
             steps_awaiting_event_manager,
-            persistent_step_manager,
+            persistence_manager,
             marker: PhantomData,
         }
     }

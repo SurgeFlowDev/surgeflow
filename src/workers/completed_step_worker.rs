@@ -24,13 +24,13 @@ where
 {
     let mut completed_step_receiver = dependencies.completed_step_receiver;
     let mut next_step_sender = dependencies.next_step_sender;
-    let mut persistent_step_manager = dependencies.persistent_step_manager;
+    let mut persistence_manager = dependencies.persistence_manager;
 
     loop {
         if let Err(err) = receive_and_process(
             &mut completed_step_receiver,
             &mut next_step_sender,
-            &mut persistent_step_manager,
+            &mut persistence_manager,
         )
         .await
         {
@@ -47,7 +47,7 @@ async fn receive_and_process<
 >(
     completed_step_receiver: &mut CompletedStepReceiverT,
     next_step_sender: &mut NextStepSenderT,
-    persistent_step_manager: &mut PersistenceManagerT,
+    persistence_manager: &mut PersistenceManagerT,
 ) -> anyhow::Result<()>
 where
     CompletedStepReceiverT: CompletedStepReceiver<P>,
@@ -56,7 +56,7 @@ where
 {
     let (step, handle) = completed_step_receiver.receive().await?;
 
-    if let Err(err) = process(next_step_sender, persistent_step_manager, step).await {
+    if let Err(err) = process(next_step_sender, persistence_manager, step).await {
         tracing::error!("Error processing completed step: {:?}", err);
     }
 
@@ -75,7 +75,7 @@ enum CompletedStepWorkerError<P: Project, NextStepSenderT: NextStepSender<P>> {
 
 async fn process<P, NextStepSenderT, PersistenceManagerT>(
     next_step_sender: &mut NextStepSenderT,
-    persistent_step_manager: &mut PersistenceManagerT,
+    persistence_manager: &mut PersistenceManagerT,
     step: FullyQualifiedStep<P>,
 ) -> Result<(), CompletedStepWorkerError<P, NextStepSenderT>>
 where
@@ -88,7 +88,7 @@ where
         step.instance.external_id
     );
 
-    persistent_step_manager
+    persistence_manager
         .set_step_status(step.step_id, 4)
         .await
         .expect("TODO: handle error");
@@ -106,7 +106,7 @@ where
     let next_step = step.next_step;
 
     if let Some(next_step) = next_step {
-        persistent_step_manager
+        persistence_manager
             .insert_step_output::<P>(step.step_id, Some(&next_step.step))
             .await
             .expect("TODO: handle error");
@@ -127,7 +127,7 @@ where
         // TODO: push to instance completed queue ?
         tracing::info!("Instance {} completed", step.instance.external_id);
 
-        persistent_step_manager
+        persistence_manager
             .insert_step_output::<P>(step.step_id, None)
             .await
             .expect("TODO: handle error");

@@ -20,7 +20,7 @@ pub struct CompletedStepWorkerDependencies<
 {
     pub completed_step_receiver: CompletedStepReceiverT,
     pub next_step_sender: NextStepSenderT,
-    pub persistent_step_manager: PersistenceManagerT,
+    pub persistence_manager: PersistenceManagerT,
     marker: PhantomData<P>,
 }
 
@@ -34,12 +34,12 @@ where
     pub fn new(
         completed_step_receiver: CompletedStepReceiverT,
         next_step_sender: NextStepSenderT,
-        persistent_step_manager: PersistenceManagerT,
+        persistence_manager: PersistenceManagerT,
     ) -> Self {
         Self {
             completed_step_receiver,
             next_step_sender,
-            persistent_step_manager,
+            persistence_manager,
             marker: PhantomData,
         }
     }

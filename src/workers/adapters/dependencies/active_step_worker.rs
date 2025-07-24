@@ -28,7 +28,7 @@ pub struct ActiveStepWorkerDependencies<
     pub active_step_sender: ActiveStepSenderT,
     pub failed_step_sender: FailedStepSenderT,
     pub completed_step_sender: CompletedStepSenderT,
-    pub persistent_step_manager: PersistenceManagerT,
+    pub persistence_manager: PersistenceManagerT,
     _marker: PhantomData<P>,
 }
 
@@ -61,14 +61,14 @@ where
         active_step_sender: ActiveStepSenderT,
         failed_step_sender: FailedStepSenderT,
         completed_step_sender: CompletedStepSenderT,
-        persistent_step_manager: PersistenceManagerT,
+        persistence_manager: PersistenceManagerT,
     ) -> Self {
         Self {
             active_step_receiver,
             active_step_sender,
             failed_step_sender,
             completed_step_sender,
-            persistent_step_manager,
+            persistence_manager,
             _marker: PhantomData,
         }
     }
