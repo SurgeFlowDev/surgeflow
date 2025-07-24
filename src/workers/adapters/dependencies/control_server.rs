@@ -1,34 +1,31 @@
 use crate::{
-    workers::adapters::{managers::WorkflowInstanceManager, senders::EventSender},
+    workers::adapters::senders::{EventSender, NewInstanceSender},
     workflows::Project,
 };
-use std::future::Future;
+use std::marker::PhantomData;
 
-pub struct ControlServerDependencies<P: Project, C: ControlServerContext<P>> {
-    pub event_sender: C::EventSender,
-    pub instance_manager: C::InstanceManager,
-    #[expect(dead_code)]
-    context: C,
+pub struct ControlServerDependencies<P, EventSenderT, NewInstanceSenderT>
+where
+    P: Project,
+    EventSenderT: EventSender<P>,
+    NewInstanceSenderT: NewInstanceSender<P>,
+{
+    pub event_sender: EventSenderT,
+    pub new_instance_sender: NewInstanceSenderT,
+    _marker: PhantomData<P>,
 }
-
-impl<P: Project, C: ControlServerContext<P>> ControlServerDependencies<P, C> {
-    pub fn new(
-        event_sender: C::EventSender,
-        instance_manager: C::InstanceManager,
-        context: C,
-    ) -> Self {
+impl<P, EventSenderT, NewInstanceSenderT>
+    ControlServerDependencies<P, EventSenderT, NewInstanceSenderT>
+where
+    P: Project,
+    EventSenderT: EventSender<P>,
+    NewInstanceSenderT: NewInstanceSender<P>,
+{
+    pub fn new(event_sender: EventSenderT, new_instance_sender: NewInstanceSenderT) -> Self {
         Self {
             event_sender,
-            instance_manager,
-            context,
+            new_instance_sender,
+            _marker: PhantomData,
         }
     }
-}
-
-pub trait ControlServerContext<P: Project>: Sized {
-    type EventSender: EventSender<P>;
-    //
-    type InstanceManager: WorkflowInstanceManager<P>;
-    fn dependencies()
-    -> impl Future<Output = anyhow::Result<ControlServerDependencies<P, Self>>> + Send;
 }

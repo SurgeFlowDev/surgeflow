@@ -1,3 +1,5 @@
+// TODO: review this file. a senders/receivers/managers are receiveing &str queue names when they should receive String to avoid one extra allocation
+
 use azservicebus::{ServiceBusClient, ServiceBusClientOptions, core::BasicRetryPolicy};
 use azure_data_cosmos::CosmosClient;
 use sqlx::PgPool;
@@ -6,12 +8,13 @@ use crate::{
     workers::{
         adapters::dependencies::{
             ActiveStepWorkerDependencyProvider, CompletedInstanceWorkerDependencyProvider,
-            CompletedStepWorkerDependencyProvider, DependencyManager,
-            FailedInstanceWorkerDependencyProvider, FailedStepWorkerDependencyProvider,
-            NewEventWorkerDependencyProvider, NewInstanceWorkerDependencyProvider,
-            NextStepWorkerDependencyProvider,
+            CompletedStepWorkerDependencyProvider, ControlServerDependencyProvider,
+            DependencyManager, FailedInstanceWorkerDependencyProvider,
+            FailedStepWorkerDependencyProvider, NewEventWorkerDependencyProvider,
+            NewInstanceWorkerDependencyProvider, NextStepWorkerDependencyProvider,
             completed_instance_worker::CompletedInstanceWorkerDependencies,
             completed_step_worker::CompletedStepWorkerDependencies,
+            control_server::ControlServerDependencies,
         },
         azure_adapter::{
             managers::{AzurePersistentStepManager, AzureServiceBusStepsAwaitingEventManager},
@@ -23,23 +26,14 @@ use crate::{
             },
             senders::{
                 AzureServiceBusActiveStepSender, AzureServiceBusCompletedStepSender,
-                AzureServiceBusFailedInstanceSender, AzureServiceBusFailedStepSender,
+                AzureServiceBusEventSender, AzureServiceBusFailedInstanceSender,
+                AzureServiceBusFailedStepSender, AzureServiceBusNewInstanceSender,
                 AzureServiceBusNextStepSender,
             },
         },
     },
     workflows::Project,
 };
-
-pub mod active_step_worker;
-pub mod completed_instance_worker;
-pub mod completed_step_worker;
-pub mod control_server;
-pub mod failed_instance_worker;
-pub mod failed_step_worker;
-pub mod new_event_worker;
-pub mod new_instance_worker;
-pub mod next_step_worker;
 
 #[derive(Debug)]
 pub struct AzureAdapterConfig {
@@ -415,8 +409,7 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager 
         let service_bus_client = self.service_bus_client().await;
 
         let next_step_receiver =
-            AzureServiceBusNextStepReceiver::<P>::new(service_bus_client, &next_steps_queue)
-                .await?;
+            AzureServiceBusNextStepReceiver::<P>::new(service_bus_client, next_steps_queue).await?;
 
         let active_step_sender =
             AzureServiceBusActiveStepSender::<P>::new(service_bus_client, &active_steps_queue)
@@ -435,6 +428,34 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager 
             active_step_sender,
             steps_awaiting_event_manager,
             persistent_step_manager,
+        ))
+    }
+}
+
+impl<P: Project> ControlServerDependencyProvider<P> for AzureDependencyManager {
+    type EventSender = AzureServiceBusEventSender<P>;
+    type NewInstanceSender = AzureServiceBusNewInstanceSender<P>;
+    type Error = anyhow::Error;
+
+    async fn control_server_dependencies(
+        &mut self,
+    ) -> Result<ControlServerDependencies<P, Self::EventSender, Self::NewInstanceSender>, Self::Error>
+    {
+        let new_event_queue_suffix = self.config.new_event_queue_suffix.clone();
+        let new_instance_queue_suffix = self.config.new_instance_queue_suffix.clone();
+        let service_bus_client = self.service_bus_client().await;
+        let event_sender =
+            AzureServiceBusEventSender::<P>::new(service_bus_client, &new_event_queue_suffix)
+                .await?;
+        let new_instance_sender = AzureServiceBusNewInstanceSender::<P>::new(
+            service_bus_client,
+            &new_instance_queue_suffix,
+        )
+        .await?;
+
+        Ok(ControlServerDependencies::new(
+            event_sender,
+            new_instance_sender,
         ))
     }
 }

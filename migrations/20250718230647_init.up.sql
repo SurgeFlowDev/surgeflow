@@ -8,7 +8,7 @@ CREATE TABLE
 CREATE TABLE
     workflow_instances (
         "id" INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        "external_id" UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+        "external_id" UUID NOT NULL UNIQUE,
         "workflow_id" INTEGER NOT NULL REFERENCES workflows ("id"),
         "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );

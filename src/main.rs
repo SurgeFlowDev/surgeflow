@@ -16,21 +16,20 @@ use rust_workflow_2::workers::failed_step_worker;
 use rust_workflow_2::workers::new_event_worker;
 use rust_workflow_2::workers::new_instance_worker;
 use rust_workflow_2::workers::next_step_worker;
-use rust_workflow_2::workflows::TxState;
 use rust_workflow_2::{
     // workers::azure_adapter::dependencies::control_server::AzureServiceBusControlServerDependencies,
     workflows::init_app_state,
 };
 
-use rust_workflow_2::workflows::{Project, Tx, TxLayer, WorkflowControl};
+use rust_workflow_2::workflows::{Project, WorkflowControl};
 
 use sqlx::PgPool;
 use tokio::{net::TcpListener, try_join};
 use tower_http::normalize_path::NormalizePathLayer;
 use tower_layer::Layer;
 
-async fn serve(router: ApiRouter, sqlx_tx_layer: TxLayer) -> anyhow::Result<()> {
-    let router = ApiRouter::new().merge(router).layer(sqlx_tx_layer);
+async fn serve(router: ApiRouter) -> anyhow::Result<()> {
+    let router = ApiRouter::new().merge(router);
 
     let mut api = base_open_api();
 
@@ -52,13 +51,7 @@ async fn serve(router: ApiRouter, sqlx_tx_layer: TxLayer) -> anyhow::Result<()> 
     axum::serve(listener, router).await?;
     Ok(())
 }
-#[cfg(feature = "control_server")]
-async fn control_server_setup() -> anyhow::Result<(TxState, TxLayer)> {
-    let connection_string =
-        std::env::var("APP_USER_DATABASE_URL").expect("APP_USER_DATABASE_URL must be set");
 
-    Ok(Tx::setup(PgPool::connect(&connection_string).await?))
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -86,33 +79,32 @@ async fn main() -> anyhow::Result<()> {
     // my_main!(Workflow0, Workflow1);
     // my_main!(Workflow1);
 
-    
-    #[cfg(feature = "control_server")]
-    {
-        use rust_workflow_2::workers::azure_adapter::{
-            dependencies::control_server::AzureServiceBusControlServerDependencies,
-            managers::AzureServiceBusWorkflowInstanceManager, senders::AzureServiceBusEventSender,
-        };
+    // #[cfg(feature = "control_server")]
+    // {
+    //     use rust_workflow_2::workers::azure_adapter::{
+    //         dependencies::control_server::AzureServiceBusControlServerDependencies,
+    //         managers::AzureServiceBusWorkflowInstanceManager, senders::AzureServiceBusEventSender,
+    //     };
 
-        let (tx_state, tx_layer) = control_server_setup().await?;
-        let app_state = init_app_state::<
-            MyProject,
-            AzureServiceBusControlServerDependencies<MyProject>,
-        >(tx_state)
-        .await?;
-        let router = Workflow1::control_router::<
-            AzureServiceBusEventSender<MyProject>,
-            AzureServiceBusWorkflowInstanceManager<MyProject>,
-        >()
-        .await?
-        .with_state(app_state);
+    //     let (tx_state, tx_layer) = control_server_setup().await?;
+    //     let app_state = init_app_state::<
+    //         MyProject,
+    //         AzureServiceBusControlServerDependencies<MyProject>,
+    //     >(tx_state)
+    //     .await?;
+    //     let router = Workflow1::control_router::<
+    //         AzureServiceBusEventSender<MyProject>,
+    //         AzureServiceBusWorkflowInstanceManager<MyProject>,
+    //     >()
+    //     .await?
+    //     .with_state(app_state);
 
-        tokio::spawn(async move {
-            if let Err(e) = serve(router, tx_layer).await {
-                tracing::error!("Control server error: {}", e);
-            }
-        });
-    }
+    //     tokio::spawn(async move {
+    //         if let Err(e) = serve(router, tx_layer).await {
+    //             tracing::error!("Control server error: {}", e);
+    //         }
+    //     });
+    // }
     main_handler::<MyProject>(
         "workflow_1".to_string(),
         MyProjectWorkflow::Workflow1(Workflow1),

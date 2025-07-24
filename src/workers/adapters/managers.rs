@@ -55,6 +55,7 @@ pub use persistent_step_manager::PersistentStepManager;
 mod workflow_instance_manager {
     use std::error::Error;
 
+    use derive_more::{From, Into};
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
     use sqlx::PgConnection;
@@ -64,18 +65,28 @@ mod workflow_instance_manager {
     #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
     pub struct WorkflowInstance {
         pub external_id: WorkflowInstanceId,
-        pub workflow_id: WorkflowId,
+        pub workflow_name: WorkflowName,
+    }
+    #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone, From, Into)]
+    #[serde(transparent)]
+    pub struct WorkflowName(String);
+
+    impl From<&str> for WorkflowName {
+        fn from(value: &str) -> Self {
+            Self(value.to_string())
+        }
     }
 
     pub trait WorkflowInstanceManager<P: Project> {
         type Error: Error + Send + Sync + 'static;
         fn create_instance(
             &self,
-            workflow_name: &str,
+            workflow_name: WorkflowName,
             conn: &mut PgConnection,
-        ) -> impl Future<Output = Result<WorkflowInstance, Self::Error>> + Send;
+        ) -> impl Future<Output = Result<WorkflowInstanceId, Self::Error>> + Send;
     }
 }
 
 pub use workflow_instance_manager::WorkflowInstance;
 pub use workflow_instance_manager::WorkflowInstanceManager;
+pub use workflow_instance_manager::WorkflowName;

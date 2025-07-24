@@ -15,7 +15,7 @@ aide = { git = "https://github.com/Zizico2/aide.git", branch = "feat/typed-routi
 anyhow = { version = "1.0.98" }
 axum = { version = "0.8.4", features = ["http2", "macros", "multipart"] }
 axum-extra = { version = "0.10.1", features = ["typed-routing"] }
-axum-sqlx-tx = "0.10.0"
+# axum-sqlx-tx = "0.10.0"
 axum_thiserror = "0.1.0"
 azservicebus = "0.25.1"
 azure_core = "0.21.0"

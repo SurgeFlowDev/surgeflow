@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO workflow_instances (\"workflow_id\", \"external_id\")\n                    SELECT \"id\", $1\n                    FROM workflows\n                    WHERE \"name\" = $2\n                    RETURNING \"external_id\", \"workflow_id\";\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "external_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "workflow_id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "bf2bc9214c8ad7c3f0d57c457a170528a403a6ae341c26b2c074862892e55296"
+}

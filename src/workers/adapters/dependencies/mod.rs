@@ -4,6 +4,7 @@ use crate::{
             active_step_worker::ActiveStepWorkerDependencies,
             completed_instance_worker::CompletedInstanceWorkerDependencies,
             completed_step_worker::CompletedStepWorkerDependencies,
+            control_server::ControlServerDependencies,
             failed_instance_worker::FailedInstanceWorkerDependencies,
             failed_step_worker::FailedStepWorkerDependencies,
             new_event_worker::NewEventWorkerDependencies,
@@ -16,8 +17,8 @@ use crate::{
             FailedInstanceReceiver, FailedStepReceiver, NewInstanceReceiver, NextStepReceiver,
         },
         senders::{
-            ActiveStepSender, CompletedStepSender, FailedInstanceSender, FailedStepSender,
-            NextStepSender,
+            ActiveStepSender, CompletedStepSender, EventSender, FailedInstanceSender,
+            FailedStepSender, NewInstanceSender, NextStepSender,
         },
     },
     workflows::Project,
@@ -54,6 +55,22 @@ pub trait ActiveStepWorkerDependencyProvider<P: Project> {
                 Self::CompletedStepSender,
                 Self::PersistentStepManager,
             >,
+            Self::Error,
+        >,
+    > + Send;
+}
+
+pub trait ControlServerDependencyProvider<P: Project> {
+    type Error: Send + Sync + 'static;
+
+    type EventSender: EventSender<P>;
+    type NewInstanceSender: NewInstanceSender<P>;
+
+    fn control_server_dependencies(
+        &mut self,
+    ) -> impl std::future::Future<
+        Output = Result<
+            ControlServerDependencies<P, Self::EventSender, Self::NewInstanceSender>,
             Self::Error,
         >,
     > + Send;
@@ -198,6 +215,7 @@ pub trait DependencyManager<P: Project>:
     + NewEventWorkerDependencyProvider<P>
     + NewInstanceWorkerDependencyProvider<P>
     + NextStepWorkerDependencyProvider<P>
+    + ControlServerDependencyProvider<P>
 {
     type Error: Send + Sync + 'static;
 }

@@ -299,7 +299,7 @@ impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
 impl<P: Project> AzureServiceBusNextStepReceiver<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
-        queue_name: &str,
+        queue_name: String,
     ) -> anyhow::Result<Self> {
         let receiver = service_bus_client
             .create_receiver_for_queue(queue_name, ServiceBusReceiverOptions::default())
