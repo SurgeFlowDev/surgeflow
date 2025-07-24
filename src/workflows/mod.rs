@@ -247,7 +247,7 @@ pub trait ProjectStep:
     type Project: Project<Step = Self>;
 
     fn is_event<T: Event + 'static>(&self) -> bool;
-    fn is_project_event<T: ProjectEvent + 'static>(&self, event: &T) -> bool;
+    fn is_project_event(&self, event: &<Self::Project as Project>::Event) -> bool;
     fn run_raw(
         &self,
         wf: <Self::Project as Project>::Workflow,
@@ -272,7 +272,12 @@ pub trait ProjectWorkflow: Sized + Send + Sync + 'static + Clone {
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait Workflow:
-    Clone + Send + Sync + 'static + Into<<Self::Project as Project>::Workflow>
+    Clone
+    + Send
+    + Sync
+    + 'static
+    + Into<<Self::Project as Project>::Workflow>
+    + TryFrom<<Self::Project as Project>::Workflow>
 {
     type Project: Project;
     type Event: WorkflowEvent<Workflow = Self>;
@@ -290,6 +295,7 @@ pub trait WorkflowStep:
     + Send
     + fmt::Debug
     + Into<<<Self::Workflow as Workflow>::Project as Project>::Step>
+    + TryFrom<<<Self::Workflow as Workflow>::Project as Project>::Step>
 {
     type Workflow: Workflow<Step = Self>;
     fn run_raw(
@@ -303,18 +309,38 @@ pub trait WorkflowStep:
     > + Send;
 
     fn is_event<T: Event + 'static>(&self) -> bool;
-    fn is_workflow_event<T: WorkflowEvent + 'static>(&self, event: &T) -> bool;
+    fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool;
 }
 
 pub trait WorkflowEvent:
     Serialize + for<'de> Deserialize<'de> + Debug + Send + Clone
     + Into<<<Self::Workflow as Workflow>::Project as Project>::Event>
+    + TryFrom<<<Self::Workflow as Workflow>::Project as Project>::Event>
+    + TryFromRef<<<Self::Workflow as Workflow>::Project as Project>::Event>
     // JsonSchema should probably be implemented as an extension trait. JsonSchema doesn't matter for the 
     // inner workings of the workflow, but it is useful for API documentation
-     + JsonSchema
+    + JsonSchema
 {
     type Workflow: Workflow<Event = Self>;
     fn is_event<T: Event + 'static>(&self) -> bool;
+}
+
+pub trait TryFromRef<T: ?Sized> {
+    type Error;
+    fn try_from_ref(value: &T) -> Result<&Self, Self::Error>;
+}
+
+pub trait TryAsRef<T: ?Sized> {
+    type Error;
+    fn try_as_ref(&self) -> Result<&T, Self::Error>;
+}
+
+impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
+    type Error = U::Error;
+
+    fn try_as_ref(&self) -> Result<&U, Self::Error> {
+        U::try_from_ref(self)
+    }
 }
 
 //////////////////////////////////
@@ -324,6 +350,7 @@ pub trait Step:
     + for<'a> Deserialize<'a>
     + fmt::Debug
     + Into<<Self::Workflow as Workflow>::Step>
+    + TryFrom<<Self::Workflow as Workflow>::Step>
     + Send
     + Clone
 {

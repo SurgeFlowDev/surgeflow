@@ -2,11 +2,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::workflows::{
-    Event, Project, ProjectEvent, ProjectStep, ProjectWorkflow, Step, Workflow, WorkflowEvent,
-    WorkflowStep,
+    Event, Project, ProjectEvent, ProjectStep, ProjectWorkflow, Step, TryAsRef, TryFromRef,
+    Workflow, WorkflowEvent, WorkflowStep,
 };
 
-pub struct MyProject {}
+pub struct MyProject;
 impl Project for MyProject {
     type Step = MyProjectStep;
     type Event = MyProjectEvent;
@@ -37,7 +37,10 @@ impl Workflow for Workflow1 {
     const NAME: &'static str = "workflow_1";
 
     fn entrypoint() -> crate::step::StepWithSettings<Self::Project> {
-        todo!()
+        crate::step::StepWithSettings {
+            step: MyProjectStep::Workflow1(Workflow1Step::Step0(Step0)),
+            settings: crate::step::StepSettings { max_retries: 3 },
+        }
     }
 }
 
@@ -45,7 +48,9 @@ impl ProjectWorkflow for MyProjectWorkflow {
     type Project = MyProject;
 
     fn entrypoint() -> crate::step::StepWithSettings<Self::Project> {
-        todo!()
+        match Self::Workflow1(Workflow1) {
+            MyProjectWorkflow::Workflow1(_) => Workflow1::entrypoint(),
+        }
     }
 }
 
@@ -58,26 +63,33 @@ impl ProjectStep for MyProjectStep {
     type Project = MyProject;
 
     fn is_event<T: super::Event + 'static>(&self) -> bool {
-        todo!()
+        match self {
+            MyProjectStep::Workflow1(step) => step.is_event::<T>(),
+        }
     }
 
-    fn is_project_event<T: ProjectEvent + 'static>(&self, event: &T) -> bool {
-        todo!()
+    fn is_project_event(&self, event: &<Self::Project as Project>::Event) -> bool {
+        match self {
+            MyProjectStep::Workflow1(step) => step.is_workflow_event(event.try_as_ref().unwrap()),
+        }
     }
 
-    fn run_raw(
+    async fn run_raw(
         &self,
         wf: <Self::Project as Project>::Workflow,
         event: Option<<Self::Project as Project>::Event>,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> impl std::future::Future<
-        Output = Result<
-            Option<crate::step::StepWithSettings<Self::Project>>,
-            crate::step::StepError,
-        >,
-    > + Send {
-        async move { todo!() }
+    ) -> Result<Option<crate::step::StepWithSettings<Self::Project>>, crate::step::StepError> {
+        match self {
+            MyProjectStep::Workflow1(step) => {
+                step.run_raw(
+                    wf.try_into().unwrap(),
+                    event.map(TryInto::try_into).transpose().unwrap(),
+                )
+                .await
+            }
+        }
     }
 }
 
@@ -89,33 +101,51 @@ pub enum Workflow1Step {
 impl WorkflowStep for Workflow1Step {
     type Workflow = Workflow1;
 
-    fn run_raw(
+    async fn run_raw(
         &self,
         wf: Self::Workflow,
         event: Option<<Self::Workflow as Workflow>::Event>,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> impl std::future::Future<
-        Output = Result<
-            Option<crate::step::StepWithSettings<<Self::Workflow as Workflow>::Project>>,
-            crate::step::StepError,
-        >,
-    > + Send {
-        async move { todo!() }
+    ) -> Result<
+        Option<crate::step::StepWithSettings<<Self::Workflow as Workflow>::Project>>,
+        crate::step::StepError,
+    > {
+        match self {
+            Workflow1Step::Step0(step) => {
+                step.run_raw(wf, event.unwrap().try_into().unwrap()).await
+            }
+        }
     }
 
     fn is_event<T: Event + 'static>(&self) -> bool {
-        todo!()
+        match self {
+            Workflow1Step::Step0(_) => <Step0 as Step>::Event::is::<T>(),
+        }
     }
 
-    fn is_workflow_event<T: WorkflowEvent + 'static>(&self, event: &T) -> bool {
-        todo!()
+    fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool {
+        match self {
+            Workflow1Step::Step0(_) => event.is_event::<<Step0 as Step>::Event>(),
+        }
     }
 }
 
 impl From<Workflow1Step> for MyProjectStep {
     fn from(step: Workflow1Step) -> Self {
         MyProjectStep::Workflow1(step)
+    }
+}
+
+impl TryFrom<MyProjectStep> for Workflow1Step {
+    type Error = ();
+
+    fn try_from(step: MyProjectStep) -> Result<Self, Self::Error> {
+        if let MyProjectStep::Workflow1(workflow_step) = step {
+            Ok(workflow_step)
+        } else {
+            Err(())
+        }
     }
 }
 
@@ -133,19 +163,30 @@ impl Step for Step0 {
 
     type Workflow = Workflow1;
 
-    fn run_raw(
+    async fn run_raw(
         &self,
         wf: Self::Workflow,
         event: Self::Event,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> impl std::future::Future<
-        Output = Result<
-            Option<crate::step::StepWithSettings<<Self::Workflow as Workflow>::Project>>,
-            crate::step::StepError,
-        >,
-    > + Send {
-        async move { todo!() }
+    ) -> Result<
+        Option<crate::step::StepWithSettings<<Self::Workflow as Workflow>::Project>>,
+        crate::step::StepError,
+    > {
+        tracing::info!("Running Step0 in Workflow1");
+        Ok(None)
+    }
+}
+
+impl TryFrom<Workflow1Step> for Step0 {
+    type Error = ();
+
+    fn try_from(step: Workflow1Step) -> Result<Self, Self::Error> {
+        if let Workflow1Step::Step0(step0) = step {
+            Ok(step0)
+        } else {
+            Err(())
+        }
     }
 }
 
@@ -175,7 +216,57 @@ impl WorkflowEvent for Workflow1Event {
     type Workflow = Workflow1;
 
     fn is_event<T: Event + 'static>(&self) -> bool {
-        todo!()
+        match self {
+            Workflow1Event::Event0(_) => Event0::is::<T>(),
+        }
+    }
+}
+
+impl TryFrom<Workflow1Event> for Event0 {
+    type Error = ();
+
+    fn try_from(event: Workflow1Event) -> Result<Self, Self::Error> {
+        if let Workflow1Event::Event0(event0) = event {
+            Ok(event0)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl TryFrom<MyProjectEvent> for Workflow1Event {
+    type Error = ();
+
+    fn try_from(event: MyProjectEvent) -> Result<Self, Self::Error> {
+        if let MyProjectEvent::Workflow1(workflow_event) = event {
+            Ok(workflow_event)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl TryFromRef<MyProjectEvent> for Workflow1Event {
+    type Error = ();
+
+    fn try_from_ref(event: &MyProjectEvent) -> Result<&Self, Self::Error> {
+        if let MyProjectEvent::Workflow1(workflow_event) = event {
+            Ok(workflow_event)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl TryFrom<MyProjectWorkflow> for Workflow1 {
+    type Error = ();
+
+    fn try_from(workflow: MyProjectWorkflow) -> Result<Self, Self::Error> {
+        if let MyProjectWorkflow::Workflow1(workflow1) = workflow {
+            Ok(workflow1)
+        } else {
+            Err(())
+        }
     }
 }
 
