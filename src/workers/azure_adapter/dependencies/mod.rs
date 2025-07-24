@@ -6,16 +6,15 @@ use crate::{
     workers::{
         adapters::dependencies::{
             ActiveStepWorkerDependencyProvider, CompletedInstanceWorkerDependencyProvider,
-            CompletedStepWorkerDependencyProvider, ControlServerDependencyProvider, DependencyManager,
+            CompletedStepWorkerDependencyProvider, DependencyManager,
             FailedInstanceWorkerDependencyProvider, FailedStepWorkerDependencyProvider,
             NewEventWorkerDependencyProvider, NewInstanceWorkerDependencyProvider,
             NextStepWorkerDependencyProvider,
             completed_instance_worker::CompletedInstanceWorkerDependencies,
             completed_step_worker::CompletedStepWorkerDependencies,
-            control_server::ControlServerDependencies,
         },
         azure_adapter::{
-            managers::{AzurePersistentStepManager, AzureServiceBusStepsAwaitingEventManager, AzureServiceBusWorkflowInstanceManager},
+            managers::{AzurePersistentStepManager, AzureServiceBusStepsAwaitingEventManager},
             receivers::{
                 AzureServiceBusActiveStepReceiver, AzureServiceBusCompletedInstanceReceiver,
                 AzureServiceBusCompletedStepReceiver, AzureServiceBusEventReceiver,
@@ -23,7 +22,7 @@ use crate::{
                 AzureServiceBusNewInstanceReceiver, AzureServiceBusNextStepReceiver,
             },
             senders::{
-                AzureServiceBusActiveStepSender, AzureServiceBusCompletedStepSender, AzureServiceBusEventSender,
+                AzureServiceBusActiveStepSender, AzureServiceBusCompletedStepSender,
                 AzureServiceBusFailedInstanceSender, AzureServiceBusFailedStepSender,
                 AzureServiceBusNextStepSender,
             },
@@ -437,30 +436,6 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager 
             steps_awaiting_event_manager,
             persistent_step_manager,
         ))
-    }
-}
-
-impl<P: Project> ControlServerDependencyProvider<P> for AzureDependencyManager {
-    type EventSender = AzureServiceBusEventSender<P>;
-    type InstanceManager = AzureServiceBusWorkflowInstanceManager<P>;
-    type Error = anyhow::Error;
-
-    async fn control_server_dependencies(
-        &mut self,
-    ) -> Result<
-        ControlServerDependencies<P, Self::EventSender, Self::InstanceManager>,
-        Self::Error,
-    > {
-        let new_event_queue = self.config.new_event_queue_suffix.clone();
-        let new_instance_queue = self.config.new_instance_queue_suffix.clone();
-        let service_bus_client = self.service_bus_client().await;
-
-        let event_sender =
-            AzureServiceBusEventSender::<P>::new(service_bus_client, &new_event_queue).await?;
-
-        let instance_manager = AzureServiceBusWorkflowInstanceManager::<P>::new(service_bus_client, &new_instance_queue).await?;
-
-        Ok(ControlServerDependencies::new(event_sender, instance_manager))
     }
 }
 
