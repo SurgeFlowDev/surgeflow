@@ -1,9 +1,10 @@
+use aide::axum::ApiRouter;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::workflows::{
     Event, Project, ProjectEvent, ProjectStep, ProjectWorkflow, Step, TryAsRef, TryFromRef,
-    Workflow, WorkflowEvent, WorkflowStep,
+    Workflow, WorkflowControl, WorkflowEvent, WorkflowStep,
 };
 
 pub struct MyProject;
@@ -51,6 +52,18 @@ impl ProjectWorkflow for MyProjectWorkflow {
         match Self::Workflow1(Workflow1) {
             MyProjectWorkflow::Workflow1(_) => Workflow1::entrypoint(),
         }
+    }
+
+    async fn control_router<
+        NewEventSenderT: crate::workers::adapters::senders::EventSender<Self::Project>,
+        NewInstanceSenderT: crate::workers::adapters::senders::NewInstanceSender<Self::Project>,
+    >() -> anyhow::Result<
+        ApiRouter<crate::ArcAppState<Self::Project, NewEventSenderT, NewInstanceSenderT>>,
+    > {
+        let workflow_0_router =
+            Workflow1::control_router::<NewEventSenderT, NewInstanceSenderT>().await?;
+
+        Ok(workflow_0_router)
     }
 }
 

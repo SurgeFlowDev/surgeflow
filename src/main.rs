@@ -1,78 +1,26 @@
-use aide::{
-    axum::{ApiRouter, IntoApiResponse, routing::get_with},
-    openapi::{Info, OpenApi},
-    scalar::Scalar,
-};
-use axum::{
-    Extension, ServiceExt,
-    extract::{Json, Request},
-};
+use aide::openapi::{Info, OpenApi};
 use rust_workflow_2::workers::active_step_worker;
+use rust_workflow_2::workers::adapters::dependencies::ControlServerDependencyProvider;
 use rust_workflow_2::workers::completed_instance_worker;
 use rust_workflow_2::workers::completed_step_worker;
+use rust_workflow_2::workers::control_server;
 use rust_workflow_2::workers::failed_instance_worker;
 use rust_workflow_2::workers::failed_step_worker;
 use rust_workflow_2::workers::new_event_worker;
 use rust_workflow_2::workers::new_instance_worker;
 use rust_workflow_2::workers::next_step_worker;
-use rust_workflow_2::workflows::init_app_state;
 use rust_workflow_2::workflows::workflow_1::MyProject;
 
-use rust_workflow_2::workflows::{Project, WorkflowControl};
-use tokio::{net::TcpListener, try_join};
-use tower_http::normalize_path::NormalizePathLayer;
-use tower_layer::Layer;
-
-async fn serve(router: ApiRouter) -> anyhow::Result<()> {
-    let router = ApiRouter::new().merge(router);
-
-    let mut api = base_open_api();
-
-    let router = if cfg!(debug_assertions) {
-        let router = router
-            .api_route(
-                "/openapi.json",
-                get_with(serve_api, |op| op.summary("OpenAPI Spec").hidden(false)),
-            )
-            .route("/docs", Scalar::new("/openapi.json").axum_route());
-        router.finish_api(&mut api).layer(Extension(api))
-    } else {
-        router.into()
-    };
-    let router = NormalizePathLayer::trim_trailing_slash().layer(router);
-    let router = ServiceExt::<Request>::into_make_service(router);
-
-    let listener = TcpListener::bind(&format!("0.0.0.0:{}", 8080)).await?;
-    axum::serve(listener, router).await?;
-    Ok(())
-}
+use rust_workflow_2::workflows::Project;
+use rust_workflow_2::workflows::workflow_1::{MyProjectWorkflow, Workflow1};
+use tokio::try_join;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    // Example usage of the updated main_handler with Project-based architecture
-    // This demonstrates that the azure_adapter now works with Project trait
-    use rust_workflow_2::workflows::workflow_1::{MyProjectWorkflow, Workflow1};
-
-    // NOTE: This would require environment variables to be set:
-    // - AZURE_SERVICE_BUS_CONNECTION_STRING
-    // - COSMOS_CONNECTION_STRING
-    // - APP_USER_DATABASE_URL
-    // Uncomment to test (would fail at runtime without env vars):
-    // main_handler::<MyProject>(
-    //     "workflow_1".to_string(),
-    //     MyProjectWorkflow::Workflow1(Workflow1)
-    // ).await?;
-
-    // this shouldn't have to be hard coded
-    // type ControlServerDependencies<W> = AzureServiceBusControlServerDependencies<W>;
-
-    // my_main!(Workflow0, Workflow1);
-    // my_main!(Workflow1);
-
-    main_handler(MyProjectWorkflow::Workflow1(Workflow1)).await?;
+    main_handler::<MyProject>(MyProjectWorkflow::Workflow1(Workflow1)).await?;
     Ok(())
 }
 
@@ -86,10 +34,6 @@ pub fn base_open_api() -> OpenApi {
     }
 }
 
-async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
-    Json(api)
-}
-
 // TODO: testing with MyProject instead of generic Project
 // async fn main_handler<P: Project>(project_workflow: P::Workflow) -> anyhow::Result<()>
 #[cfg(any(
@@ -100,9 +44,10 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
     feature = "completed_step_worker",
     feature = "failed_step_worker",
     feature = "failed_instance_worker",
-    feature = "completed_instance_worker"
+    feature = "completed_instance_worker",
+    feature = "control_server"
 ))]
-async fn main_handler(project_workflow: <MyProject as Project>::Workflow) -> anyhow::Result<()> {
+async fn main_handler<P: Project>(project_workflow: P::Workflow) -> anyhow::Result<()> {
     use rust_workflow_2::workers::adapters::dependencies::ActiveStepWorkerDependencyProvider;
     use rust_workflow_2::workers::adapters::dependencies::CompletedInstanceWorkerDependencyProvider;
     use rust_workflow_2::workers::adapters::dependencies::CompletedStepWorkerDependencyProvider;
@@ -132,47 +77,16 @@ async fn main_handler(project_workflow: <MyProject as Project>::Workflow) -> any
             pg_connection_string: std::env::var("APP_USER_DATABASE_URL")
                 .expect("APP_USER_DATABASE_URL must be set"),
         });
-
-    #[cfg(feature = "control_server")]
-    {
-        use rust_workflow_2::{
-            workers::{
-                adapters::dependencies::ControlServerDependencyProvider,
-                azure_adapter::senders::{
-                    AzureServiceBusEventSender, AzureServiceBusNewInstanceSender,
-                },
-            },
-            workflows::workflow_1::Workflow1,
-        };
-
-        let app_state = init_app_state::<
-            MyProject,
-            AzureServiceBusEventSender<MyProject>,
-            AzureServiceBusNewInstanceSender<MyProject>,
-        >(
+    try_join!(
+        #[cfg(feature = "control_server")]
+        control_server::main::<P, _, _>(
             dependency_manager
                 .control_server_dependencies()
                 .await
-                .expect("TODO: handle error"),
-        )
-        .await?;
-        let router = Workflow1::control_router::<
-            AzureServiceBusEventSender<MyProject>,
-            AzureServiceBusNewInstanceSender<MyProject>,
-        >()
-        .await?
-        .with_state(app_state);
-
-        tokio::spawn(async move {
-            if let Err(e) = serve(router).await {
-                tracing::error!("Control server error: {}", e);
-            }
-        });
-    }
-
-    try_join!(
+                .expect("TODO: handle error")
+        ),
         #[cfg(feature = "active_step_worker")]
-        active_step_worker::main::<MyProject, _, _, _, _, _>(
+        active_step_worker::main::<P, _, _, _, _, _>(
             dependency_manager
                 .active_step_worker_dependencies()
                 .await
@@ -180,14 +94,14 @@ async fn main_handler(project_workflow: <MyProject as Project>::Workflow) -> any
             project_workflow.clone(),
         ),
         #[cfg(feature = "new_instance_worker")]
-        new_instance_worker::main::<MyProject, _, _, _>(
+        new_instance_worker::main::<P, _, _, _>(
             dependency_manager
                 .new_instance_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "next_step_worker")]
-        next_step_worker::main::<MyProject, _, _, _, _>(
+        next_step_worker::main::<P, _, _, _, _>(
             dependency_manager
                 .next_step_worker_dependencies()
                 .await
@@ -201,28 +115,28 @@ async fn main_handler(project_workflow: <MyProject as Project>::Workflow) -> any
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "completed_step_worker")]
-        completed_step_worker::main::<MyProject, _, _, _>(
+        completed_step_worker::main::<P, _, _, _>(
             dependency_manager
                 .completed_step_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "failed_step_worker")]
-        failed_step_worker::main::<MyProject, _, _, _>(
+        failed_step_worker::main::<P, _, _, _>(
             dependency_manager
                 .failed_step_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "failed_instance_worker")]
-        failed_instance_worker::main::<MyProject, _>(
+        failed_instance_worker::main::<P, _>(
             dependency_manager
                 .failed_instance_worker_dependencies()
                 .await
                 .expect("TODO: handle error")
         ),
         #[cfg(feature = "completed_instance_worker")]
-        completed_instance_worker::main::<MyProject, _>(
+        completed_instance_worker::main::<P, _>(
             dependency_manager
                 .completed_instance_worker_dependencies()
                 .await

@@ -254,6 +254,15 @@ pub trait ProjectWorkflow: Sized + Send + Sync + 'static + Clone {
     type Project: Project<Workflow = Self>;
 
     fn entrypoint() -> StepWithSettings<Self::Project>;
+
+    fn control_router<
+        NewEventSenderT: EventSender<Self::Project>,
+        NewInstanceSenderT: NewInstanceSender<Self::Project>,
+    >() -> impl Future<
+        Output = anyhow::Result<
+            ApiRouter<ArcAppState<Self::Project, NewEventSenderT, NewInstanceSenderT>>,
+        >,
+    > + Send;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////

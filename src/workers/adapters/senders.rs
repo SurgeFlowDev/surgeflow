@@ -41,7 +41,7 @@ pub trait CompletedStepSender<P: Project>: Sized {
 
 // Events
 
-pub trait EventSender<P: Project>: Sized {
+pub trait EventSender<P: Project>: Sized + Send + Sync + 'static {
     type Error: Error + Send + Sync + 'static;
     fn send(&self, event: InstanceEvent<P>)
     -> impl Future<Output = Result<(), Self::Error>> + Send;
@@ -49,7 +49,7 @@ pub trait EventSender<P: Project>: Sized {
 
 // Instances
 
-pub trait NewInstanceSender<P: Project>: Sized {
+pub trait NewInstanceSender<P: Project>:  Sized + Send + Sync + 'static {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,
