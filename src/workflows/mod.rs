@@ -1,3 +1,4 @@
+use crate::event::Immediate;
 use crate::step::StepError;
 use crate::workers::adapters::dependencies::control_server::ControlServerDependencies;
 use crate::workers::adapters::managers::WorkflowInstance;
@@ -227,10 +228,7 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
     type Event: ProjectEvent<Project = Self>;
     type Workflow: ProjectWorkflow<Project = Self>;
 
-    fn workflow_for_step(
-        &self,
-        step: &Self::Step,
-    ) -> Self::Workflow;
+    fn workflow_for_step(&self, step: &Self::Step) -> Self::Workflow;
 }
 
 pub trait ProjectStep:
@@ -243,13 +241,21 @@ pub trait ProjectStep:
     fn run_raw(
         &self,
         wf: <Self::Project as Project>::Workflow,
-        event: Option<<Self::Project as Project>::Event>,
+        event: <Self::Project as Project>::Event,
     ) -> impl std::future::Future<
         Output = Result<Option<StepWithSettings<Self::Project>>, StepError>,
     > + Send;
 }
 pub trait ProjectEvent:
-    Sized + Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>
+    Sized
+    + Send
+    + Sync
+    + 'static
+    + Clone
+    + Serialize
+    + for<'de> Deserialize<'de>
+    + From<Immediate>
+    + TryInto<Immediate>
 {
     type Project: Project<Event = Self>;
 }
@@ -300,7 +306,7 @@ pub trait WorkflowStep:
     fn run_raw(
         &self,
         wf: Self::Workflow,
-        event: Option<<Self::Workflow as Workflow>::Event>,
+        event: <Self::Workflow as Workflow>::Event,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
     ) -> impl std::future::Future<
@@ -316,6 +322,8 @@ pub trait WorkflowEvent:
     + Into<<<Self::Workflow as Workflow>::Project as Project>::Event>
     + TryFrom<<<Self::Workflow as Workflow>::Project as Project>::Event>
     + TryFromRef<<<Self::Workflow as Workflow>::Project as Project>::Event>
+     + From<Immediate>
+     + TryInto<Immediate>
     // JsonSchema should probably be implemented as an extension trait. JsonSchema doesn't matter for the 
     // inner workings of the workflow, but it is useful for API documentation
     + JsonSchema

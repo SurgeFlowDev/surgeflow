@@ -1,4 +1,5 @@
-use crate::workflows::ProjectStep;
+use crate::event::Immediate;
+use crate::workflows::{ProjectEvent, ProjectStep, WorkflowEvent};
 use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
@@ -37,7 +38,11 @@ where
         .await
         .expect("TODO: handle error");
 
-    let next_step = step.step.step.run_raw(wf.clone(), step.event.clone()).await;
+    let next_step = step
+        .step
+        .step
+        .run_raw(wf.clone(), step.event.clone().unwrap_or(Immediate.into()))
+        .await;
     step.retry_count += 1;
     if let Ok(next_step) = next_step {
         completed_step_sender

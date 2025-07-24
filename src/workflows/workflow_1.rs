@@ -2,9 +2,12 @@ use aide::axum::ApiRouter;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::workflows::{
-    Event, Project, ProjectEvent, ProjectStep, ProjectWorkflow, Step, TryAsRef, TryFromRef,
-    Workflow, WorkflowControl, WorkflowEvent, WorkflowStep,
+use crate::{
+    event::Immediate,
+    workflows::{
+        Event, Project, ProjectEvent, ProjectStep, ProjectWorkflow, Step, TryAsRef, TryFromRef,
+        Workflow, WorkflowControl, WorkflowEvent, WorkflowStep,
+    },
 };
 
 #[derive(Clone)]
@@ -100,17 +103,14 @@ impl ProjectStep for MyProjectStep {
     async fn run_raw(
         &self,
         wf: <Self::Project as Project>::Workflow,
-        event: Option<<Self::Project as Project>::Event>,
+        event: <Self::Project as Project>::Event,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
     ) -> Result<Option<crate::step::StepWithSettings<Self::Project>>, crate::step::StepError> {
         match self {
             MyProjectStep::Workflow1(step) => {
-                step.run_raw(
-                    wf.try_into().unwrap(),
-                    event.map(TryInto::try_into).transpose().unwrap(),
-                )
-                .await
+                step.run_raw(wf.try_into().unwrap(), event.try_into().unwrap())
+                    .await
             }
         }
     }
@@ -127,7 +127,7 @@ impl WorkflowStep for Workflow1Step {
     async fn run_raw(
         &self,
         wf: Self::Workflow,
-        event: Option<<Self::Workflow as Workflow>::Event>,
+        event: <Self::Workflow as Workflow>::Event,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
     ) -> Result<
@@ -135,9 +135,7 @@ impl WorkflowStep for Workflow1Step {
         crate::step::StepError,
     > {
         match self {
-            Workflow1Step::Step0(step) => {
-                step.run_raw(wf, event.unwrap().try_into().unwrap()).await
-            }
+            Workflow1Step::Step0(step) => step.run_raw(wf, event.try_into().unwrap()).await,
         }
     }
 
@@ -218,15 +216,36 @@ impl TryFrom<Workflow1Step> for Step0 {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MyProjectEvent {
     Workflow1(Workflow1Event),
+    #[serde(skip)]
+    Immediate(Immediate),
 }
 
 impl ProjectEvent for MyProjectEvent {
     type Project = MyProject;
 }
 
+impl From<Immediate> for MyProjectEvent {
+    fn from(immediate: Immediate) -> Self {
+        MyProjectEvent::Immediate(immediate)
+    }
+}
+
+impl TryFrom<MyProjectEvent> for Immediate {
+    type Error = ();
+
+    fn try_from(event: MyProjectEvent) -> Result<Self, Self::Error> {
+        match event {
+            MyProjectEvent::Immediate(immediate) => Ok(immediate),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub enum Workflow1Event {
     Event0(Event0),
+    #[serde(skip)]
+    Immediate(Immediate),
 }
 
 impl From<Workflow1Event> for MyProjectEvent {
@@ -241,7 +260,25 @@ impl WorkflowEvent for Workflow1Event {
     fn is_event<T: Event + 'static>(&self) -> bool {
         match self {
             Workflow1Event::Event0(_) => Event0::is::<T>(),
+            Workflow1Event::Immediate(_) => Immediate::is::<T>(),
         }
+    }
+}
+
+impl TryFrom<Workflow1Event> for Immediate {
+    type Error = ();
+
+    fn try_from(event: Workflow1Event) -> Result<Self, Self::Error> {
+        match event {
+            Workflow1Event::Immediate(immediate) => Ok(immediate),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<Immediate> for Workflow1Event {
+    fn from(immediate: Immediate) -> Self {
+        Workflow1Event::Immediate(immediate)
     }
 }
 
@@ -261,10 +298,10 @@ impl TryFrom<MyProjectEvent> for Workflow1Event {
     type Error = ();
 
     fn try_from(event: MyProjectEvent) -> Result<Self, Self::Error> {
-        if let MyProjectEvent::Workflow1(workflow_event) = event {
-            Ok(workflow_event)
-        } else {
-            Err(())
+        match event {
+            MyProjectEvent::Workflow1(workflow_event) => Ok(workflow_event),
+            MyProjectEvent::Immediate(immediate) => Ok(Workflow1Event::Immediate(immediate)),
+            _ => Err(()),
         }
     }
 }
