@@ -66,9 +66,15 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     // Example usage of the updated main_handler with Project-based architecture
-    // Uncomment the lines below to test with MyProject and workflow_1
+    // This demonstrates that the azure_adapter now works with Project trait
     
-    // use rust_workflow_2::workflows::workflow_1::{MyProject, MyProjectWorkflow, Workflow1};
+    use rust_workflow_2::workflows::workflow_1::{MyProject, MyProjectWorkflow, Workflow1};
+    
+    // NOTE: This would require environment variables to be set:
+    // - AZURE_SERVICE_BUS_CONNECTION_STRING
+    // - COSMOS_CONNECTION_STRING  
+    // - APP_USER_DATABASE_URL
+    // Uncomment to test (would fail at runtime without env vars):
     // main_handler::<MyProject>(
     //     "workflow_1".to_string(),
     //     MyProjectWorkflow::Workflow1(Workflow1)
