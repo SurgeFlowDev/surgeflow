@@ -216,7 +216,7 @@ pub trait WorkflowControl: Workflow {
             tracing::info!("creating instance...");
             let res = state
                 .workflow_instance_manager
-                .create_instance(&mut tx)
+                .create_instance(T::NAME, &mut tx)
                 .await
                 .map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
             Ok(Json(res))

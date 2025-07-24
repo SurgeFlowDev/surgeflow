@@ -232,21 +232,18 @@ mod workflow_instance_manager {
     #[derive(Debug)]
     pub struct AzureServiceBusWorkflowInstanceManager<P: Project> {
         sender: AzureServiceBusNewInstanceSender<P>,
-        workflow_name: String,
         _marker: PhantomData<P>,
     }
     impl<P: Project> AzureServiceBusWorkflowInstanceManager<P> {
         pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
             service_bus_client: &mut ServiceBusClient<RP>,
             instance_queue_name: &str,
-            workflow_name: String,
         ) -> anyhow::Result<Self> {
             let sender =
                 AzureServiceBusNewInstanceSender::<P>::new(service_bus_client, instance_queue_name)
                     .await?;
             Ok(Self {
                 sender,
-                workflow_name,
                 _marker: PhantomData,
             })
         }
@@ -261,9 +258,10 @@ mod workflow_instance_manager {
         type Error = AzureAdapterError;
         async fn create_instance(
             &self,
+            workflow_name: &str,
             conn: &mut PgConnection,
         ) -> Result<WorkflowInstance, AzureAdapterError> {
-            tracing::info!("Creating workflow instance for: {}", self.workflow_name);
+            tracing::info!("Creating workflow instance for: {}", workflow_name);
             let res = query_as!(
                 WorkflowInstanceRecord,
                 r#"
@@ -273,7 +271,7 @@ mod workflow_instance_manager {
                     WHERE "name" = $1
                     RETURNING "external_id", "workflow_id";
                 "#,
-                self.workflow_name
+                workflow_name
             )
             .fetch_one(conn)
             .await
@@ -281,7 +279,7 @@ mod workflow_instance_manager {
 
             tracing::info!(
                 "Created workflow instance: {} with id: {}",
-                self.workflow_name,
+                workflow_name,
                 res.external_id
             );
 
@@ -291,7 +289,7 @@ mod workflow_instance_manager {
 
             tracing::info!(
                 "Sending workflow instance: {} with id: {} to Azure Service Bus",
-                self.workflow_name,
+                workflow_name,
                 res.external_id
             );
 

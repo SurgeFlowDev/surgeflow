@@ -135,15 +135,14 @@ async fn main_handler<P: Project>(
                 .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set"),
             cosmos_connection_string: std::env::var("COSMOS_CONNECTION_STRING")
                 .expect("COSMOS_CONNECTION_STRING must be set"),
-            workflow_name,
-            new_instance_queue_suffix: "-instance".into(),
-            next_step_queue_suffix: "-next-steps".into(),
-            completed_instance_queue_suffix: "-completed-instances".into(),
-            completed_step_queue_suffix: "-completed-steps".into(),
-            active_step_queue_suffix: "-active-steps".into(),
-            failed_instance_queue_suffix: "-failed-instances".into(),
-            failed_step_queue_suffix: "-failed-steps".into(),
-            new_event_queue_suffix: "-events".into(),
+            new_instance_queue_suffix: "instance".into(),
+            next_step_queue_suffix: "next-steps".into(),
+            completed_instance_queue_suffix: "completed-instances".into(),
+            completed_step_queue_suffix: "completed-steps".into(),
+            active_step_queue_suffix: "active-steps".into(),
+            failed_instance_queue_suffix: "failed-instances".into(),
+            failed_step_queue_suffix: "failed-steps".into(),
+            new_event_queue_suffix: "events".into(),
             pg_connection_string: std::env::var("APP_USER_DATABASE_URL")
                 .expect("APP_USER_DATABASE_URL must be set"),
         });

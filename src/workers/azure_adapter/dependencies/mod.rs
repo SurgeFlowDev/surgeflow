@@ -45,8 +45,6 @@ pub mod next_step_worker;
 pub struct AzureAdapterConfig {
     pub service_bus_connection_string: String,
     pub cosmos_connection_string: String,
-    /// The workflow name used for queue naming
-    pub workflow_name: String,
     /// The suffix for the new instance queue
     pub new_instance_queue_suffix: String,
     /// The suffix for the next step queue
@@ -142,7 +140,7 @@ impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AzureDependenc
         &mut self,
     ) -> anyhow::Result<CompletedInstanceWorkerDependencies<P, Self::CompletedInstanceReceiver>>
     {
-        let completed_instance_queue = format!("{}{}", self.config.workflow_name, self.config.completed_instance_queue_suffix);
+        let completed_instance_queue = self.config.completed_instance_queue_suffix.clone();
 
         let instance_receiver = AzureServiceBusCompletedInstanceReceiver::new(
             self.service_bus_client().await,
@@ -170,8 +168,8 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AzureDependencyMan
             Self::PersistentStepManager,
         >,
     > {
-        let completed_steps_queue = format!("{}{}", self.config.workflow_name, self.config.completed_step_queue_suffix);
-        let next_steps_queue = format!("{}{}", self.config.workflow_name, self.config.next_step_queue_suffix);
+        let completed_steps_queue = self.config.completed_step_queue_suffix.clone();
+        let next_steps_queue = self.config.next_step_queue_suffix.clone();
 
         let completed_step_receiver = AzureServiceBusCompletedStepReceiver::<P>::new(
             self.service_bus_client().await,
@@ -217,10 +215,9 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AzureDependencyManage
         >,
         Self::Error,
     > {
-        let active_steps_queue = format!("{}{}", self.config.workflow_name, self.config.active_step_queue_suffix);
-        let failed_steps_queue = format!("{}{}", self.config.workflow_name, self.config.failed_step_queue_suffix);
-        let completed_steps_queue =
-            format!("{}{}", self.config.workflow_name, self.config.completed_step_queue_suffix);
+        let active_steps_queue = self.config.active_step_queue_suffix.clone();
+        let failed_steps_queue = self.config.failed_step_queue_suffix.clone();
+        let completed_steps_queue = self.config.completed_step_queue_suffix.clone();
         let service_bus_client = self.service_bus_client().await;
 
         let active_step_receiver =
@@ -264,8 +261,7 @@ impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AzureDependencyMa
         crate::workers::adapters::dependencies::failed_instance_worker::FailedInstanceWorkerDependencies<P, Self::FailedInstanceReceiver>,
         Self::Error,
     >{
-        let failed_instances_queue =
-            format!("{}{}", self.config.workflow_name, self.config.failed_instance_queue_suffix);
+        let failed_instances_queue = self.config.failed_instance_queue_suffix.clone();
 
         let failed_instance_receiver = AzureServiceBusFailedInstanceReceiver::<P>::new(
             self.service_bus_client().await,
@@ -296,9 +292,8 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AzureDependencyManage
         >,
         Self::Error,
     > {
-        let failed_steps_queue = format!("{}{}", self.config.workflow_name, self.config.failed_step_queue_suffix);
-        let failed_instances_queue =
-            format!("{}{}", self.config.workflow_name, self.config.failed_instance_queue_suffix);
+        let failed_steps_queue = self.config.failed_step_queue_suffix.clone();
+        let failed_instances_queue = self.config.failed_instance_queue_suffix.clone();
         let service_bus_client = self.service_bus_client().await;
 
         let failed_step_receiver =
@@ -339,8 +334,8 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AzureDependencyManager 
         >,
         Self::Error,
     > {
-        let new_event_queue = format!("{}{}", self.config.workflow_name, self.config.new_event_queue_suffix);
-        let active_steps_queue = format!("{}{}", self.config.workflow_name, self.config.active_step_queue_suffix);
+        let new_event_queue = self.config.new_event_queue_suffix.clone();
+        let active_steps_queue = self.config.active_step_queue_suffix.clone();
         let service_bus_client = self.service_bus_client().await;
 
         let event_receiver =
@@ -378,8 +373,8 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AzureDependencyManag
         >,
         Self::Error,
     > {
-        let new_instance_queue = format!("{}{}", self.config.workflow_name, self.config.new_instance_queue_suffix);
-        let next_steps_queue = format!("{}{}", self.config.workflow_name, self.config.next_step_queue_suffix);
+        let new_instance_queue = self.config.new_instance_queue_suffix.clone();
+        let next_steps_queue = self.config.next_step_queue_suffix.clone();
         let service_bus_client = self.service_bus_client().await;
 
         let new_instance_receiver =
@@ -415,8 +410,8 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager 
         >,
         Self::Error,
     > {
-        let next_steps_queue = format!("{}{}", self.config.workflow_name, self.config.next_step_queue_suffix);
-        let active_steps_queue = format!("{}{}", self.config.workflow_name, self.config.active_step_queue_suffix);
+        let next_steps_queue = self.config.next_step_queue_suffix.clone();
+        let active_steps_queue = self.config.active_step_queue_suffix.clone();
         let service_bus_client = self.service_bus_client().await;
 
         let next_step_receiver =

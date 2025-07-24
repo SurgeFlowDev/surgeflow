@@ -71,6 +71,7 @@ mod workflow_instance_manager {
         type Error: Error + Send + Sync + 'static;
         fn create_instance(
             &self,
+            workflow_name: &str,
             conn: &mut PgConnection,
         ) -> impl Future<Output = Result<WorkflowInstance, Self::Error>> + Send;
     }
