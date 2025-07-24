@@ -4,19 +4,20 @@ use crate::{
             active_step_worker::ActiveStepWorkerDependencies,
             completed_instance_worker::CompletedInstanceWorkerDependencies,
             completed_step_worker::CompletedStepWorkerDependencies,
+            control_server::ControlServerDependencies,
             failed_instance_worker::FailedInstanceWorkerDependencies,
             failed_step_worker::FailedStepWorkerDependencies,
             new_event_worker::NewEventWorkerDependencies,
             new_instance_worker::NewInstanceWorkerDependencies,
             next_step_worker::NextStepWorkerDependencies,
         },
-        managers::{PersistentStepManager, StepsAwaitingEventManager},
+        managers::{PersistentStepManager, StepsAwaitingEventManager, WorkflowInstanceManager},
         receivers::{
             ActiveStepReceiver, CompletedInstanceReceiver, CompletedStepReceiver, EventReceiver,
             FailedInstanceReceiver, FailedStepReceiver, NewInstanceReceiver, NextStepReceiver,
         },
         senders::{
-            ActiveStepSender, CompletedStepSender, FailedInstanceSender, FailedStepSender,
+            ActiveStepSender, CompletedStepSender, EventSender, FailedInstanceSender, FailedStepSender,
             NextStepSender,
         },
     },
@@ -188,11 +189,27 @@ pub trait NextStepWorkerDependencyProvider<P: Project> {
     > + Send;
 }
 
+pub trait ControlServerDependencyProvider<P: Project> {
+    type EventSender: EventSender<P>;
+    type InstanceManager: WorkflowInstanceManager<P>;
+    type Error: Send + Sync + 'static;
+
+    fn control_server_dependencies(
+        &mut self,
+    ) -> impl std::future::Future<
+        Output = Result<
+            ControlServerDependencies<P, Self::EventSender, Self::InstanceManager>,
+            Self::Error,
+        >,
+    > + Send;
+}
+
 pub trait DependencyManager<P: Project>:
     Sized
     + ActiveStepWorkerDependencyProvider<P>
     + CompletedInstanceWorkerDependencyProvider<P>
     + CompletedStepWorkerDependencyProvider<P>
+    + ControlServerDependencyProvider<P>
     + FailedInstanceWorkerDependencyProvider<P>
     + FailedStepWorkerDependencyProvider<P>
     + NewEventWorkerDependencyProvider<P>

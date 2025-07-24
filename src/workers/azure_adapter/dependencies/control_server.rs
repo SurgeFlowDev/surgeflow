@@ -1,54 +1,53 @@
 use crate::{
     workers::{
-        adapters::dependencies::control_server::{ControlServerContext, ControlServerDependencies},
+        adapters::dependencies::{ControlServerDependencyProvider, control_server::{ControlServerContext, ControlServerDependencies}},
         azure_adapter::{
-            managers::AzureServiceBusWorkflowInstanceManager, senders::AzureServiceBusEventSender,
+            dependencies::{AzureDependencyManager, AzureAdapterConfig},
+            managers::AzureServiceBusWorkflowInstanceManager, 
+            senders::AzureServiceBusEventSender,
         },
     },
     workflows::Project,
 };
-use azservicebus::{ServiceBusClient, ServiceBusClientOptions, core::BasicRetryPolicy};
 
-use std::marker::PhantomData;
-
-pub struct AzureServiceBusControlServerDependencies<P: Project> {
-    #[expect(dead_code)]
-    service_bus_client: ServiceBusClient<BasicRetryPolicy>,
-    workflow_name: String,
-    _marker: PhantomData<P>,
+pub struct AzureServiceBusControlServerContext<P: Project> {
+    dependency_manager: AzureDependencyManager,
+    _marker: std::marker::PhantomData<P>,
 }
 
-impl<P: Project> AzureServiceBusControlServerDependencies<P> {
-    pub fn new(service_bus_client: ServiceBusClient<BasicRetryPolicy>, workflow_name: String) -> Self {
+impl<P: Project> AzureServiceBusControlServerContext<P> {
+    pub fn new(config: AzureAdapterConfig) -> Self {
         Self {
-            service_bus_client,
-            workflow_name,
-            _marker: PhantomData,
+            dependency_manager: AzureDependencyManager::new(config),
+            _marker: std::marker::PhantomData,
         }
     }
-    
-    pub async fn with_workflow_name(workflow_name: String) -> anyhow::Result<Self> {
-        let azure_service_bus_connection_string =
-            std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
-                .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set");
-
-        let service_bus_client = ServiceBusClient::new_from_connection_string(
-            azure_service_bus_connection_string,
-            ServiceBusClientOptions::default(),
-        )
-        .await?;
-
-        Ok(Self::new(service_bus_client, workflow_name))
-    }
 }
 
-impl<P: Project> ControlServerContext<P> for AzureServiceBusControlServerDependencies<P> {
+impl<P: Project> ControlServerContext<P> for AzureServiceBusControlServerContext<P> {
     type EventSender = AzureServiceBusEventSender<P>;
     type InstanceManager = AzureServiceBusWorkflowInstanceManager<P>;
     
-    async fn dependencies() -> anyhow::Result<ControlServerDependencies<P, Self>> {
-        // This approach won't work because we can't get the workflow name from a static method.
-        // We need to refactor this to pass the workflow name explicitly.
-        todo!("This needs to be refactored to accept workflow name as parameter")
+    async fn dependencies() -> anyhow::Result<ControlServerDependencies<P, Self::EventSender, Self::InstanceManager>> {
+        // Create a default config - this could be improved by making it configurable
+        let config = AzureAdapterConfig {
+            service_bus_connection_string: std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
+                .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set"),
+            cosmos_connection_string: std::env::var("AZURE_COSMOS_CONNECTION_STRING")
+                .expect("AZURE_COSMOS_CONNECTION_STRING must be set"),
+            new_instance_queue_suffix: "new-instances".to_string(),
+            next_step_queue_suffix: "next-steps".to_string(),
+            completed_instance_queue_suffix: "completed-instances".to_string(),
+            completed_step_queue_suffix: "completed-steps".to_string(),
+            active_step_queue_suffix: "active-steps".to_string(),
+            failed_instance_queue_suffix: "failed-instances".to_string(),
+            failed_step_queue_suffix: "failed-steps".to_string(),
+            new_event_queue_suffix: "new-events".to_string(),
+            pg_connection_string: std::env::var("DATABASE_URL")
+                .expect("DATABASE_URL must be set"),
+        };
+        
+        let mut dependency_manager = AzureDependencyManager::new(config);
+        dependency_manager.control_server_dependencies().await
     }
 }

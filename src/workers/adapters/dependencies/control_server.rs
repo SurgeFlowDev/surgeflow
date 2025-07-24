@@ -4,23 +4,22 @@ use crate::{
 };
 use std::future::Future;
 
-pub struct ControlServerDependencies<P: Project, C: ControlServerContext<P>> {
-    pub event_sender: C::EventSender,
-    pub instance_manager: C::InstanceManager,
+pub struct ControlServerDependencies<P: Project, ES: EventSender<P>, IM: WorkflowInstanceManager<P>> {
+    pub event_sender: ES,
+    pub instance_manager: IM,
     #[expect(dead_code)]
-    context: C,
+    _marker: std::marker::PhantomData<P>,
 }
 
-impl<P: Project, C: ControlServerContext<P>> ControlServerDependencies<P, C> {
+impl<P: Project, ES: EventSender<P>, IM: WorkflowInstanceManager<P>> ControlServerDependencies<P, ES, IM> {
     pub fn new(
-        event_sender: C::EventSender,
-        instance_manager: C::InstanceManager,
-        context: C,
+        event_sender: ES,
+        instance_manager: IM,
     ) -> Self {
         Self {
             event_sender,
             instance_manager,
-            context,
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -30,5 +29,5 @@ pub trait ControlServerContext<P: Project>: Sized {
     //
     type InstanceManager: WorkflowInstanceManager<P>;
     fn dependencies()
-    -> impl Future<Output = anyhow::Result<ControlServerDependencies<P, Self>>> + Send;
+    -> impl Future<Output = anyhow::Result<ControlServerDependencies<P, Self::EventSender, Self::InstanceManager>>> + Send;
 }
