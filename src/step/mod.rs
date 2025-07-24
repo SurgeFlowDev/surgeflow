@@ -2,37 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::{
-    event::Event,
     workers::adapters::managers::WorkflowInstance,
     workflows::{Project, StepId, Workflow, WorkflowEvent},
 };
 use derive_more::Debug;
 
 pub type StepResult<W> = Result<Option<StepWithSettings<W>>, StepError>;
-
-pub trait Step:
-    Serialize
-    + for<'a> Deserialize<'a>
-    + fmt::Debug
-    + Into<<Self::Workflow as Workflow>::Step>
-    + Send
-    + Clone
-{
-    type Event: Event + 'static;
-    type Workflow: Workflow;
-
-    fn run_raw(
-        &self,
-        wf: Self::Workflow,
-        event: Self::Event,
-        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
-        // where we can get the WorkflowStep type from
-    ) -> impl std::future::Future<
-        Output = Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Project>>, StepError>,
-    > + Send;
-}
-
-
 
 #[derive(Debug, thiserror::Error)]
 pub enum StepError {

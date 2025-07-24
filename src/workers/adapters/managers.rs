@@ -25,7 +25,7 @@ pub trait StepsAwaitingEventManager<P: Project>: Sized {
 mod persistent_step_manager {
     use std::fmt::{Debug, Display};
 
-    use crate::workflows::{StepId, Project, WorkflowInstanceId};
+    use crate::workflows::{Project, StepId, WorkflowInstanceId};
 
     pub trait PersistentStepManager {
         type Error: Send + Sync + 'static + Debug + Display;

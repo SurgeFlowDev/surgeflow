@@ -1,5 +1,4 @@
-use crate::event::Event;
-use crate::step::{FullyQualifiedStep, StepError};
+use crate::step::StepError;
 use crate::workers::adapters::managers::WorkflowInstance;
 // use crate::workflows::workflow_0::Workflow0;
 use crate::{
@@ -19,11 +18,12 @@ use derive_more::{Display, From, Into};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sqlx::Postgres;
+use std::any::TypeId;
 use std::fmt::{self, Debug};
 use std::{marker::PhantomData, sync::Arc};
 use uuid::Uuid;
 
-// pub mod workflow_0;
+pub mod workflow_1;
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema,
@@ -263,9 +263,7 @@ pub trait ProjectEvent:
 {
     type Project: Project<Event = Self>;
 }
-pub trait ProjectWorkflow:
-    Sized + Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>
-{
+pub trait ProjectWorkflow: Sized + Send + Sync + 'static + Clone {
     type Project: Project<Workflow = Self>;
 
     fn entrypoint() -> StepWithSettings<Self::Project>;
@@ -317,4 +315,37 @@ pub trait WorkflowEvent:
 {
     type Workflow: Workflow<Event = Self>;
     fn is_event<T: Event + 'static>(&self) -> bool;
+}
+
+//////////////////////////////////
+
+pub trait Step:
+    Serialize
+    + for<'a> Deserialize<'a>
+    + fmt::Debug
+    + Into<<Self::Workflow as Workflow>::Step>
+    + Send
+    + Clone
+{
+    type Event: Event + 'static;
+    type Workflow: Workflow;
+
+    fn run_raw(
+        &self,
+        wf: Self::Workflow,
+        event: Self::Event,
+        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
+        // where we can get the WorkflowStep type from
+    ) -> impl std::future::Future<
+        Output = Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Project>>, StepError>,
+    > + Send;
+}
+
+pub trait Event:
+    Serialize + for<'a> Deserialize<'a> + Clone + Debug + Send + JsonSchema + 'static
+{
+    // move to extension trait so it can't be overridden
+    fn is<T: Event + 'static>() -> bool {
+        TypeId::of::<Self>() == TypeId::of::<T>()
+    }
 }

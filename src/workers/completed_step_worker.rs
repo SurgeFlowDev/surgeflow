@@ -5,7 +5,7 @@ use crate::{
         dependencies::completed_step_worker::CompletedStepWorkerDependencies,
         receivers::CompletedStepReceiver, senders::NextStepSender,
     },
-    workflows::{StepId, Project},
+    workflows::{Project, StepId},
 };
 use derive_more::Debug;
 

@@ -17,7 +17,7 @@ async fn process<
     CompletedStepSenderT,
     PersistentStepManagerT,
 >(
-    wf: P::Workflow,
+    wf: <P as Project>::Workflow,
     active_step_sender: &mut ActiveStepSenderT,
     failed_step_sender: &mut FailedStepSenderT,
     completed_step_sender: &mut CompletedStepSenderT,
@@ -74,7 +74,7 @@ pub async fn main<
         CompletedStepSenderT,
         PersistentStepManagerT,
     >,
-    wf: P::Workflow,
+    wf: <P as Project>::Workflow,
 ) -> anyhow::Result<()>
 where
     P: Project,

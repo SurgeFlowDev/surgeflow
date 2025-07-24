@@ -5,7 +5,7 @@ use crate::{
         dependencies::new_instance_worker::NewInstanceWorkerDependencies,
         managers::WorkflowInstance, receivers::NewInstanceReceiver, senders::NextStepSender,
     },
-    workflows::{StepId, Project},
+    workflows::{Project, StepId},
 };
 
 async fn process<P, NextStepSenderT>(
@@ -19,7 +19,7 @@ where
 {
     let entrypoint = FullyQualifiedStep {
         instance,
-        step: P::Workflow::entrypoint(),
+        step: <<P as Project>::Workflow as ProjectWorkflow>::entrypoint(),
         retry_count: 0,
         step_id: StepId::new(),
         event: None,
