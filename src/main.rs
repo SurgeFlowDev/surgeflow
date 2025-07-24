@@ -22,7 +22,7 @@ use rust_workflow_2::{
     workflows::init_app_state,
 };
 
-use rust_workflow_2::workflows::{Tx, TxLayer, Workflow, WorkflowControl};
+use rust_workflow_2::workflows::{Tx, TxLayer, Project, WorkflowControl};
 
 use sqlx::PgPool;
 use tokio::{net::TcpListener, try_join};
@@ -65,6 +65,15 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
+    // Example usage of the updated main_handler with Project-based architecture
+    // Uncomment the lines below to test with MyProject and workflow_1
+    
+    // use rust_workflow_2::workflows::workflow_1::{MyProject, MyProjectWorkflow, Workflow1};
+    // main_handler::<MyProject>(
+    //     "workflow_1".to_string(),
+    //     MyProjectWorkflow::Workflow1(Workflow1)
+    // ).await?;
+
     // this shouldn't have to be hard coded
     // type ControlServerDependencies<W> = AzureServiceBusControlServerDependencies<W>;
 
@@ -98,99 +107,100 @@ async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
     feature = "failed_instance_worker",
     feature = "completed_instance_worker"
 ))]
-async fn main_handler<W: Workflow>(
-    #[cfg(feature = "active_step_worker")] wf: W,
+async fn main_handler<P: Project>(
+    workflow_name: String,
+    project_workflow: P::Workflow,
 ) -> anyhow::Result<()> {
-    // TODO
-    // use rust_workflow_2::workers::adapters::dependencies::ActiveStepWorkerDependencyProvider;
-    // use rust_workflow_2::workers::adapters::dependencies::CompletedInstanceWorkerDependencyProvider;
-    // use rust_workflow_2::workers::adapters::dependencies::CompletedStepWorkerDependencyProvider;
-    // use rust_workflow_2::workers::adapters::dependencies::FailedInstanceWorkerDependencyProvider;
-    // use rust_workflow_2::workers::adapters::dependencies::FailedStepWorkerDependencyProvider;
-    // use rust_workflow_2::workers::adapters::dependencies::NewEventWorkerDependencyProvider;
-    // use rust_workflow_2::workers::adapters::dependencies::NewInstanceWorkerDependencyProvider;
-    // use rust_workflow_2::workers::adapters::dependencies::NextStepWorkerDependencyProvider;
-    // use rust_workflow_2::workers::azure_adapter::dependencies::{
-    //     AzureAdapterConfig, AzureDependencyManager,
-    // };
+    use rust_workflow_2::workers::adapters::dependencies::ActiveStepWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::CompletedInstanceWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::CompletedStepWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::FailedInstanceWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::FailedStepWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::NewEventWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::NewInstanceWorkerDependencyProvider;
+    use rust_workflow_2::workers::adapters::dependencies::NextStepWorkerDependencyProvider;
+    use rust_workflow_2::workers::azure_adapter::dependencies::{
+        AzureAdapterConfig, AzureDependencyManager,
+    };
 
-    // let mut dependency_manager: AzureDependencyManager =
-    //     AzureDependencyManager::new(AzureAdapterConfig {
-    //         service_bus_connection_string: std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
-    //             .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set"),
-    //         cosmos_connection_string: std::env::var("COSMOS_CONNECTION_STRING")
-    //             .expect("COSMOS_CONNECTION_STRING must be set"),
-    //         new_instance_queue_suffix: "-instance".into(),
-    //         next_step_queue_suffix: "-next-steps".into(),
-    //         completed_instance_queue_suffix: "-completed-instances".into(),
-    //         completed_step_queue_suffix: "-completed-steps".into(),
-    //         active_step_queue_suffix: "-active-steps".into(),
-    //         failed_instance_queue_suffix: "-failed-instances".into(),
-    //         failed_step_queue_suffix: "-failed-steps".into(),
-    //         new_event_queue_suffix: "-events".into(),
-    //         pg_connection_string: std::env::var("APP_USER_DATABASE_URL")
-    //             .expect("APP_USER_DATABASE_URL must be set"),
-    //     });
+    let mut dependency_manager: AzureDependencyManager =
+        AzureDependencyManager::new(AzureAdapterConfig {
+            service_bus_connection_string: std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
+                .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set"),
+            cosmos_connection_string: std::env::var("COSMOS_CONNECTION_STRING")
+                .expect("COSMOS_CONNECTION_STRING must be set"),
+            workflow_name,
+            new_instance_queue_suffix: "-instance".into(),
+            next_step_queue_suffix: "-next-steps".into(),
+            completed_instance_queue_suffix: "-completed-instances".into(),
+            completed_step_queue_suffix: "-completed-steps".into(),
+            active_step_queue_suffix: "-active-steps".into(),
+            failed_instance_queue_suffix: "-failed-instances".into(),
+            failed_step_queue_suffix: "-failed-steps".into(),
+            new_event_queue_suffix: "-events".into(),
+            pg_connection_string: std::env::var("APP_USER_DATABASE_URL")
+                .expect("APP_USER_DATABASE_URL must be set"),
+        });
 
-    // try_join!(
-    //     #[cfg(feature = "active_step_worker")]
-    //     active_step_worker::main::<W, _, _, _, _, _>(
-    //         dependency_manager
-    //             .active_step_worker_dependencies()
-    //             .await
-    //             .expect("TODO: handle error"),
-    //         wf,
-    //     ),
-    //     #[cfg(feature = "new_instance_worker")]
-    //     new_instance_worker::main::<W, _, _>(
-    //         dependency_manager
-    //             .new_instance_worker_dependencies()
-    //             .await
-    //             .expect("TODO: handle error")
-    //     ),
-    //     #[cfg(feature = "next_step_worker")]
-    //     next_step_worker::main::<W, _, _, _, _>(
-    //         dependency_manager
-    //             .next_step_worker_dependencies()
-    //             .await
-    //             .expect("TODO: handle error")
-    //     ),
-    //     #[cfg(feature = "new_event_worker")]
-    //     new_event_worker::main::<W, _, _, _>(
-    //         dependency_manager
-    //             .new_event_worker_dependencies()
-    //             .await
-    //             .expect("TODO: handle error")
-    //     ),
-    //     #[cfg(feature = "completed_step_worker")]
-    //     completed_step_worker::main::<W, _, _, _>(
-    //         dependency_manager
-    //             .completed_step_worker_dependencies()
-    //             .await
-    //             .expect("TODO: handle error")
-    //     ),
-    //     #[cfg(feature = "failed_step_worker")]
-    //     failed_step_worker::main::<W, _, _, _>(
-    //         dependency_manager
-    //             .failed_step_worker_dependencies()
-    //             .await
-    //             .expect("TODO: handle error")
-    //     ),
-    //     #[cfg(feature = "failed_instance_worker")]
-    //     failed_instance_worker::main::<W, _>(
-    //         dependency_manager
-    //             .failed_instance_worker_dependencies()
-    //             .await
-    //             .expect("TODO: handle error")
-    //     ),
-    //     #[cfg(feature = "completed_instance_worker")]
-    //     completed_instance_worker::main::<W, _>(
-    //         dependency_manager
-    //             .completed_instance_worker_dependencies()
-    //             .await
-    //             .expect("TODO: handle error")
-    //     ),
-    // )?;
+    try_join!(
+        #[cfg(feature = "active_step_worker")]
+        active_step_worker::main::<P, _, _, _, _, _>(
+            dependency_manager
+                .active_step_worker_dependencies()
+                .await
+                .expect("TODO: handle error"),
+            project_workflow.clone(),
+        ),
+        #[cfg(feature = "new_instance_worker")]
+        new_instance_worker::main::<P, _, _>(
+            dependency_manager
+                .new_instance_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "next_step_worker")]
+        next_step_worker::main::<P, _, _, _, _>(
+            dependency_manager
+                .next_step_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "new_event_worker")]
+        new_event_worker::main::<P, _, _, _>(
+            dependency_manager
+                .new_event_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "completed_step_worker")]
+        completed_step_worker::main::<P, _, _, _>(
+            dependency_manager
+                .completed_step_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "failed_step_worker")]
+        failed_step_worker::main::<P, _, _, _>(
+            dependency_manager
+                .failed_step_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "failed_instance_worker")]
+        failed_instance_worker::main::<P, _>(
+            dependency_manager
+                .failed_instance_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+        #[cfg(feature = "completed_instance_worker")]
+        completed_instance_worker::main::<P, _>(
+            dependency_manager
+                .completed_instance_worker_dependencies()
+                .await
+                .expect("TODO: handle error")
+        ),
+    )?;
 
     Ok(())
 }
