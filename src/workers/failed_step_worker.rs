@@ -2,26 +2,25 @@ use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
         dependencies::failed_step_worker::FailedStepWorkerDependencies,
-        managers::PersistentStepManager, receivers::FailedStepReceiver,
-        senders::FailedInstanceSender,
+        managers::PersistenceManager, receivers::FailedStepReceiver, senders::FailedInstanceSender,
     },
     workflows::Project,
 };
 use derive_more::Debug;
 
-pub async fn main<P, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>(
+pub async fn main<P, FailedStepReceiverT, FailedInstanceSenderT, PersistenceManagerT>(
     dependencies: FailedStepWorkerDependencies<
         P,
         FailedStepReceiverT,
         FailedInstanceSenderT,
-        PersistentStepManagerT,
+        PersistenceManagerT,
     >,
 ) -> anyhow::Result<()>
 where
     P: Project,
     FailedStepReceiverT: FailedStepReceiver<P>,
     FailedInstanceSenderT: FailedInstanceSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     let mut failed_step_receiver = dependencies.failed_step_receiver;
     let mut failed_instance_sender = dependencies.failed_instance_sender;
@@ -32,7 +31,7 @@ where
             P,
             FailedStepReceiverT,
             FailedInstanceSenderT,
-            PersistentStepManagerT,
+            PersistenceManagerT,
         >(
             &mut failed_step_receiver,
             &mut failed_instance_sender,
@@ -45,25 +44,20 @@ where
     }
 }
 
-async fn receive_and_process<
-    P,
-    FailedStepReceiverT,
-    FailedInstanceSenderT,
-    PersistentStepManagerT,
->(
+async fn receive_and_process<P, FailedStepReceiverT, FailedInstanceSenderT, PersistenceManagerT>(
     failed_step_receiver: &mut FailedStepReceiverT,
     failed_instance_sender: &mut FailedInstanceSenderT,
-    persistent_step_manager: &mut PersistentStepManagerT,
+    persistent_step_manager: &mut PersistenceManagerT,
 ) -> anyhow::Result<()>
 where
     P: Project,
     FailedStepReceiverT: FailedStepReceiver<P>,
     FailedInstanceSenderT: FailedInstanceSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     let (step, handle) = failed_step_receiver.receive().await?;
 
-    if let Err(err) = process::<P, FailedInstanceSenderT, PersistentStepManagerT>(
+    if let Err(err) = process::<P, FailedInstanceSenderT, PersistenceManagerT>(
         failed_instance_sender,
         persistent_step_manager,
         step,
@@ -79,27 +73,27 @@ where
 }
 
 #[derive(thiserror::Error, Debug)]
-enum FailedStepWorkerError<P, FailedInstanceSenderT, PersistentStepManagerT>
+enum FailedStepWorkerError<P, FailedInstanceSenderT, PersistenceManagerT>
 where
     P: Project,
     FailedInstanceSenderT: FailedInstanceSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     #[error("Database error occurred")]
-    PersistentStepManagerError(#[source] <PersistentStepManagerT as PersistentStepManager>::Error),
+    PersistenceManagerError(#[source] <PersistenceManagerT as PersistenceManager>::Error),
     #[error("Failed to send instance: {0}")]
     SendError(#[source] <FailedInstanceSenderT as FailedInstanceSender<P>>::Error),
 }
 
-async fn process<P, FailedInstanceSenderT, PersistentStepManagerT>(
+async fn process<P, FailedInstanceSenderT, PersistenceManagerT>(
     failed_instance_sender: &mut FailedInstanceSenderT,
-    persistent_step_manager: &mut PersistentStepManagerT,
+    persistent_step_manager: &mut PersistenceManagerT,
     step: FullyQualifiedStep<P>,
-) -> Result<(), FailedStepWorkerError<P, FailedInstanceSenderT, PersistentStepManagerT>>
+) -> Result<(), FailedStepWorkerError<P, FailedInstanceSenderT, PersistenceManagerT>>
 where
     P: Project,
     FailedInstanceSenderT: FailedInstanceSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     tracing::info!(
         "received failed step for instance: {}",
@@ -109,7 +103,7 @@ where
     persistent_step_manager
         .set_step_status(step.step_id, 5)
         .await
-        .map_err(FailedStepWorkerError::PersistentStepManagerError)?;
+        .map_err(FailedStepWorkerError::PersistenceManagerError)?;
 
     failed_instance_sender
         .send(&step.instance)

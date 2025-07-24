@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     workers::adapters::{
-        managers::{PersistentStepManager, StepsAwaitingEventManager},
+        managers::{PersistenceManager, StepsAwaitingEventManager},
         receivers::NextStepReceiver,
         senders::ActiveStepSender,
     },
@@ -14,18 +14,18 @@ pub struct NextStepWorkerDependencies<
     NextStepReceiverT,
     ActiveStepSenderT,
     StepsAwaitingEventManagerT,
-    PersistentStepManagerT,
+    PersistenceManagerT,
 > where
     P: Project,
     NextStepReceiverT: NextStepReceiver<P>,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     pub next_step_receiver: NextStepReceiverT,
     pub active_step_sender: ActiveStepSenderT,
     pub steps_awaiting_event_manager: StepsAwaitingEventManagerT,
-    pub persistent_step_manager: PersistentStepManagerT,
+    pub persistent_step_manager: PersistenceManagerT,
     marker: PhantomData<P>,
 }
 
@@ -34,26 +34,26 @@ impl<
     NextStepReceiverT,
     ActiveStepSenderT,
     StepsAwaitingEventManagerT,
-    PersistentStepManagerT,
+    PersistenceManagerT,
 >
     NextStepWorkerDependencies<
         P,
         NextStepReceiverT,
         ActiveStepSenderT,
         StepsAwaitingEventManagerT,
-        PersistentStepManagerT,
+        PersistenceManagerT,
     >
 where
     NextStepReceiverT: NextStepReceiver<P>,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     pub fn new(
         next_step_receiver: NextStepReceiverT,
         active_step_sender: ActiveStepSenderT,
         steps_awaiting_event_manager: StepsAwaitingEventManagerT,
-        persistent_step_manager: PersistentStepManagerT,
+        persistent_step_manager: PersistenceManagerT,
     ) -> Self {
         Self {
             next_step_receiver,

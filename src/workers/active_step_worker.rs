@@ -3,7 +3,7 @@ use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
         dependencies::active_step_worker::ActiveStepWorkerDependencies,
-        managers::PersistentStepManager,
+        managers::PersistenceManager,
         receivers::ActiveStepReceiver,
         senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
     },
@@ -15,13 +15,13 @@ async fn process<
     ActiveStepSenderT,
     FailedStepSenderT,
     CompletedStepSenderT,
-    PersistentStepManagerT,
+    PersistenceManagerT,
 >(
     wf: <P as Project>::Workflow,
     active_step_sender: &mut ActiveStepSenderT,
     failed_step_sender: &mut FailedStepSenderT,
     completed_step_sender: &mut CompletedStepSenderT,
-    persistent_step_manager: &mut PersistentStepManagerT,
+    persistent_step_manager: &mut PersistenceManagerT,
     mut step: FullyQualifiedStep<P>,
 ) -> anyhow::Result<()>
 where
@@ -29,7 +29,7 @@ where
     ActiveStepSenderT: ActiveStepSender<P>,
     FailedStepSenderT: FailedStepSender<P>,
     CompletedStepSenderT: CompletedStepSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     tracing::info!("Received new step");
     persistent_step_manager
@@ -64,7 +64,7 @@ pub async fn main<
     ActiveStepSenderT,
     FailedStepSenderT,
     CompletedStepSenderT,
-    PersistentStepManagerT,
+    PersistenceManagerT,
 >(
     dependencies: ActiveStepWorkerDependencies<
         P,
@@ -72,7 +72,7 @@ pub async fn main<
         ActiveStepSenderT,
         FailedStepSenderT,
         CompletedStepSenderT,
-        PersistentStepManagerT,
+        PersistenceManagerT,
     >,
     wf: <P as Project>::Workflow,
 ) -> anyhow::Result<()>
@@ -82,7 +82,7 @@ where
     ActiveStepSenderT: ActiveStepSender<P>,
     FailedStepSenderT: FailedStepSender<P>,
     CompletedStepSenderT: CompletedStepSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     // tracing::info!("Active Step Worker started for project: {}", P::NAME);
 
@@ -103,7 +103,7 @@ where
             ActiveStepSenderT,
             FailedStepSenderT,
             CompletedStepSenderT,
-            PersistentStepManagerT,
+            PersistenceManagerT,
         >(
             wf.clone(),
             &mut active_step_sender,

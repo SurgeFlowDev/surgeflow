@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     workers::adapters::{
-        managers::PersistentStepManager,
+        managers::PersistenceManager,
         receivers::ActiveStepReceiver,
         senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
     },
@@ -15,20 +15,20 @@ pub struct ActiveStepWorkerDependencies<
     ActiveStepSenderT,
     FailedStepSenderT,
     CompletedStepSenderT,
-    PersistentStepManagerT,
+    PersistenceManagerT,
 > where
     P: Project,
     ActiveStepReceiverT: ActiveStepReceiver<P>,
     ActiveStepSenderT: ActiveStepSender<P>,
     FailedStepSenderT: FailedStepSender<P>,
     CompletedStepSenderT: CompletedStepSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     pub active_step_receiver: ActiveStepReceiverT,
     pub active_step_sender: ActiveStepSenderT,
     pub failed_step_sender: FailedStepSenderT,
     pub completed_step_sender: CompletedStepSenderT,
-    pub persistent_step_manager: PersistentStepManagerT,
+    pub persistent_step_manager: PersistenceManagerT,
     _marker: PhantomData<P>,
 }
 
@@ -38,7 +38,7 @@ impl<
     ActiveStepSenderT,
     FailedStepSenderT,
     CompletedStepSenderT,
-    PersistentStepManagerT,
+    PersistenceManagerT,
 >
     ActiveStepWorkerDependencies<
         P,
@@ -46,7 +46,7 @@ impl<
         ActiveStepSenderT,
         FailedStepSenderT,
         CompletedStepSenderT,
-        PersistentStepManagerT,
+        PersistenceManagerT,
     >
 where
     P: Project,
@@ -54,14 +54,14 @@ where
     ActiveStepSenderT: ActiveStepSender<P>,
     FailedStepSenderT: FailedStepSender<P>,
     CompletedStepSenderT: CompletedStepSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     pub fn new(
         active_step_receiver: ActiveStepReceiverT,
         active_step_sender: ActiveStepSenderT,
         failed_step_sender: FailedStepSenderT,
         completed_step_sender: CompletedStepSenderT,
-        persistent_step_manager: PersistentStepManagerT,
+        persistent_step_manager: PersistenceManagerT,
     ) -> Self {
         Self {
             active_step_receiver,

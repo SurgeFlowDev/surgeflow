@@ -134,19 +134,19 @@ mod persistent_step_manager {
     use uuid::Uuid;
 
     use crate::{
-        workers::adapters::managers::PersistentStepManager,
+        workers::adapters::managers::{PersistenceManager, WorkflowInstance},
         workflows::{Project, StepId, WorkflowInstanceId},
     };
 
-    pub struct AzurePersistentStepManager {
+    pub struct AzurePersistenceManager {
         sqlx_pool: PgPool,
     }
-    impl AzurePersistentStepManager {
+    impl AzurePersistenceManager {
         pub fn new(sqlx_pool: PgPool) -> Self {
             Self { sqlx_pool }
         }
     }
-    impl PersistentStepManager for AzurePersistentStepManager {
+    impl PersistenceManager for AzurePersistenceManager {
         type Error = anyhow::Error;
         async fn set_step_status(&self, step_id: StepId, status: i32) -> Result<(), anyhow::Error> {
             query!(
@@ -204,101 +204,27 @@ mod persistent_step_manager {
 
             Ok(())
         }
+
+        async fn insert_instance(
+            &self,
+            workflow_instance: WorkflowInstance,
+        ) -> Result<WorkflowInstanceId, Self::Error> {
+            query!(
+                r#"
+                INSERT INTO workflow_instances ("workflow_id", "external_id")
+                SELECT "id", $1
+                FROM workflows
+                WHERE "name" = $2
+                RETURNING "external_id"
+                "#,
+                Uuid::from(workflow_instance.external_id.clone()),
+                String::from(workflow_instance.workflow_name)
+            )
+            .fetch_one(&self.sqlx_pool)
+            .await?;
+
+            Ok(workflow_instance.external_id)
+        }
     }
 }
-pub use persistent_step_manager::AzurePersistentStepManager;
-
-// mod workflow_instance_manager {
-//     use std::marker::PhantomData;
-
-//     use azservicebus::{
-//         ServiceBusClient, primitives::service_bus_retry_policy::ServiceBusRetryPolicyExt,
-//     };
-//     use sqlx::{PgConnection, query_as};
-//     use uuid::Uuid;
-
-//     use crate::{
-//         workers::{
-//             adapters::{
-//                 managers::{WorkflowInstance, WorkflowInstanceManager, WorkflowName},
-//                 senders::NewInstanceSender,
-//             },
-//             azure_adapter::{AzureAdapterError, senders::AzureServiceBusNewInstanceSender},
-//         },
-//         workflows::{Project, WorkflowInstanceId},
-//     };
-
-//     // must be thread-safe
-//     #[derive(Debug)]
-//     pub struct AzureServiceBusWorkflowInstanceManager<P: Project> {
-//         sender: AzureServiceBusNewInstanceSender<P>,
-//         _marker: PhantomData<P>,
-//     }
-//     impl<P: Project> AzureServiceBusWorkflowInstanceManager<P> {
-//         pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
-//             service_bus_client: &mut ServiceBusClient<RP>,
-//             instance_queue_name: &str,
-//         ) -> anyhow::Result<Self> {
-//             let sender =
-//                 AzureServiceBusNewInstanceSender::<P>::new(service_bus_client, instance_queue_name)
-//                     .await?;
-//             Ok(Self {
-//                 sender,
-//                 _marker: PhantomData,
-//             })
-//         }
-//     }
-
-//     impl<P: Project> WorkflowInstanceManager<P> for AzureServiceBusWorkflowInstanceManager<P> {
-//         type Error = AzureAdapterError;
-//         async fn create_instance(
-//             &self,
-//             workflow_name: WorkflowName,
-//             conn: &mut PgConnection,
-//         ) -> Result<WorkflowInstanceId, AzureAdapterError> {
-//             // tracing::info!("Creating workflow instance for: {}", workflow_name);
-//             let workflow_instance_id = WorkflowInstanceId::new();
-//             // let res = query_as!(
-//             //     WorkflowInstanceRecord,
-//             //     r#"
-//             //         INSERT INTO workflow_instances ("workflow_id", "external_id")
-//             //         SELECT "id", $1
-//             //         FROM workflows
-//             //         WHERE "name" = $2
-//             //         RETURNING "external_id", "workflow_id";
-//             //     "#,
-//             //     Uuid::from(workflow_instance_id),
-//             //     workflow_name
-//             // )
-//             // .fetch_one(conn)
-//             // .await
-//             // .map_err(AzureAdapterError::DatabaseError)?;
-
-//             // tracing::info!(
-//             //     "Created workflow instance: {} with id: {}",
-//             //     workflow_name,
-//             //     res.external_id
-//             // );
-
-//             // let res: WorkflowInstance = res
-//             //     .try_into()
-//             //     .map_err(|_| AzureAdapterError::DbConversionError)?;
-
-//             // tracing::info!(
-//             //     "Sending workflow instance: {} with id: {} to Azure Service Bus",
-//             //     workflow_name,
-//             //     res.external_id
-//             // );
-
-//             let res = WorkflowInstance {
-//                 external_id: workflow_instance_id,
-//                 workflow_name,
-//             };
-
-//             self.sender.send(&res).await?;
-//             Ok(res.external_id)
-//         }
-//     }
-// }
-
-// pub use workflow_instance_manager::AzureServiceBusWorkflowInstanceManager;
+pub use persistent_step_manager::AzurePersistenceManager;

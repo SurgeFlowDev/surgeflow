@@ -1,4 +1,4 @@
-use crate::workers::adapters::managers::PersistentStepManager;
+use crate::workers::adapters::managers::PersistenceManager;
 use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
@@ -9,18 +9,18 @@ use crate::{
 };
 use derive_more::Debug;
 
-pub async fn main<P: Project, CompletedStepReceiverT, NextStepSenderT, PersistentStepManagerT>(
+pub async fn main<P: Project, CompletedStepReceiverT, NextStepSenderT, PersistenceManagerT>(
     dependencies: CompletedStepWorkerDependencies<
         P,
         CompletedStepReceiverT,
         NextStepSenderT,
-        PersistentStepManagerT,
+        PersistenceManagerT,
     >,
 ) -> anyhow::Result<()>
 where
     CompletedStepReceiverT: CompletedStepReceiver<P>,
     NextStepSenderT: NextStepSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     let mut completed_step_receiver = dependencies.completed_step_receiver;
     let mut next_step_sender = dependencies.next_step_sender;
@@ -43,16 +43,16 @@ async fn receive_and_process<
     P: Project,
     CompletedStepReceiverT,
     NextStepSenderT,
-    PersistentStepManagerT,
+    PersistenceManagerT,
 >(
     completed_step_receiver: &mut CompletedStepReceiverT,
     next_step_sender: &mut NextStepSenderT,
-    persistent_step_manager: &mut PersistentStepManagerT,
+    persistent_step_manager: &mut PersistenceManagerT,
 ) -> anyhow::Result<()>
 where
     CompletedStepReceiverT: CompletedStepReceiver<P>,
     NextStepSenderT: NextStepSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     let (step, handle) = completed_step_receiver.receive().await?;
 
@@ -73,15 +73,15 @@ enum CompletedStepWorkerError<P: Project, NextStepSenderT: NextStepSender<P>> {
     SendNextStepError(#[source] <NextStepSenderT as NextStepSender<P>>::Error),
 }
 
-async fn process<P, NextStepSenderT, PersistentStepManagerT>(
+async fn process<P, NextStepSenderT, PersistenceManagerT>(
     next_step_sender: &mut NextStepSenderT,
-    persistent_step_manager: &mut PersistentStepManagerT,
+    persistent_step_manager: &mut PersistenceManagerT,
     step: FullyQualifiedStep<P>,
 ) -> Result<(), CompletedStepWorkerError<P, NextStepSenderT>>
 where
     P: Project,
     NextStepSenderT: NextStepSender<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     tracing::info!(
         "received completed step for instance: {}",

@@ -20,14 +20,17 @@ pub trait StepsAwaitingEventManager<P: Project>: Sized {
         &mut self,
         step: FullyQualifiedStep<P>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+    
 }
 
 mod persistent_step_manager {
     use std::fmt::{Debug, Display};
 
-    use crate::workflows::{Project, StepId, WorkflowInstanceId};
+    use crate::{workers::adapters::managers::WorkflowInstance, workflows::{Project, StepId, WorkflowInstanceId}};
 
-    pub trait PersistentStepManager {
+    // TODO: should these take references instead of ownership?
+    pub trait PersistenceManager {
         type Error: Send + Sync + 'static + Debug + Display;
         fn set_step_status(
             &self,
@@ -47,20 +50,22 @@ mod persistent_step_manager {
             step_id: StepId,
             output: Option<&P::Step>,
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+        fn insert_instance(
+        &self,
+        workflow_instance: WorkflowInstance,
+    ) -> impl Future<Output = Result<WorkflowInstanceId, Self::Error>> + Send;
     }
 }
 
-pub use persistent_step_manager::PersistentStepManager;
+pub use persistent_step_manager::PersistenceManager;
 
+// TODO: this should be moved to a more appropriate place
 mod workflow_instance_manager {
-    use std::error::Error;
-
+    use crate::workflows::WorkflowInstanceId;
     use derive_more::{From, Into};
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
-    use sqlx::PgConnection;
-
-    use crate::workflows::{Project, WorkflowId, WorkflowInstanceId};
 
     #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
     pub struct WorkflowInstance {
@@ -76,17 +81,7 @@ mod workflow_instance_manager {
             Self(value.to_string())
         }
     }
-
-    pub trait WorkflowInstanceManager<P: Project> {
-        type Error: Error + Send + Sync + 'static;
-        fn create_instance(
-            &self,
-            workflow_name: WorkflowName,
-            conn: &mut PgConnection,
-        ) -> impl Future<Output = Result<WorkflowInstanceId, Self::Error>> + Send;
-    }
 }
 
 pub use workflow_instance_manager::WorkflowInstance;
-pub use workflow_instance_manager::WorkflowInstanceManager;
 pub use workflow_instance_manager::WorkflowName;

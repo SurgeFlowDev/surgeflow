@@ -3,7 +3,7 @@ use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
         dependencies::next_step_worker::NextStepWorkerDependencies,
-        managers::{PersistentStepManager, StepsAwaitingEventManager},
+        managers::{PersistenceManager, StepsAwaitingEventManager},
         receivers::NextStepReceiver,
         senders::ActiveStepSender,
     },
@@ -16,14 +16,14 @@ pub async fn main<
     NextStepReceiverT,
     ActiveStepSenderT,
     StepsAwaitingEventManagerT,
-    PersistentStepManagerT,
+    PersistenceManagerT,
 >(
     dependencies: NextStepWorkerDependencies<
         P,
         NextStepReceiverT,
         ActiveStepSenderT,
         StepsAwaitingEventManagerT,
-        PersistentStepManagerT,
+        PersistenceManagerT,
     >,
 ) -> anyhow::Result<()>
 where
@@ -31,7 +31,7 @@ where
     NextStepReceiverT: NextStepReceiver<P>,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     let mut next_step_receiver = dependencies.next_step_receiver;
     let mut active_step_sender = dependencies.active_step_sender;
@@ -44,7 +44,7 @@ where
             NextStepReceiverT,
             ActiveStepSenderT,
             StepsAwaitingEventManagerT,
-            PersistentStepManagerT,
+            PersistenceManagerT,
         >(
             &mut next_step_receiver,
             &mut active_step_sender,
@@ -63,24 +63,24 @@ async fn receive_and_process<
     NextStepReceiverT,
     ActiveStepSenderT,
     StepsAwaitingEventManagerT,
-    PersistentStepManagerT,
+    PersistenceManagerT,
 >(
     next_step_receiver: &mut NextStepReceiverT,
     active_step_sender: &mut ActiveStepSenderT,
     steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
-    persistent_step_manager: &mut PersistentStepManagerT,
+    persistent_step_manager: &mut PersistenceManagerT,
 ) -> anyhow::Result<()>
 where
     P: Project,
     NextStepReceiverT: NextStepReceiver<P>,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     let (step, handle) = next_step_receiver.receive().await?;
 
     if let Err(err) =
-        process::<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>(
+        process::<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceManagerT>(
             active_step_sender,
             steps_awaiting_event_manager,
             persistent_step_manager,
@@ -97,35 +97,35 @@ where
 }
 
 #[derive(thiserror::Error, Debug)]
-enum NextStepWorkerError<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>
+enum NextStepWorkerError<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceManagerT>
 where
     P: Project,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     #[error("Database error occurred")]
-    DatabaseError(#[source] <PersistentStepManagerT as PersistentStepManager>::Error),
+    DatabaseError(#[source] <PersistenceManagerT as PersistenceManager>::Error),
     #[error("Failed to send active step")]
     SendActiveStepError(#[source] <ActiveStepSenderT as ActiveStepSender<P>>::Error),
     #[error("Failed to put step in awaiting event manager")]
     AwaitEventError(#[source] <StepsAwaitingEventManagerT as StepsAwaitingEventManager<P>>::Error),
 }
 
-async fn process<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>(
+async fn process<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceManagerT>(
     active_step_sender: &mut ActiveStepSenderT,
     steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
-    persistent_step_manager: &mut PersistentStepManagerT,
+    persistent_step_manager: &mut PersistenceManagerT,
     step: FullyQualifiedStep<P>,
 ) -> Result<
     (),
-    NextStepWorkerError<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistentStepManagerT>,
+    NextStepWorkerError<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceManagerT>,
 >
 where
     P: Project,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistentStepManagerT: PersistentStepManager,
+    PersistenceManagerT: PersistenceManager,
 {
     tracing::info!(
         "received next step for instance: {}",

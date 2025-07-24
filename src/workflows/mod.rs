@@ -76,19 +76,16 @@ impl Default for StepId {
 )]
 pub struct WorkflowId(i32);
 
-
-
 pub async fn init_app_state<
     P: Project,
     EventSenderT: EventSender<P>,
     NewInstanceSenderT: NewInstanceSender<P>,
 >(
-    
     dependencies: ControlServerDependencies<P, EventSenderT, NewInstanceSenderT>,
 ) -> anyhow::Result<ArcAppState<P, EventSenderT, NewInstanceSenderT>> {
     Ok(ArcAppState(Arc::new(AppState {
         dependencies,
-        
+
         _marker: PhantomData,
     })))
 }

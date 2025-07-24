@@ -52,7 +52,6 @@ async fn serve(router: ApiRouter) -> anyhow::Result<()> {
     Ok(())
 }
 
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
@@ -181,7 +180,7 @@ async fn main_handler<P: Project>(
             project_workflow.clone(),
         ),
         #[cfg(feature = "new_instance_worker")]
-        new_instance_worker::main::<P, _, _>(
+        new_instance_worker::main::<P, _, _,_>(
             dependency_manager
                 .new_instance_worker_dependencies()
                 .await

@@ -17,7 +17,7 @@ use crate::{
             control_server::ControlServerDependencies,
         },
         azure_adapter::{
-            managers::{AzurePersistentStepManager, AzureServiceBusStepsAwaitingEventManager},
+            managers::{AzurePersistenceManager, AzureServiceBusStepsAwaitingEventManager},
             receivers::{
                 AzureServiceBusActiveStepReceiver, AzureServiceBusCompletedInstanceReceiver,
                 AzureServiceBusCompletedStepReceiver, AzureServiceBusEventReceiver,
@@ -149,7 +149,7 @@ impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AzureDependenc
 impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AzureDependencyManager {
     type CompletedStepReceiver = AzureServiceBusCompletedStepReceiver<P>;
     type NextStepSender = AzureServiceBusNextStepSender<P>;
-    type PersistentStepManager = AzurePersistentStepManager;
+    type PersistenceManager = AzurePersistenceManager;
     type Error = anyhow::Error;
 
     async fn completed_step_worker_dependencies(
@@ -159,7 +159,7 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AzureDependencyMan
             P,
             Self::CompletedStepReceiver,
             Self::NextStepSender,
-            Self::PersistentStepManager,
+            Self::PersistenceManager,
         >,
     > {
         let completed_steps_queue = self.config.completed_step_queue_suffix.clone();
@@ -177,8 +177,7 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AzureDependencyMan
         )
         .await?;
 
-        let persistent_step_manager =
-            AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
+        let persistent_step_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(CompletedStepWorkerDependencies::new(
             completed_step_receiver,
@@ -193,7 +192,7 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AzureDependencyManage
     type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
     type FailedStepSender = AzureServiceBusFailedStepSender<P>;
     type CompletedStepSender = AzureServiceBusCompletedStepSender<P>;
-    type PersistentStepManager = AzurePersistentStepManager;
+    type PersistenceManager = AzurePersistenceManager;
     type Error = anyhow::Error;
 
     async fn active_step_worker_dependencies(
@@ -205,7 +204,7 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AzureDependencyManage
             Self::ActiveStepSender,
             Self::FailedStepSender,
             Self::CompletedStepSender,
-            Self::PersistentStepManager,
+            Self::PersistenceManager,
         >,
         Self::Error,
     > {
@@ -232,8 +231,7 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AzureDependencyManage
         )
         .await?;
 
-        let persistent_step_manager =
-            AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
+        let persistent_step_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::active_step_worker::ActiveStepWorkerDependencies::new(
             active_step_receiver,
@@ -272,7 +270,7 @@ impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AzureDependencyMa
 impl<P: Project> FailedStepWorkerDependencyProvider<P> for AzureDependencyManager {
     type FailedStepReceiver = AzureServiceBusFailedStepReceiver<P>;
     type FailedInstanceSender = AzureServiceBusFailedInstanceSender<P>;
-    type PersistentStepManager = AzurePersistentStepManager;
+    type PersistenceManager = AzurePersistenceManager;
     type Error = anyhow::Error;
 
     async fn failed_step_worker_dependencies(
@@ -282,7 +280,7 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AzureDependencyManage
             P,
             Self::FailedStepReceiver,
             Self::FailedInstanceSender,
-            Self::PersistentStepManager,
+            Self::PersistenceManager,
         >,
         Self::Error,
     > {
@@ -300,8 +298,7 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AzureDependencyManage
         )
         .await?;
 
-        let persistent_step_manager =
-            AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
+        let persistent_step_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::failed_step_worker::FailedStepWorkerDependencies::new(
             failed_step_receiver,
@@ -355,6 +352,7 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AzureDependencyManager 
 impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AzureDependencyManager {
     type NextStepSender = AzureServiceBusNextStepSender<P>;
     type NewInstanceReceiver = AzureServiceBusNewInstanceReceiver<P>;
+    type PersistenceManager = AzurePersistenceManager;
     type Error = anyhow::Error;
 
     async fn new_instance_worker_dependencies(
@@ -364,6 +362,7 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AzureDependencyManag
             P,
             Self::NextStepSender,
             Self::NewInstanceReceiver,
+            Self::PersistenceManager,
         >,
         Self::Error,
     > {
@@ -378,9 +377,12 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AzureDependencyManag
         let next_step_sender =
             AzureServiceBusNextStepSender::<P>::new(service_bus_client, &next_steps_queue).await?;
 
+        let persistent_step_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+
         Ok(crate::workers::adapters::dependencies::new_instance_worker::NewInstanceWorkerDependencies::new(
             next_step_sender,
             new_instance_receiver,
+            persistent_step_manager,
         ))
     }
 }
@@ -389,7 +391,7 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager 
     type NextStepReceiver = AzureServiceBusNextStepReceiver<P>;
     type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
     type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<P>;
-    type PersistentStepManager = AzurePersistentStepManager;
+    type PersistenceManager = AzurePersistenceManager;
     type Error = anyhow::Error;
 
     async fn next_step_worker_dependencies(
@@ -400,7 +402,7 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager 
             Self::NextStepReceiver,
             Self::ActiveStepSender,
             Self::StepsAwaitingEventManager,
-            Self::PersistentStepManager,
+            Self::PersistenceManager,
         >,
         Self::Error,
     > {
@@ -420,8 +422,7 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager 
         let steps_awaiting_event_manager =
             AzureServiceBusStepsAwaitingEventManager::<P>::new(cosmos_client);
 
-        let persistent_step_manager =
-            AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
+        let persistent_step_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::next_step_worker::NextStepWorkerDependencies::new(
             next_step_receiver,
