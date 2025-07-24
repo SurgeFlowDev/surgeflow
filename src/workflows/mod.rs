@@ -274,26 +274,35 @@ pub trait ProjectWorkflow:
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait Workflow:
-    Clone + Send + Sync + 'static + From<<Self::Project as Project>::Workflow>
+    Clone + Send + Sync + 'static + Into<<Self::Project as Project>::Workflow>
 {
     type Project: Project;
-    type Event: WorkflowEvent + Into<<Self::Project as Project>::Event>;
-    type Step: WorkflowStep<Self>;
+    type Event: WorkflowEvent<Workflow = Self>;
+    type Step: WorkflowStep<Workflow = Self>;
     const NAME: &'static str;
 
     fn entrypoint() -> StepWithSettings<Self::Project>;
 }
 
-pub trait WorkflowStep<W: Workflow<Step = Self>>:
-    Sync + Serialize + for<'de> Deserialize<'de> + Clone + Send + fmt::Debug
+pub trait WorkflowStep:
+    Sync
+    + Serialize
+    + for<'de> Deserialize<'de>
+    + Clone
+    + Send
+    + fmt::Debug
+    + Into<<<Self::Workflow as Workflow>::Project as Project>::Step>
 {
+    type Workflow: Workflow<Step = Self>;
     fn run_raw(
         &self,
-        wf: W,
-        event: Option<<W as Workflow>::Event>,
+        wf: Self::Workflow,
+        event: Option<<Self::Workflow as Workflow>::Event>,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> impl std::future::Future<Output = Result<Option<StepWithSettings<W::Project>>, StepError>> + Send;
+    ) -> impl std::future::Future<
+        Output = Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Project>>, StepError>,
+    > + Send;
 
     fn is_event<T: Event + 'static>(&self) -> bool;
     fn is_workflow_event<T: WorkflowEvent + 'static>(&self, event: &T) -> bool;
@@ -301,9 +310,11 @@ pub trait WorkflowStep<W: Workflow<Step = Self>>:
 
 pub trait WorkflowEvent:
     Serialize + for<'de> Deserialize<'de> + Debug + Send + Clone
+    + Into<<<Self::Workflow as Workflow>::Project as Project>::Event>
     // JsonSchema should probably be implemented as an extension trait. JsonSchema doesn't matter for the 
     // inner workings of the workflow, but it is useful for API documentation
      + JsonSchema
 {
+    type Workflow: Workflow<Event = Self>;
     fn is_event<T: Event + 'static>(&self) -> bool;
 }
