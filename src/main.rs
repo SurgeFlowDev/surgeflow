@@ -22,7 +22,7 @@ use rust_workflow_2::{
     workflows::init_app_state,
 };
 
-use rust_workflow_2::workflows::{Tx, TxLayer, Project, WorkflowControl};
+use rust_workflow_2::workflows::{Project, Tx, TxLayer, WorkflowControl};
 
 use sqlx::PgPool;
 use tokio::{net::TcpListener, try_join};
@@ -67,12 +67,12 @@ async fn main() -> anyhow::Result<()> {
 
     // Example usage of the updated main_handler with Project-based architecture
     // This demonstrates that the azure_adapter now works with Project trait
-    
+
     use rust_workflow_2::workflows::workflow_1::{MyProject, MyProjectWorkflow, Workflow1};
-    
+
     // NOTE: This would require environment variables to be set:
     // - AZURE_SERVICE_BUS_CONNECTION_STRING
-    // - COSMOS_CONNECTION_STRING  
+    // - COSMOS_CONNECTION_STRING
     // - APP_USER_DATABASE_URL
     // Uncomment to test (would fail at runtime without env vars):
     // main_handler::<MyProject>(
@@ -84,8 +84,40 @@ async fn main() -> anyhow::Result<()> {
     // type ControlServerDependencies<W> = AzureServiceBusControlServerDependencies<W>;
 
     // my_main!(Workflow0, Workflow1);
-    // my_main!(Workflow0);
+    // my_main!(Workflow1);
 
+    
+    #[cfg(feature = "control_server")]
+    {
+        use rust_workflow_2::workers::azure_adapter::{
+            dependencies::control_server::AzureServiceBusControlServerDependencies,
+            managers::AzureServiceBusWorkflowInstanceManager, senders::AzureServiceBusEventSender,
+        };
+
+        let (tx_state, tx_layer) = control_server_setup().await?;
+        let app_state = init_app_state::<
+            MyProject,
+            AzureServiceBusControlServerDependencies<MyProject>,
+        >(tx_state)
+        .await?;
+        let router = Workflow1::control_router::<
+            AzureServiceBusEventSender<MyProject>,
+            AzureServiceBusWorkflowInstanceManager<MyProject>,
+        >()
+        .await?
+        .with_state(app_state);
+
+        tokio::spawn(async move {
+            if let Err(e) = serve(router, tx_layer).await {
+                tracing::error!("Control server error: {}", e);
+            }
+        });
+    }
+    main_handler::<MyProject>(
+        "workflow_1".to_string(),
+        MyProjectWorkflow::Workflow1(Workflow1),
+    )
+    .await?;
     Ok(())
 }
 
