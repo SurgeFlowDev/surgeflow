@@ -20,7 +20,7 @@ use crate::{
             NextStepSender,
         },
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 
 pub mod control_server;
@@ -34,11 +34,11 @@ pub mod new_event_worker;
 pub mod new_instance_worker;
 pub mod next_step_worker;
 
-pub trait ActiveStepWorkerDependencyProvider<W: Workflow> {
-    type ActiveStepReceiver: ActiveStepReceiver<W>;
-    type ActiveStepSender: ActiveStepSender<W>;
-    type FailedStepSender: FailedStepSender<W>;
-    type CompletedStepSender: CompletedStepSender<W>;
+pub trait ActiveStepWorkerDependencyProvider<P: Project> {
+    type ActiveStepReceiver: ActiveStepReceiver<P>;
+    type ActiveStepSender: ActiveStepSender<P>;
+    type FailedStepSender: FailedStepSender<P>;
+    type CompletedStepSender: CompletedStepSender<P>;
     type PersistentStepManager: PersistentStepManager;
     type Error: Send + Sync + 'static;
 
@@ -47,7 +47,7 @@ pub trait ActiveStepWorkerDependencyProvider<W: Workflow> {
     ) -> impl std::future::Future<
         Output = Result<
             ActiveStepWorkerDependencies<
-                W,
+                P,
                 Self::ActiveStepReceiver,
                 Self::ActiveStepSender,
                 Self::FailedStepSender,
@@ -59,23 +59,23 @@ pub trait ActiveStepWorkerDependencyProvider<W: Workflow> {
     > + Send;
 }
 
-pub trait CompletedInstanceWorkerDependencyProvider<W: Workflow> {
-    type CompletedInstanceReceiver: CompletedInstanceReceiver<W>;
+pub trait CompletedInstanceWorkerDependencyProvider<P: Project> {
+    type CompletedInstanceReceiver: CompletedInstanceReceiver<P>;
     type Error: Send + Sync + 'static;
 
     fn completed_instance_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            CompletedInstanceWorkerDependencies<W, Self::CompletedInstanceReceiver>,
+            CompletedInstanceWorkerDependencies<P, Self::CompletedInstanceReceiver>,
             Self::Error,
         >,
     > + Send;
 }
 
-pub trait CompletedStepWorkerDependencyProvider<W: Workflow> {
-    type CompletedStepReceiver: CompletedStepReceiver<W>;
-    type NextStepSender: NextStepSender<W>;
+pub trait CompletedStepWorkerDependencyProvider<P: Project> {
+    type CompletedStepReceiver: CompletedStepReceiver<P>;
+    type NextStepSender: NextStepSender<P>;
     type PersistentStepManager: PersistentStepManager;
     type Error: Send + Sync + 'static;
 
@@ -84,7 +84,7 @@ pub trait CompletedStepWorkerDependencyProvider<W: Workflow> {
     ) -> impl std::future::Future<
         Output = Result<
             CompletedStepWorkerDependencies<
-                W,
+                P,
                 Self::CompletedStepReceiver,
                 Self::NextStepSender,
                 Self::PersistentStepManager,
@@ -94,23 +94,23 @@ pub trait CompletedStepWorkerDependencyProvider<W: Workflow> {
     > + Send;
 }
 
-pub trait FailedInstanceWorkerDependencyProvider<W: Workflow> {
-    type FailedInstanceReceiver: FailedInstanceReceiver<W>;
+pub trait FailedInstanceWorkerDependencyProvider<P: Project> {
+    type FailedInstanceReceiver: FailedInstanceReceiver<P>;
     type Error: Send + Sync + 'static;
 
     fn failed_instance_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            FailedInstanceWorkerDependencies<W, Self::FailedInstanceReceiver>,
+            FailedInstanceWorkerDependencies<P, Self::FailedInstanceReceiver>,
             Self::Error,
         >,
     > + Send;
 }
 
-pub trait FailedStepWorkerDependencyProvider<W: Workflow> {
-    type FailedStepReceiver: FailedStepReceiver<W>;
-    type FailedInstanceSender: FailedInstanceSender<W>;
+pub trait FailedStepWorkerDependencyProvider<P: Project> {
+    type FailedStepReceiver: FailedStepReceiver<P>;
+    type FailedInstanceSender: FailedInstanceSender<P>;
     type PersistentStepManager: PersistentStepManager;
     type Error: Send + Sync + 'static;
 
@@ -119,7 +119,7 @@ pub trait FailedStepWorkerDependencyProvider<W: Workflow> {
     ) -> impl std::future::Future<
         Output = Result<
             FailedStepWorkerDependencies<
-                W,
+                P,
                 Self::FailedStepReceiver,
                 Self::FailedInstanceSender,
                 Self::PersistentStepManager,
@@ -129,10 +129,10 @@ pub trait FailedStepWorkerDependencyProvider<W: Workflow> {
     > + Send;
 }
 
-pub trait NewEventWorkerDependencyProvider<W: Workflow> {
-    type ActiveStepSender: ActiveStepSender<W>;
-    type EventReceiver: EventReceiver<W>;
-    type StepsAwaitingEventManager: StepsAwaitingEventManager<W>;
+pub trait NewEventWorkerDependencyProvider<P: Project> {
+    type ActiveStepSender: ActiveStepSender<P>;
+    type EventReceiver: EventReceiver<P>;
+    type StepsAwaitingEventManager: StepsAwaitingEventManager<P>;
     type Error: Send + Sync + 'static;
 
     fn new_event_worker_dependencies(
@@ -140,7 +140,7 @@ pub trait NewEventWorkerDependencyProvider<W: Workflow> {
     ) -> impl std::future::Future<
         Output = Result<
             NewEventWorkerDependencies<
-                W,
+                P,
                 Self::ActiveStepSender,
                 Self::EventReceiver,
                 Self::StepsAwaitingEventManager,
@@ -150,25 +150,25 @@ pub trait NewEventWorkerDependencyProvider<W: Workflow> {
     > + Send;
 }
 
-pub trait NewInstanceWorkerDependencyProvider<W: Workflow> {
-    type NextStepSender: NextStepSender<W>;
-    type NewInstanceReceiver: NewInstanceReceiver<W>;
+pub trait NewInstanceWorkerDependencyProvider<P: Project> {
+    type NextStepSender: NextStepSender<P>;
+    type NewInstanceReceiver: NewInstanceReceiver<P>;
     type Error: Send + Sync + 'static;
 
     fn new_instance_worker_dependencies(
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            NewInstanceWorkerDependencies<W, Self::NextStepSender, Self::NewInstanceReceiver>,
+            NewInstanceWorkerDependencies<P, Self::NextStepSender, Self::NewInstanceReceiver>,
             Self::Error,
         >,
     > + Send;
 }
 
-pub trait NextStepWorkerDependencyProvider<W: Workflow> {
-    type NextStepReceiver: NextStepReceiver<W>;
-    type ActiveStepSender: ActiveStepSender<W>;
-    type StepsAwaitingEventManager: StepsAwaitingEventManager<W>;
+pub trait NextStepWorkerDependencyProvider<P: Project> {
+    type NextStepReceiver: NextStepReceiver<P>;
+    type ActiveStepSender: ActiveStepSender<P>;
+    type StepsAwaitingEventManager: StepsAwaitingEventManager<P>;
     type PersistentStepManager: PersistentStepManager;
     type Error: Send + Sync + 'static;
 
@@ -177,7 +177,7 @@ pub trait NextStepWorkerDependencyProvider<W: Workflow> {
     ) -> impl std::future::Future<
         Output = Result<
             NextStepWorkerDependencies<
-                W,
+                P,
                 Self::NextStepReceiver,
                 Self::ActiveStepSender,
                 Self::StepsAwaitingEventManager,
@@ -188,16 +188,16 @@ pub trait NextStepWorkerDependencyProvider<W: Workflow> {
     > + Send;
 }
 
-pub trait DependencyManager<W: Workflow>:
+pub trait DependencyManager<P: Project>:
     Sized
-    + ActiveStepWorkerDependencyProvider<W>
-    + CompletedInstanceWorkerDependencyProvider<W>
-    + CompletedStepWorkerDependencyProvider<W>
-    + FailedInstanceWorkerDependencyProvider<W>
-    + FailedStepWorkerDependencyProvider<W>
-    + NewEventWorkerDependencyProvider<W>
-    + NewInstanceWorkerDependencyProvider<W>
-    + NextStepWorkerDependencyProvider<W>
+    + ActiveStepWorkerDependencyProvider<P>
+    + CompletedInstanceWorkerDependencyProvider<P>
+    + CompletedStepWorkerDependencyProvider<P>
+    + FailedInstanceWorkerDependencyProvider<P>
+    + FailedStepWorkerDependencyProvider<P>
+    + NewEventWorkerDependencyProvider<P>
+    + NewInstanceWorkerDependencyProvider<P>
+    + NextStepWorkerDependencyProvider<P>
 {
     type Error: Send + Sync + 'static;
 }

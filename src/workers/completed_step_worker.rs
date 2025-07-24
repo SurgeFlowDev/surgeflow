@@ -5,21 +5,21 @@ use crate::{
         dependencies::completed_step_worker::CompletedStepWorkerDependencies,
         receivers::CompletedStepReceiver, senders::NextStepSender,
     },
-    workflows::{StepId, Workflow},
+    workflows::{StepId, Project},
 };
 use derive_more::Debug;
 
-pub async fn main<W: Workflow, CompletedStepReceiverT, NextStepSenderT, PersistentStepManagerT>(
+pub async fn main<P: Project, CompletedStepReceiverT, NextStepSenderT, PersistentStepManagerT>(
     dependencies: CompletedStepWorkerDependencies<
-        W,
+        P,
         CompletedStepReceiverT,
         NextStepSenderT,
         PersistentStepManagerT,
     >,
 ) -> anyhow::Result<()>
 where
-    CompletedStepReceiverT: CompletedStepReceiver<W>,
-    NextStepSenderT: NextStepSender<W>,
+    CompletedStepReceiverT: CompletedStepReceiver<P>,
+    NextStepSenderT: NextStepSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     let mut completed_step_receiver = dependencies.completed_step_receiver;
@@ -40,7 +40,7 @@ where
 }
 
 async fn receive_and_process<
-    W: Workflow,
+    P: Project,
     CompletedStepReceiverT,
     NextStepSenderT,
     PersistentStepManagerT,
@@ -50,8 +50,8 @@ async fn receive_and_process<
     persistent_step_manager: &mut PersistentStepManagerT,
 ) -> anyhow::Result<()>
 where
-    CompletedStepReceiverT: CompletedStepReceiver<W>,
-    NextStepSenderT: NextStepSender<W>,
+    CompletedStepReceiverT: CompletedStepReceiver<P>,
+    NextStepSenderT: NextStepSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     let (step, handle) = completed_step_receiver.receive().await?;
@@ -66,21 +66,21 @@ where
 }
 
 #[derive(thiserror::Error, Debug)]
-enum CompletedStepWorkerError<W: Workflow, NextStepSenderT: NextStepSender<W>> {
+enum CompletedStepWorkerError<P: Project, NextStepSenderT: NextStepSender<P>> {
     #[error("Database error occurred")]
     DatabaseError(#[from] sqlx::Error),
     #[error("Failed to send next step")]
-    SendNextStepError(#[source] <NextStepSenderT as NextStepSender<W>>::Error),
+    SendNextStepError(#[source] <NextStepSenderT as NextStepSender<P>>::Error),
 }
 
-async fn process<W, NextStepSenderT, PersistentStepManagerT>(
+async fn process<P, NextStepSenderT, PersistentStepManagerT>(
     next_step_sender: &mut NextStepSenderT,
     persistent_step_manager: &mut PersistentStepManagerT,
-    step: FullyQualifiedStep<W>,
-) -> Result<(), CompletedStepWorkerError<W, NextStepSenderT>>
+    step: FullyQualifiedStep<P>,
+) -> Result<(), CompletedStepWorkerError<P, NextStepSenderT>>
 where
-    W: Workflow,
-    NextStepSenderT: NextStepSender<W>,
+    P: Project,
+    NextStepSenderT: NextStepSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     tracing::info!(
@@ -107,7 +107,7 @@ where
 
     if let Some(next_step) = next_step {
         persistent_step_manager
-            .insert_step_output::<W>(step.step_id, Some(&next_step.step))
+            .insert_step_output::<P>(step.step_id, Some(&next_step.step))
             .await
             .expect("TODO: handle error");
 
@@ -128,7 +128,7 @@ where
         tracing::info!("Instance {} completed", step.instance.external_id);
 
         persistent_step_manager
-            .insert_step_output::<W>(step.step_id, None)
+            .insert_step_output::<P>(step.step_id, None)
             .await
             .expect("TODO: handle error");
     }

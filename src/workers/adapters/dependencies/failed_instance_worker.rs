@@ -1,20 +1,20 @@
 use std::marker::PhantomData;
 
-use crate::{workers::adapters::receivers::FailedInstanceReceiver, workflows::Workflow};
+use crate::{workers::adapters::receivers::FailedInstanceReceiver, workflows::Project};
 
-pub struct FailedInstanceWorkerDependencies<W, FailedInstanceReceiverT>
+pub struct FailedInstanceWorkerDependencies<P, FailedInstanceReceiverT>
 where
-    W: Workflow,
-    FailedInstanceReceiverT: FailedInstanceReceiver<W>,
+    P: Project,
+    FailedInstanceReceiverT: FailedInstanceReceiver<P>,
 {
     pub failed_instance_receiver: FailedInstanceReceiverT,
-    marker: PhantomData<W>,
+    marker: PhantomData<P>,
 }
 
-impl<W, FailedInstanceReceiverT> FailedInstanceWorkerDependencies<W, FailedInstanceReceiverT>
+impl<P, FailedInstanceReceiverT> FailedInstanceWorkerDependencies<P, FailedInstanceReceiverT>
 where
-    W: Workflow,
-    FailedInstanceReceiverT: FailedInstanceReceiver<W>,
+    P: Project,
+    FailedInstanceReceiverT: FailedInstanceReceiver<P>,
 {
     pub fn new(failed_instance_receiver: FailedInstanceReceiverT) -> Self {
         Self {

@@ -2,26 +2,26 @@ use std::marker::PhantomData;
 
 use crate::{
     workers::adapters::{receivers::NewInstanceReceiver, senders::NextStepSender},
-    workflows::Workflow,
+    workflows::Project,
 };
 
-pub struct NewInstanceWorkerDependencies<W, NextStepSenderT, NewInstanceReceiverT>
+pub struct NewInstanceWorkerDependencies<P, NextStepSenderT, NewInstanceReceiverT>
 where
-    W: Workflow,
-    NextStepSenderT: NextStepSender<W>,
-    NewInstanceReceiverT: NewInstanceReceiver<W>,
+    P: Project,
+    NextStepSenderT: NextStepSender<P>,
+    NewInstanceReceiverT: NewInstanceReceiver<P>,
 {
     pub next_step_sender: NextStepSenderT,
     pub new_instance_receiver: NewInstanceReceiverT,
-    marker: PhantomData<W>,
+    marker: PhantomData<P>,
 }
 
-impl<W, NextStepSenderT, NewInstanceReceiverT>
-    NewInstanceWorkerDependencies<W, NextStepSenderT, NewInstanceReceiverT>
+impl<P, NextStepSenderT, NewInstanceReceiverT>
+    NewInstanceWorkerDependencies<P, NextStepSenderT, NewInstanceReceiverT>
 where
-    W: Workflow,
-    NextStepSenderT: NextStepSender<W>,
-    NewInstanceReceiverT: NewInstanceReceiver<W>,
+    P: Project,
+    NextStepSenderT: NextStepSender<P>,
+    NewInstanceReceiverT: NewInstanceReceiver<P>,
 {
     pub fn new(
         next_step_sender: NextStepSenderT,

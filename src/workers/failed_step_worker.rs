@@ -5,22 +5,22 @@ use crate::{
         managers::PersistentStepManager, receivers::FailedStepReceiver,
         senders::FailedInstanceSender,
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 use derive_more::Debug;
 
-pub async fn main<W, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>(
+pub async fn main<P, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>(
     dependencies: FailedStepWorkerDependencies<
-        W,
+        P,
         FailedStepReceiverT,
         FailedInstanceSenderT,
         PersistentStepManagerT,
     >,
 ) -> anyhow::Result<()>
 where
-    W: Workflow,
-    FailedStepReceiverT: FailedStepReceiver<W>,
-    FailedInstanceSenderT: FailedInstanceSender<W>,
+    P: Project,
+    FailedStepReceiverT: FailedStepReceiver<P>,
+    FailedInstanceSenderT: FailedInstanceSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     let mut failed_step_receiver = dependencies.failed_step_receiver;
@@ -29,7 +29,7 @@ where
 
     loop {
         if let Err(err) = receive_and_process::<
-            W,
+            P,
             FailedStepReceiverT,
             FailedInstanceSenderT,
             PersistentStepManagerT,
@@ -46,7 +46,7 @@ where
 }
 
 async fn receive_and_process<
-    W,
+    P,
     FailedStepReceiverT,
     FailedInstanceSenderT,
     PersistentStepManagerT,
@@ -56,14 +56,14 @@ async fn receive_and_process<
     persistent_step_manager: &mut PersistentStepManagerT,
 ) -> anyhow::Result<()>
 where
-    W: Workflow,
-    FailedStepReceiverT: FailedStepReceiver<W>,
-    FailedInstanceSenderT: FailedInstanceSender<W>,
+    P: Project,
+    FailedStepReceiverT: FailedStepReceiver<P>,
+    FailedInstanceSenderT: FailedInstanceSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     let (step, handle) = failed_step_receiver.receive().await?;
 
-    if let Err(err) = process::<W, FailedInstanceSenderT, PersistentStepManagerT>(
+    if let Err(err) = process::<P, FailedInstanceSenderT, PersistentStepManagerT>(
         failed_instance_sender,
         persistent_step_manager,
         step,
@@ -79,26 +79,26 @@ where
 }
 
 #[derive(thiserror::Error, Debug)]
-enum FailedStepWorkerError<W, FailedInstanceSenderT, PersistentStepManagerT>
+enum FailedStepWorkerError<P, FailedInstanceSenderT, PersistentStepManagerT>
 where
-    W: Workflow,
-    FailedInstanceSenderT: FailedInstanceSender<W>,
+    P: Project,
+    FailedInstanceSenderT: FailedInstanceSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     #[error("Database error occurred")]
     PersistentStepManagerError(#[source] <PersistentStepManagerT as PersistentStepManager>::Error),
     #[error("Failed to send instance: {0}")]
-    SendError(#[source] <FailedInstanceSenderT as FailedInstanceSender<W>>::Error),
+    SendError(#[source] <FailedInstanceSenderT as FailedInstanceSender<P>>::Error),
 }
 
-async fn process<W, FailedInstanceSenderT, PersistentStepManagerT>(
+async fn process<P, FailedInstanceSenderT, PersistentStepManagerT>(
     failed_instance_sender: &mut FailedInstanceSenderT,
     persistent_step_manager: &mut PersistentStepManagerT,
-    step: FullyQualifiedStep<W>,
-) -> Result<(), FailedStepWorkerError<W, FailedInstanceSenderT, PersistentStepManagerT>>
+    step: FullyQualifiedStep<P>,
+) -> Result<(), FailedStepWorkerError<P, FailedInstanceSenderT, PersistentStepManagerT>>
 where
-    W: Workflow,
-    FailedInstanceSenderT: FailedInstanceSender<W>,
+    P: Project,
+    FailedInstanceSenderT: FailedInstanceSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     tracing::info!(

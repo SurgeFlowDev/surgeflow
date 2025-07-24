@@ -1,21 +1,21 @@
 use std::marker::PhantomData;
 
-use crate::{workers::adapters::receivers::CompletedInstanceReceiver, workflows::Workflow};
+use crate::{workers::adapters::receivers::CompletedInstanceReceiver, workflows::Project};
 
-pub struct CompletedInstanceWorkerDependencies<W, CompletedInstanceReceiverT>
+pub struct CompletedInstanceWorkerDependencies<P, CompletedInstanceReceiverT>
 where
-    W: Workflow,
-    CompletedInstanceReceiverT: CompletedInstanceReceiver<W>,
+    P: Project,
+    CompletedInstanceReceiverT: CompletedInstanceReceiver<P>,
 {
     pub completed_instance_receiver: CompletedInstanceReceiverT,
-    marker: PhantomData<W>,
+    marker: PhantomData<P>,
 }
 
-impl<W, CompletedInstanceReceiverT>
-    CompletedInstanceWorkerDependencies<W, CompletedInstanceReceiverT>
+impl<P, CompletedInstanceReceiverT>
+    CompletedInstanceWorkerDependencies<P, CompletedInstanceReceiverT>
 where
-    W: Workflow,
-    CompletedInstanceReceiverT: CompletedInstanceReceiver<W>,
+    P: Project,
+    CompletedInstanceReceiverT: CompletedInstanceReceiver<P>,
 {
     pub fn new(completed_instance_receiver: CompletedInstanceReceiverT) -> Self {
         Self {

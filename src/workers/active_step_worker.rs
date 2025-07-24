@@ -1,33 +1,34 @@
+use crate::workflows::ProjectStep;
 use crate::{
-    step::{FullyQualifiedStep, WorkflowStep},
+    step::FullyQualifiedStep,
     workers::adapters::{
         dependencies::active_step_worker::ActiveStepWorkerDependencies,
         managers::PersistentStepManager,
         receivers::ActiveStepReceiver,
         senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 
 async fn process<
-    W,
+    P,
     ActiveStepSenderT,
     FailedStepSenderT,
     CompletedStepSenderT,
     PersistentStepManagerT,
 >(
-    wf: W,
+    wf: P::Workflow,
     active_step_sender: &mut ActiveStepSenderT,
     failed_step_sender: &mut FailedStepSenderT,
     completed_step_sender: &mut CompletedStepSenderT,
     persistent_step_manager: &mut PersistentStepManagerT,
-    mut step: FullyQualifiedStep<W>,
+    mut step: FullyQualifiedStep<P>,
 ) -> anyhow::Result<()>
 where
-    W: Workflow,
-    ActiveStepSenderT: ActiveStepSender<W>,
-    FailedStepSenderT: FailedStepSender<W>,
-    CompletedStepSenderT: CompletedStepSender<W>,
+    P: Project,
+    ActiveStepSenderT: ActiveStepSender<P>,
+    FailedStepSenderT: FailedStepSender<P>,
+    CompletedStepSenderT: CompletedStepSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     tracing::info!("Received new step");
@@ -43,7 +44,7 @@ where
             .send(FullyQualifiedStep { next_step, ..step })
             .await?;
     } else {
-        tracing::info!("Failed to run step: {:?}", step.step);
+        // tracing::info!("Failed to run step: {:?}", step.step);
 
         if step.retry_count <= step.step.settings.max_retries {
             tracing::info!("Retrying step. Retry count: {}", step.retry_count);
@@ -58,7 +59,7 @@ where
 }
 
 pub async fn main<
-    W,
+    P,
     ActiveStepReceiverT,
     ActiveStepSenderT,
     FailedStepSenderT,
@@ -66,24 +67,24 @@ pub async fn main<
     PersistentStepManagerT,
 >(
     dependencies: ActiveStepWorkerDependencies<
-        W,
+        P,
         ActiveStepReceiverT,
         ActiveStepSenderT,
         FailedStepSenderT,
         CompletedStepSenderT,
         PersistentStepManagerT,
     >,
-    wf: W,
+    wf: P::Workflow,
 ) -> anyhow::Result<()>
 where
-    W: Workflow,
-    ActiveStepReceiverT: ActiveStepReceiver<W>,
-    ActiveStepSenderT: ActiveStepSender<W>,
-    FailedStepSenderT: FailedStepSender<W>,
-    CompletedStepSenderT: CompletedStepSender<W>,
+    P: Project,
+    ActiveStepReceiverT: ActiveStepReceiver<P>,
+    ActiveStepSenderT: ActiveStepSender<P>,
+    FailedStepSenderT: FailedStepSender<P>,
+    CompletedStepSenderT: CompletedStepSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
-    tracing::info!("Active Step Worker started for workflow: {}", W::NAME);
+    // tracing::info!("Active Step Worker started for project: {}", P::NAME);
 
     let mut active_step_receiver = dependencies.active_step_receiver;
     let mut active_step_sender = dependencies.active_step_sender;
@@ -98,7 +99,7 @@ where
         };
 
         if let Err(err) = process::<
-            W,
+            P,
             ActiveStepSenderT,
             FailedStepSenderT,
             CompletedStepSenderT,

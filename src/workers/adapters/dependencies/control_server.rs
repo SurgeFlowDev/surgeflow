@@ -1,16 +1,16 @@
 use crate::{
     workers::adapters::{managers::WorkflowInstanceManager, senders::EventSender},
-    workflows::Workflow,
+    workflows::Project,
 };
 
-pub struct ControlServerDependencies<W: Workflow, C: ControlServerContext<W>> {
+pub struct ControlServerDependencies<P: Project, C: ControlServerContext<P>> {
     pub event_sender: C::EventSender,
     pub instance_manager: C::InstanceManager,
     #[expect(dead_code)]
     context: C,
 }
 
-impl<W: Workflow, C: ControlServerContext<W>> ControlServerDependencies<W, C> {
+impl<P: Project, C: ControlServerContext<P>> ControlServerDependencies<P, C> {
     pub fn new(
         event_sender: C::EventSender,
         instance_manager: C::InstanceManager,
@@ -24,10 +24,10 @@ impl<W: Workflow, C: ControlServerContext<W>> ControlServerDependencies<W, C> {
     }
 }
 
-pub trait ControlServerContext<W: Workflow>: Sized {
-    type EventSender: EventSender<W>;
+pub trait ControlServerContext<P: Project>: Sized {
+    type EventSender: EventSender<P>;
     //
-    type InstanceManager: WorkflowInstanceManager<W>;
+    type InstanceManager: WorkflowInstanceManager<P>;
     fn dependencies()
-    -> impl Future<Output = anyhow::Result<ControlServerDependencies<W, Self>>> + Send;
+    -> impl Future<Output = anyhow::Result<ControlServerDependencies<P, Self>>> + Send;
 }

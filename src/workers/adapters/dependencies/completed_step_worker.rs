@@ -4,36 +4,36 @@ use crate::{
     workers::adapters::{
         managers::PersistentStepManager, receivers::CompletedStepReceiver, senders::NextStepSender,
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 
 pub struct CompletedStepWorkerDependencies<
-    W,
+    P,
     CompletedStepReceiverT,
     NextStepSenderT,
     PersistentStepManagerT,
 > where
-    W: Workflow,
-    CompletedStepReceiverT: CompletedStepReceiver<W>,
-    NextStepSenderT: NextStepSender<W>,
+    P: Project,
+    CompletedStepReceiverT: CompletedStepReceiver<P>,
+    NextStepSenderT: NextStepSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     pub completed_step_receiver: CompletedStepReceiverT,
     pub next_step_sender: NextStepSenderT,
     pub persistent_step_manager: PersistentStepManagerT,
-    marker: PhantomData<W>,
+    marker: PhantomData<P>,
 }
 
-impl<W: Workflow, CompletedStepReceiverT, NextStepSenderT, PersistentStepManagerT>
+impl<P: Project, CompletedStepReceiverT, NextStepSenderT, PersistentStepManagerT>
     CompletedStepWorkerDependencies<
-        W,
+        P,
         CompletedStepReceiverT,
         NextStepSenderT,
         PersistentStepManagerT,
     >
 where
-    CompletedStepReceiverT: CompletedStepReceiver<W>,
-    NextStepSenderT: NextStepSender<W>,
+    CompletedStepReceiverT: CompletedStepReceiver<P>,
+    NextStepSenderT: NextStepSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     pub fn new(

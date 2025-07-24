@@ -2,54 +2,54 @@ use std::error::Error;
 
 use crate::{
     event::InstanceEvent, step::FullyQualifiedStep, workers::adapters::managers::WorkflowInstance,
-    workflows::Workflow,
+    workflows::Project,
 };
 
 // Steps
 
-pub trait NextStepSender<W: Workflow>: Sized {
+pub trait NextStepSender<P: Project>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
-        step: FullyQualifiedStep<W>,
+        step: FullyQualifiedStep<P>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait ActiveStepSender<W: Workflow>: Sized {
+pub trait ActiveStepSender<P: Project>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
-        step: FullyQualifiedStep<W>,
+        step: FullyQualifiedStep<P>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait FailedStepSender<W: Workflow>: Sized {
+pub trait FailedStepSender<P: Project>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
-        step: FullyQualifiedStep<W>,
+        step: FullyQualifiedStep<P>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait CompletedStepSender<W: Workflow>: Sized {
+pub trait CompletedStepSender<P: Project>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
-        step: FullyQualifiedStep<W>,
+        step: FullyQualifiedStep<P>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 // Events
 
-pub trait EventSender<W: Workflow>: Sized {
+pub trait EventSender<P: Project>: Sized {
     type Error: Error + Send + Sync + 'static;
-    fn send(&self, event: InstanceEvent<W>)
+    fn send(&self, event: InstanceEvent<P>)
     -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 // Instances
 
-pub trait NewInstanceSender<W: Workflow>: Sized {
+pub trait NewInstanceSender<P: Project>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,
@@ -57,7 +57,7 @@ pub trait NewInstanceSender<W: Workflow>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait CompletedInstanceSender<W: Workflow>: Sized {
+pub trait CompletedInstanceSender<P: Project>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,
@@ -65,7 +65,7 @@ pub trait CompletedInstanceSender<W: Workflow>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait FailedInstanceSender<W: Workflow>: Sized {
+pub trait FailedInstanceSender<P: Project>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,

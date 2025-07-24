@@ -6,47 +6,47 @@ use crate::{
         receivers::NextStepReceiver,
         senders::ActiveStepSender,
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 
 pub struct NextStepWorkerDependencies<
-    W,
+    P,
     NextStepReceiverT,
     ActiveStepSenderT,
     StepsAwaitingEventManagerT,
     PersistentStepManagerT,
 > where
-    W: Workflow,
-    NextStepReceiverT: NextStepReceiver<W>,
-    ActiveStepSenderT: ActiveStepSender<W>,
-    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+    P: Project,
+    NextStepReceiverT: NextStepReceiver<P>,
+    ActiveStepSenderT: ActiveStepSender<P>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     pub next_step_receiver: NextStepReceiverT,
     pub active_step_sender: ActiveStepSenderT,
     pub steps_awaiting_event_manager: StepsAwaitingEventManagerT,
     pub persistent_step_manager: PersistentStepManagerT,
-    marker: PhantomData<W>,
+    marker: PhantomData<P>,
 }
 
 impl<
-    W: Workflow,
+    P: Project,
     NextStepReceiverT,
     ActiveStepSenderT,
     StepsAwaitingEventManagerT,
     PersistentStepManagerT,
 >
     NextStepWorkerDependencies<
-        W,
+        P,
         NextStepReceiverT,
         ActiveStepSenderT,
         StepsAwaitingEventManagerT,
         PersistentStepManagerT,
     >
 where
-    NextStepReceiverT: NextStepReceiver<W>,
-    ActiveStepSenderT: ActiveStepSender<W>,
-    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+    NextStepReceiverT: NextStepReceiver<P>,
+    ActiveStepSenderT: ActiveStepSender<P>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     pub fn new(

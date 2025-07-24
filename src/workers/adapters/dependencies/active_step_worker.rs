@@ -6,22 +6,22 @@ use crate::{
         receivers::ActiveStepReceiver,
         senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 
 pub struct ActiveStepWorkerDependencies<
-    W,
+    P,
     ActiveStepReceiverT,
     ActiveStepSenderT,
     FailedStepSenderT,
     CompletedStepSenderT,
     PersistentStepManagerT,
 > where
-    W: Workflow,
-    ActiveStepReceiverT: ActiveStepReceiver<W>,
-    ActiveStepSenderT: ActiveStepSender<W>,
-    FailedStepSenderT: FailedStepSender<W>,
-    CompletedStepSenderT: CompletedStepSender<W>,
+    P: Project,
+    ActiveStepReceiverT: ActiveStepReceiver<P>,
+    ActiveStepSenderT: ActiveStepSender<P>,
+    FailedStepSenderT: FailedStepSender<P>,
+    CompletedStepSenderT: CompletedStepSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     pub active_step_receiver: ActiveStepReceiverT,
@@ -29,11 +29,11 @@ pub struct ActiveStepWorkerDependencies<
     pub failed_step_sender: FailedStepSenderT,
     pub completed_step_sender: CompletedStepSenderT,
     pub persistent_step_manager: PersistentStepManagerT,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
 impl<
-    W,
+    P,
     ActiveStepReceiverT,
     ActiveStepSenderT,
     FailedStepSenderT,
@@ -41,7 +41,7 @@ impl<
     PersistentStepManagerT,
 >
     ActiveStepWorkerDependencies<
-        W,
+        P,
         ActiveStepReceiverT,
         ActiveStepSenderT,
         FailedStepSenderT,
@@ -49,11 +49,11 @@ impl<
         PersistentStepManagerT,
     >
 where
-    W: Workflow,
-    ActiveStepReceiverT: ActiveStepReceiver<W>,
-    ActiveStepSenderT: ActiveStepSender<W>,
-    FailedStepSenderT: FailedStepSender<W>,
-    CompletedStepSenderT: CompletedStepSender<W>,
+    P: Project,
+    ActiveStepReceiverT: ActiveStepReceiver<P>,
+    ActiveStepSenderT: ActiveStepSender<P>,
+    FailedStepSenderT: FailedStepSender<P>,
+    CompletedStepSenderT: CompletedStepSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     pub fn new(

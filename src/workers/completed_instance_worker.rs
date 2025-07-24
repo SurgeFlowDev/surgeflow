@@ -3,7 +3,7 @@ use crate::{
         dependencies::completed_instance_worker::CompletedInstanceWorkerDependencies,
         managers::WorkflowInstance, receivers::CompletedInstanceReceiver,
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 
 async fn process(instance: WorkflowInstance) -> anyhow::Result<()> {
@@ -12,8 +12,8 @@ async fn process(instance: WorkflowInstance) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn main<W: Workflow, CompletedInstanceReceiverT: CompletedInstanceReceiver<W>>(
-    dependencies: CompletedInstanceWorkerDependencies<W, CompletedInstanceReceiverT>,
+pub async fn main<P: Project, CompletedInstanceReceiverT: CompletedInstanceReceiver<P>>(
+    dependencies: CompletedInstanceWorkerDependencies<P, CompletedInstanceReceiverT>,
 ) -> anyhow::Result<()> {
     let mut completed_instance_receiver = dependencies.completed_instance_receiver;
 

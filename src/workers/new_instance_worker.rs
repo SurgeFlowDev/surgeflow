@@ -1,24 +1,25 @@
+use crate::workflows::ProjectWorkflow;
 use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
         dependencies::new_instance_worker::NewInstanceWorkerDependencies,
         managers::WorkflowInstance, receivers::NewInstanceReceiver, senders::NextStepSender,
     },
-    workflows::{StepId, Workflow},
+    workflows::{StepId, Project},
 };
 
-async fn process<W, NextStepSenderT>(
+async fn process<P, NextStepSenderT>(
     next_step_sender: &mut NextStepSenderT,
 
     instance: WorkflowInstance,
 ) -> anyhow::Result<()>
 where
-    W: Workflow,
-    NextStepSenderT: NextStepSender<W>,
+    P: Project,
+    NextStepSenderT: NextStepSender<P>,
 {
     let entrypoint = FullyQualifiedStep {
         instance,
-        step: W::entrypoint(),
+        step: P::Workflow::entrypoint(),
         retry_count: 0,
         step_id: StepId::new(),
         event: None,
@@ -31,13 +32,13 @@ where
     Ok(())
 }
 
-pub async fn main<W, NextStepSenderT, NewInstanceReceiverT>(
-    dependencies: NewInstanceWorkerDependencies<W, NextStepSenderT, NewInstanceReceiverT>,
+pub async fn main<P, NextStepSenderT, NewInstanceReceiverT>(
+    dependencies: NewInstanceWorkerDependencies<P, NextStepSenderT, NewInstanceReceiverT>,
 ) -> anyhow::Result<()>
 where
-    W: Workflow,
-    NextStepSenderT: NextStepSender<W>,
-    NewInstanceReceiverT: NewInstanceReceiver<W>,
+    P: Project,
+    NextStepSenderT: NextStepSender<P>,
+    NewInstanceReceiverT: NewInstanceReceiver<P>,
 {
     let mut instance_receiver = dependencies.new_instance_receiver;
     let mut next_step_sender = dependencies.next_step_sender;

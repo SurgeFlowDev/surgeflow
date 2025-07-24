@@ -2,15 +2,15 @@ use std::error::Error;
 
 use crate::{
     step::FullyQualifiedStep,
-    workflows::{Workflow, WorkflowInstanceId},
+    workflows::{Project, WorkflowInstanceId},
 };
 
-pub trait StepsAwaitingEventManager<W: Workflow>: Sized {
+pub trait StepsAwaitingEventManager<P: Project>: Sized {
     type Error: Error + Send + Sync + 'static;
     fn get_step(
         &mut self,
         instance_id: WorkflowInstanceId,
-    ) -> impl Future<Output = Result<Option<FullyQualifiedStep<W>>, Self::Error>> + Send;
+    ) -> impl Future<Output = Result<Option<FullyQualifiedStep<P>>, Self::Error>> + Send;
     fn delete_step(
         &mut self,
         instance_id: WorkflowInstanceId,
@@ -18,14 +18,14 @@ pub trait StepsAwaitingEventManager<W: Workflow>: Sized {
 
     fn put_step(
         &mut self,
-        step: FullyQualifiedStep<W>,
+        step: FullyQualifiedStep<P>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 mod persistent_step_manager {
     use std::fmt::{Debug, Display};
 
-    use crate::workflows::{StepId, Workflow, WorkflowInstanceId};
+    use crate::workflows::{StepId, Project, WorkflowInstanceId};
 
     pub trait PersistentStepManager {
         type Error: Send + Sync + 'static + Debug + Display;
@@ -35,17 +35,17 @@ mod persistent_step_manager {
             status: i32,
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
-        fn insert_step<W: Workflow>(
+        fn insert_step<P: Project>(
             &self,
             workflow_instance_id: WorkflowInstanceId,
             step_id: StepId,
-            step: &W::Step,
+            step: &P::Step,
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
-        fn insert_step_output<W: Workflow>(
+        fn insert_step_output<P: Project>(
             &self,
             step_id: StepId,
-            output: Option<&W::Step>,
+            output: Option<&P::Step>,
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
     }
 }
@@ -59,7 +59,7 @@ mod workflow_instance_manager {
     use serde::{Deserialize, Serialize};
     use sqlx::PgConnection;
 
-    use crate::workflows::{Workflow, WorkflowId, WorkflowInstanceId};
+    use crate::workflows::{Project, WorkflowId, WorkflowInstanceId};
 
     #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
     pub struct WorkflowInstance {
@@ -67,7 +67,7 @@ mod workflow_instance_manager {
         pub workflow_id: WorkflowId,
     }
 
-    pub trait WorkflowInstanceManager<W: Workflow> {
+    pub trait WorkflowInstanceManager<P: Project> {
         type Error: Error + Send + Sync + 'static;
         fn create_instance(
             &self,

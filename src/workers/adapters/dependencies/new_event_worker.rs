@@ -4,33 +4,33 @@ use crate::{
     workers::adapters::{
         managers::StepsAwaitingEventManager, receivers::EventReceiver, senders::ActiveStepSender,
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 
 pub struct NewEventWorkerDependencies<
-    W,
+    P,
     ActiveStepSenderT,
     EventReceiverT,
     StepsAwaitingEventManagerT,
 > where
-    W: Workflow,
-    ActiveStepSenderT: ActiveStepSender<W>,
-    EventReceiverT: EventReceiver<W>,
-    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+    P: Project,
+    ActiveStepSenderT: ActiveStepSender<P>,
+    EventReceiverT: EventReceiver<P>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
 {
     pub active_step_sender: ActiveStepSenderT,
     pub event_receiver: EventReceiverT,
     pub steps_awaiting_event_manager: StepsAwaitingEventManagerT,
-    marker: PhantomData<W>,
+    marker: PhantomData<P>,
 }
 
-impl<W, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>
-    NewEventWorkerDependencies<W, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>
+impl<P, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>
+    NewEventWorkerDependencies<P, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>
 where
-    W: Workflow,
-    ActiveStepSenderT: ActiveStepSender<W>,
-    EventReceiverT: EventReceiver<W>,
-    StepsAwaitingEventManagerT: StepsAwaitingEventManager<W>,
+    P: Project,
+    ActiveStepSenderT: ActiveStepSender<P>,
+    EventReceiverT: EventReceiver<P>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
 {
     pub fn new(
         active_step_sender: ActiveStepSenderT,

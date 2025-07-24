@@ -5,37 +5,37 @@ use crate::{
         managers::PersistentStepManager, receivers::FailedStepReceiver,
         senders::FailedInstanceSender,
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 
 pub struct FailedStepWorkerDependencies<
-    W,
+    P,
     FailedStepReceiverT,
     FailedInstanceSenderT,
     PersistentStepManagerT,
 > where
-    W: Workflow,
-    FailedStepReceiverT: FailedStepReceiver<W>,
-    FailedInstanceSenderT: FailedInstanceSender<W>,
+    P: Project,
+    FailedStepReceiverT: FailedStepReceiver<P>,
+    FailedInstanceSenderT: FailedInstanceSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     pub failed_step_receiver: FailedStepReceiverT,
     pub failed_instance_sender: FailedInstanceSenderT,
     pub persistent_step_manager: PersistentStepManagerT,
-    marker: PhantomData<W>,
+    marker: PhantomData<P>,
 }
 
-impl<W, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>
+impl<P, FailedStepReceiverT, FailedInstanceSenderT, PersistentStepManagerT>
     FailedStepWorkerDependencies<
-        W,
+        P,
         FailedStepReceiverT,
         FailedInstanceSenderT,
         PersistentStepManagerT,
     >
 where
-    W: Workflow,
-    FailedStepReceiverT: FailedStepReceiver<W>,
-    FailedInstanceSenderT: FailedInstanceSender<W>,
+    P: Project,
+    FailedStepReceiverT: FailedStepReceiver<P>,
+    FailedInstanceSenderT: FailedInstanceSender<P>,
     PersistentStepManagerT: PersistentStepManager,
 {
     pub fn new(

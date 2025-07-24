@@ -1,9 +1,11 @@
 use crate::event::Event;
+use crate::step::{FullyQualifiedStep, StepError};
 use crate::workers::adapters::managers::WorkflowInstance;
+// use crate::workflows::workflow_0::Workflow0;
 use crate::{
     AppState, ArcAppState, WorkflowInstanceManager,
     event::InstanceEvent,
-    step::{StepWithSettings, WorkflowStep},
+    step::StepWithSettings,
     workers::adapters::{dependencies::control_server::ControlServerContext, senders::EventSender},
 };
 use aide::{NoApi, OperationIo, axum::ApiRouter};
@@ -21,16 +23,7 @@ use std::fmt::{self, Debug};
 use std::{marker::PhantomData, sync::Arc};
 use uuid::Uuid;
 
-pub mod workflow_0;
-
-pub trait WorkflowEvent:
-    Serialize + for<'de> Deserialize<'de> + Debug + Send + Clone
-    // JsonSchema should probably be implemented as an extension trait. JsonSchema doesn't matter for the 
-    // inner workings of the workflow, but it is useful for API documentation
-     + JsonSchema
-{
-    fn is_event<T: Event + 'static>(&self) -> bool;
-}
+// pub mod workflow_0;
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema,
@@ -82,48 +75,22 @@ impl Default for StepId {
     Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema, Display,
 )]
 pub struct WorkflowId(i32);
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema, Display,
-)]
-pub struct WorkflowName(String);
-
-impl AsRef<str> for WorkflowName {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-pub trait Workflow: Clone + Send + Sync + 'static {
-    type Event: WorkflowEvent;
-    type Step: WorkflowStep<Self>;
-    const NAME: &'static str;
-
-    fn entrypoint() -> StepWithSettings<Self>;
-}
-
-pub trait WorkflowExt: Workflow {
-    fn name() -> WorkflowName {
-        String::from(Self::NAME).into()
-    }
-}
-
-impl<T: Workflow> WorkflowExt for T {}
 
 pub type Tx = axum_sqlx_tx::Tx<sqlx::Postgres>;
 pub type TxState = axum_sqlx_tx::State<Postgres>;
 pub type TxLayer = axum_sqlx_tx::Layer<Postgres, axum_sqlx_tx::Error>;
 
-impl<W: Workflow, E: EventSender<W>, M: WorkflowInstanceManager<W>> FromRef<ArcAppState<W, E, M>>
+impl<P: Project, E: EventSender<P>, M: WorkflowInstanceManager<P>> FromRef<ArcAppState<P, E, M>>
     for TxState
 {
-    fn from_ref(input: &ArcAppState<W, E, M>) -> Self {
+    fn from_ref(input: &ArcAppState<P, E, M>) -> Self {
         input.0.sqlx_tx_state.clone()
     }
 }
 
-pub async fn init_app_state<W: Workflow, D: ControlServerContext<W>>(
+pub async fn init_app_state<P: Project, D: ControlServerContext<P>>(
     sqlx_tx_state: TxState,
-) -> anyhow::Result<ArcAppState<W, D::EventSender, D::InstanceManager>> {
+) -> anyhow::Result<ArcAppState<P, D::EventSender, D::InstanceManager>> {
     let dependencies = D::dependencies().await?;
     let event_sender = dependencies.event_sender;
     let workflow_instance_manager = dependencies.instance_manager;
@@ -138,9 +105,10 @@ pub async fn init_app_state<W: Workflow, D: ControlServerContext<W>>(
 
 pub trait WorkflowControl: Workflow {
     fn control_router<
-        E: EventSender<Self> + Send + Sync + 'static,
-        M: WorkflowInstanceManager<Self> + Send + Sync + 'static,
-    >() -> impl Future<Output = anyhow::Result<ApiRouter<ArcAppState<Self, E, M>>>> + Send {
+        E: EventSender<Self::Project> + Send + Sync + 'static,
+        M: WorkflowInstanceManager<Self::Project> + Send + Sync + 'static,
+    >() -> impl Future<Output = anyhow::Result<ApiRouter<ArcAppState<Self::Project, E, M>>>> + Send
+    {
         async {
             let post_workflow_event_api_route = Self::post_workflow_event_api_route::<E, M>();
             let post_workflow_instance_api_route = Self::post_workflow_instance_api_route::<E, M>();
@@ -156,9 +124,9 @@ pub trait WorkflowControl: Workflow {
     }
 
     fn post_workflow_event_api_route<
-        E: EventSender<Self> + Send + Sync + 'static,
-        M: WorkflowInstanceManager<Self> + Send + Sync + 'static,
-    >() -> ApiRouter<ArcAppState<Self, E, M>> {
+        E: EventSender<Self::Project> + Send + Sync + 'static,
+        M: WorkflowInstanceManager<Self::Project> + Send + Sync + 'static,
+    >() -> ApiRouter<ArcAppState<Self::Project, E, M>> {
         #[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
         #[typed_path("/{instance_id}/event")]
         pub struct PostWorkflowEvent {
@@ -182,20 +150,27 @@ pub trait WorkflowControl: Workflow {
         }
 
         // more readable than a closure
-        async fn handler<T: Workflow, E: EventSender<T>, M: WorkflowInstanceManager<T>>(
+        async fn handler<
+            T: Workflow,
+            E: EventSender<T::Project>,
+            M: WorkflowInstanceManager<T::Project>,
+        >(
             PostWorkflowEvent { instance_id }: PostWorkflowEvent,
-            State(ArcAppState(state)): State<ArcAppState<T, E, M>>,
-            Json(event): Json<<T as Workflow>::Event>,
+            State(ArcAppState(state)): State<ArcAppState<T::Project, E, M>>,
+            Json(event): Json<T::Event>,
         ) -> Result<(), PostWorkflowEventError> {
             state
                 .event_sender
-                .send(InstanceEvent { event, instance_id })
+                .send(InstanceEvent {
+                    event: event.into(),
+                    instance_id,
+                })
                 .await
                 .map_err(|_| PostWorkflowEventError::CouldntQueueEventMessage)?;
             Ok(())
         }
 
-        ApiRouter::new().typed_post_with(handler, |op| {
+        ApiRouter::new().typed_post_with(handler::<Self, _, _>, |op| {
             op.description("Send event")
                 .summary("Send event")
                 .id("post-event")
@@ -205,9 +180,9 @@ pub trait WorkflowControl: Workflow {
     }
 
     fn post_workflow_instance_api_route<
-        E: EventSender<Self> + Send + Sync + 'static,
-        M: WorkflowInstanceManager<Self> + Send + Sync + 'static,
-    >() -> ApiRouter<ArcAppState<Self, E, M>> {
+        E: EventSender<Self::Project> + Send + Sync + 'static,
+        M: WorkflowInstanceManager<Self::Project> + Send + Sync + 'static,
+    >() -> ApiRouter<ArcAppState<Self::Project, E, M>> {
         #[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
         #[typed_path("/")]
         pub struct PostWorkflowInstance;
@@ -229,10 +204,14 @@ pub trait WorkflowControl: Workflow {
         }
 
         // more readable than a closure
-        async fn handler<T: Workflow, E: EventSender<T>, M: WorkflowInstanceManager<T>>(
+        async fn handler<
+            T: Workflow,
+            E: EventSender<T::Project>,
+            M: WorkflowInstanceManager<T::Project>,
+        >(
             _: PostWorkflowInstance,
             NoApi(mut tx): NoApi<Tx>,
-            State(ArcAppState(state)): State<ArcAppState<T, E, M>>,
+            State(ArcAppState(state)): State<ArcAppState<T::Project, E, M>>,
         ) -> Result<Json<WorkflowInstance>, PostWorkflowInstanceError> {
             tracing::info!("creating instance...");
             let res = state
@@ -242,7 +221,7 @@ pub trait WorkflowControl: Workflow {
                 .map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
             Ok(Json(res))
         }
-        ApiRouter::new().typed_post_with(handler, |op| {
+        ApiRouter::new().typed_post_with(handler::<Self, _, _>, |op| {
             op.description("Create instance")
                 .summary("Create instance")
                 .id("post-workflow-instance")
@@ -253,3 +232,78 @@ pub trait WorkflowControl: Workflow {
 }
 
 impl<T: Workflow> WorkflowControl for T {}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait Project: Sized + Send + Sync + 'static {
+    type Step: ProjectStep<Project = Self>;
+    type Event: ProjectEvent<Project = Self>;
+    type Workflow: ProjectWorkflow<Project = Self>;
+}
+
+pub trait ProjectStep:
+    Sized + Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>
+{
+    type Project: Project<Step = Self>;
+
+    fn is_event<T: Event + 'static>(&self) -> bool;
+    fn is_project_event<T: ProjectEvent + 'static>(&self, event: &T) -> bool;
+    fn run_raw(
+        &self,
+        wf: <Self::Project as Project>::Workflow,
+        event: Option<<Self::Project as Project>::Event>,
+        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
+        // where we can get the WorkflowStep type from
+    ) -> impl std::future::Future<
+        Output = Result<Option<StepWithSettings<Self::Project>>, StepError>,
+    > + Send;
+}
+pub trait ProjectEvent:
+    Sized + Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>
+{
+    type Project: Project<Event = Self>;
+}
+pub trait ProjectWorkflow:
+    Sized + Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>
+{
+    type Project: Project<Workflow = Self>;
+
+    fn entrypoint() -> StepWithSettings<Self::Project>;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait Workflow:
+    Clone + Send + Sync + 'static + From<<Self::Project as Project>::Workflow>
+{
+    type Project: Project;
+    type Event: WorkflowEvent + Into<<Self::Project as Project>::Event>;
+    type Step: WorkflowStep<Self>;
+    const NAME: &'static str;
+
+    fn entrypoint() -> StepWithSettings<Self::Project>;
+}
+
+pub trait WorkflowStep<W: Workflow<Step = Self>>:
+    Sync + Serialize + for<'de> Deserialize<'de> + Clone + Send + fmt::Debug
+{
+    fn run_raw(
+        &self,
+        wf: W,
+        event: Option<<W as Workflow>::Event>,
+        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
+        // where we can get the WorkflowStep type from
+    ) -> impl std::future::Future<Output = Result<Option<StepWithSettings<W::Project>>, StepError>> + Send;
+
+    fn is_event<T: Event + 'static>(&self) -> bool;
+    fn is_workflow_event<T: WorkflowEvent + 'static>(&self, event: &T) -> bool;
+}
+
+pub trait WorkflowEvent:
+    Serialize + for<'de> Deserialize<'de> + Debug + Send + Clone
+    // JsonSchema should probably be implemented as an extension trait. JsonSchema doesn't matter for the 
+    // inner workings of the workflow, but it is useful for API documentation
+     + JsonSchema
+{
+    fn is_event<T: Event + 'static>(&self) -> bool;
+}
