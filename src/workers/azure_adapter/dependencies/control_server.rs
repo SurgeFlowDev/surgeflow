@@ -5,50 +5,50 @@ use crate::{
             managers::AzureServiceBusWorkflowInstanceManager, senders::AzureServiceBusEventSender,
         },
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 use azservicebus::{ServiceBusClient, ServiceBusClientOptions, core::BasicRetryPolicy};
 
 use std::marker::PhantomData;
 
-pub struct AzureServiceBusControlServerDependencies<W: Workflow> {
+pub struct AzureServiceBusControlServerDependencies<P: Project> {
     #[expect(dead_code)]
     service_bus_client: ServiceBusClient<BasicRetryPolicy>,
-    _marker: PhantomData<W>,
+    workflow_name: String,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> ControlServerContext<W> for AzureServiceBusControlServerDependencies<W> {
-    type EventSender = AzureServiceBusEventSender<W>;
-    type InstanceManager = AzureServiceBusWorkflowInstanceManager<W>;
-    async fn dependencies() -> anyhow::Result<ControlServerDependencies<W, Self>> {
+impl<P: Project> AzureServiceBusControlServerDependencies<P> {
+    pub fn new(service_bus_client: ServiceBusClient<BasicRetryPolicy>, workflow_name: String) -> Self {
+        Self {
+            service_bus_client,
+            workflow_name,
+            _marker: PhantomData,
+        }
+    }
+    
+    pub async fn with_workflow_name(workflow_name: String) -> anyhow::Result<Self> {
         let azure_service_bus_connection_string =
             std::env::var("AZURE_SERVICE_BUS_CONNECTION_STRING")
                 .expect("AZURE_SERVICE_BUS_CONNECTION_STRING must be set");
 
-        let mut service_bus_client = ServiceBusClient::new_from_connection_string(
+        let service_bus_client = ServiceBusClient::new_from_connection_string(
             azure_service_bus_connection_string,
             ServiceBusClientOptions::default(),
         )
         .await?;
 
-        let events_queue = format!("{}-events", W::NAME);
-        let instance_queue = format!("{}-instance", W::NAME);
+        Ok(Self::new(service_bus_client, workflow_name))
+    }
+}
 
-        let event_sender =
-            AzureServiceBusEventSender::<W>::new(&mut service_bus_client, &events_queue).await?;
-        let instance_manager = AzureServiceBusWorkflowInstanceManager::<W>::new(
-            &mut service_bus_client,
-            &instance_queue,
-        )
-        .await?;
-
-        Ok(ControlServerDependencies::new(
-            event_sender,
-            instance_manager,
-            Self {
-                service_bus_client,
-                _marker: PhantomData,
-            },
-        ))
+impl<P: Project> ControlServerContext<P> for AzureServiceBusControlServerDependencies<P> {
+    type EventSender = AzureServiceBusEventSender<P>;
+    type InstanceManager = AzureServiceBusWorkflowInstanceManager<P>;
+    
+    async fn dependencies() -> anyhow::Result<ControlServerDependencies<P, Self>> {
+        // This approach won't work because we can't get the workflow name from a static method.
+        // We need to refactor this to pass the workflow name explicitly.
+        todo!("This needs to be refactored to accept workflow name as parameter")
     }
 }

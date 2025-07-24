@@ -12,7 +12,7 @@ use crate::{
         },
         azure_adapter::AzureAdapterError,
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 use azservicebus::{
     ServiceBusClient, ServiceBusReceivedMessage, ServiceBusReceiver, ServiceBusReceiverOptions,
@@ -21,12 +21,12 @@ use azservicebus::{
 use std::marker::PhantomData;
 
 #[derive(Debug)]
-pub struct AzureServiceBusCompletedInstanceReceiver<W: Workflow> {
+pub struct AzureServiceBusCompletedInstanceReceiver<P: Project> {
     receiver: ServiceBusReceiver,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> CompletedInstanceReceiver<W> for AzureServiceBusCompletedInstanceReceiver<W> {
+impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstanceReceiver<P> {
     type Handle = ServiceBusReceivedMessage;
     type Error = AzureAdapterError;
     async fn receive(&mut self) -> Result<(WorkflowInstance, Self::Handle), Self::Error> {
@@ -61,7 +61,7 @@ impl<W: Workflow> CompletedInstanceReceiver<W> for AzureServiceBusCompletedInsta
     }
 }
 
-impl<W: Workflow> AzureServiceBusCompletedInstanceReceiver<W> {
+impl<P: Project> AzureServiceBusCompletedInstanceReceiver<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -82,12 +82,12 @@ impl<W: Workflow> AzureServiceBusCompletedInstanceReceiver<W> {
 ///////////////////////////////////////
 
 #[derive(Debug)]
-pub struct AzureServiceBusFailedInstanceReceiver<W: Workflow> {
+pub struct AzureServiceBusFailedInstanceReceiver<P: Project> {
     receiver: ServiceBusReceiver,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> FailedInstanceReceiver<W> for AzureServiceBusFailedInstanceReceiver<W> {
+impl<P: Project> FailedInstanceReceiver<P> for AzureServiceBusFailedInstanceReceiver<P> {
     type Handle = ServiceBusReceivedMessage;
     type Error = AzureAdapterError;
     async fn receive(&mut self) -> Result<(WorkflowInstance, Self::Handle), Self::Error> {
@@ -122,7 +122,7 @@ impl<W: Workflow> FailedInstanceReceiver<W> for AzureServiceBusFailedInstanceRec
     }
 }
 
-impl<W: Workflow> AzureServiceBusFailedInstanceReceiver<W> {
+impl<P: Project> AzureServiceBusFailedInstanceReceiver<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -143,12 +143,12 @@ impl<W: Workflow> AzureServiceBusFailedInstanceReceiver<W> {
 ///////////////////////////////////////
 
 #[derive(Debug)]
-pub struct AzureServiceBusNewInstanceReceiver<W: Workflow> {
+pub struct AzureServiceBusNewInstanceReceiver<P: Project> {
     receiver: ServiceBusReceiver,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> NewInstanceReceiver<W> for AzureServiceBusNewInstanceReceiver<W> {
+impl<P: Project> NewInstanceReceiver<P> for AzureServiceBusNewInstanceReceiver<P> {
     type Handle = ServiceBusReceivedMessage;
     type Error = AzureAdapterError;
     async fn receive(&mut self) -> Result<(WorkflowInstance, Self::Handle), Self::Error> {
@@ -183,7 +183,7 @@ impl<W: Workflow> NewInstanceReceiver<W> for AzureServiceBusNewInstanceReceiver<
     }
 }
 
-impl<W: Workflow> AzureServiceBusNewInstanceReceiver<W> {
+impl<P: Project> AzureServiceBusNewInstanceReceiver<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -200,15 +200,15 @@ impl<W: Workflow> AzureServiceBusNewInstanceReceiver<W> {
 }
 
 #[derive(Debug)]
-pub struct AzureServiceBusEventReceiver<W: Workflow> {
+pub struct AzureServiceBusEventReceiver<P: Project> {
     receiver: ServiceBusReceiver,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> EventReceiver<W> for AzureServiceBusEventReceiver<W> {
+impl<P: Project> EventReceiver<P> for AzureServiceBusEventReceiver<P> {
     type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(&mut self) -> Result<(InstanceEvent<W>, Self::Handle), Self::Error> {
+    async fn receive(&mut self) -> Result<(InstanceEvent<P>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -240,7 +240,7 @@ impl<W: Workflow> EventReceiver<W> for AzureServiceBusEventReceiver<W> {
     }
 }
 
-impl<W: Workflow> AzureServiceBusEventReceiver<W> {
+impl<P: Project> AzureServiceBusEventReceiver<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -256,15 +256,15 @@ impl<W: Workflow> AzureServiceBusEventReceiver<W> {
     }
 }
 #[derive(Debug)]
-pub struct AzureServiceBusNextStepReceiver<W: Workflow> {
+pub struct AzureServiceBusNextStepReceiver<P: Project> {
     receiver: ServiceBusReceiver,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> NextStepReceiver<W> for AzureServiceBusNextStepReceiver<W> {
+impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
     type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(&mut self) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -296,7 +296,7 @@ impl<W: Workflow> NextStepReceiver<W> for AzureServiceBusNextStepReceiver<W> {
     }
 }
 
-impl<W: Workflow> AzureServiceBusNextStepReceiver<W> {
+impl<P: Project> AzureServiceBusNextStepReceiver<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -317,15 +317,15 @@ impl<W: Workflow> AzureServiceBusNextStepReceiver<W> {
 /////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct AzureServiceBusCompletedStepReceiver<W: Workflow> {
+pub struct AzureServiceBusCompletedStepReceiver<P: Project> {
     receiver: ServiceBusReceiver,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> CompletedStepReceiver<W> for AzureServiceBusCompletedStepReceiver<W> {
+impl<P: Project> CompletedStepReceiver<P> for AzureServiceBusCompletedStepReceiver<P> {
     type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(&mut self) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -357,7 +357,7 @@ impl<W: Workflow> CompletedStepReceiver<W> for AzureServiceBusCompletedStepRecei
     }
 }
 
-impl<W: Workflow> AzureServiceBusCompletedStepReceiver<W> {
+impl<P: Project> AzureServiceBusCompletedStepReceiver<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -378,15 +378,15 @@ impl<W: Workflow> AzureServiceBusCompletedStepReceiver<W> {
 /////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct AzureServiceBusFailedStepReceiver<W: Workflow> {
+pub struct AzureServiceBusFailedStepReceiver<P: Project> {
     receiver: ServiceBusReceiver,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> FailedStepReceiver<W> for AzureServiceBusFailedStepReceiver<W> {
+impl<P: Project> FailedStepReceiver<P> for AzureServiceBusFailedStepReceiver<P> {
     type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(&mut self) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -418,7 +418,7 @@ impl<W: Workflow> FailedStepReceiver<W> for AzureServiceBusFailedStepReceiver<W>
     }
 }
 
-impl<W: Workflow> AzureServiceBusFailedStepReceiver<W> {
+impl<P: Project> AzureServiceBusFailedStepReceiver<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -439,15 +439,15 @@ impl<W: Workflow> AzureServiceBusFailedStepReceiver<W> {
 /////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct AzureServiceBusActiveStepReceiver<W: Workflow> {
+pub struct AzureServiceBusActiveStepReceiver<P: Project> {
     receiver: ServiceBusReceiver,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> ActiveStepReceiver<W> for AzureServiceBusActiveStepReceiver<W> {
+impl<P: Project> ActiveStepReceiver<P> for AzureServiceBusActiveStepReceiver<P> {
     type Error = AzureAdapterError;
     type Handle = ServiceBusReceivedMessage;
-    async fn receive(&mut self) -> Result<(FullyQualifiedStep<W>, Self::Handle), Self::Error> {
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error> {
         let msg = self
             .receiver
             .receive_message()
@@ -479,7 +479,7 @@ impl<W: Workflow> ActiveStepReceiver<W> for AzureServiceBusActiveStepReceiver<W>
     }
 }
 
-impl<W: Workflow> AzureServiceBusActiveStepReceiver<W> {
+impl<P: Project> AzureServiceBusActiveStepReceiver<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,

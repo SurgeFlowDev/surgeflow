@@ -17,20 +17,20 @@ use crate::{
         },
         azure_adapter::AzureAdapterError,
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 use tokio::sync::Mutex;
 
 #[derive(Debug)]
-pub struct AzureServiceBusNextStepSender<W: Workflow> {
+pub struct AzureServiceBusNextStepSender<P: Project> {
     sender: ServiceBusSender,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> NextStepSender<W> for AzureServiceBusNextStepSender<W> {
+impl<P: Project> NextStepSender<P> for AzureServiceBusNextStepSender<P> {
     type Error = AzureAdapterError;
 
-    async fn send(&mut self, step: FullyQualifiedStep<W>) -> Result<(), Self::Error> {
+    async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message(serde_json::to_vec(&step).map_err(AzureAdapterError::SerializeError)?)
@@ -40,7 +40,7 @@ impl<W: Workflow> NextStepSender<W> for AzureServiceBusNextStepSender<W> {
     }
 }
 
-impl<W: Workflow> AzureServiceBusNextStepSender<W> {
+impl<P: Project> AzureServiceBusNextStepSender<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -57,14 +57,14 @@ impl<W: Workflow> AzureServiceBusNextStepSender<W> {
 }
 
 #[derive(Debug)]
-pub struct AzureServiceBusActiveStepSender<W: Workflow> {
+pub struct AzureServiceBusActiveStepSender<P: Project> {
     sender: ServiceBusSender,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> ActiveStepSender<W> for AzureServiceBusActiveStepSender<W> {
+impl<P: Project> ActiveStepSender<P> for AzureServiceBusActiveStepSender<P> {
     type Error = AzureAdapterError;
-    async fn send(&mut self, step: FullyQualifiedStep<W>) -> Result<(), Self::Error> {
+    async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message(serde_json::to_vec(&step).map_err(AzureAdapterError::SerializeError)?)
@@ -74,7 +74,7 @@ impl<W: Workflow> ActiveStepSender<W> for AzureServiceBusActiveStepSender<W> {
     }
 }
 
-impl<W: Workflow> AzureServiceBusActiveStepSender<W> {
+impl<P: Project> AzureServiceBusActiveStepSender<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -92,15 +92,15 @@ impl<W: Workflow> AzureServiceBusActiveStepSender<W> {
 
 // TODO: fields should not be pub?
 #[derive(Debug)]
-pub struct AzureServiceBusFailedStepSender<W: Workflow> {
+pub struct AzureServiceBusFailedStepSender<P: Project> {
     sender: ServiceBusSender,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> FailedStepSender<W> for AzureServiceBusFailedStepSender<W> {
+impl<P: Project> FailedStepSender<P> for AzureServiceBusFailedStepSender<P> {
     type Error = AzureAdapterError;
 
-    async fn send(&mut self, step: FullyQualifiedStep<W>) -> Result<(), Self::Error> {
+    async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message(serde_json::to_vec(&step).map_err(AzureAdapterError::SerializeError)?)
@@ -110,7 +110,7 @@ impl<W: Workflow> FailedStepSender<W> for AzureServiceBusFailedStepSender<W> {
     }
 }
 
-impl<W: Workflow> AzureServiceBusFailedStepSender<W> {
+impl<P: Project> AzureServiceBusFailedStepSender<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -127,15 +127,15 @@ impl<W: Workflow> AzureServiceBusFailedStepSender<W> {
 }
 
 #[derive(Debug)]
-pub struct AzureServiceBusEventSender<W: Workflow> {
+pub struct AzureServiceBusEventSender<P: Project> {
     sender: Mutex<ServiceBusSender>,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> EventSender<W> for AzureServiceBusEventSender<W> {
+impl<P: Project> EventSender<P> for AzureServiceBusEventSender<P> {
     type Error = AzureAdapterError;
 
-    async fn send(&self, step: InstanceEvent<W>) -> Result<(), Self::Error> {
+    async fn send(&self, step: InstanceEvent<P>) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
             .lock()
@@ -148,7 +148,7 @@ impl<W: Workflow> EventSender<W> for AzureServiceBusEventSender<W> {
     }
 }
 
-impl<W: Workflow> AzureServiceBusEventSender<W> {
+impl<P: Project> AzureServiceBusEventSender<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -165,12 +165,12 @@ impl<W: Workflow> AzureServiceBusEventSender<W> {
 }
 
 #[derive(Debug)]
-pub struct AzureServiceBusNewInstanceSender<W: Workflow> {
+pub struct AzureServiceBusNewInstanceSender<P: Project> {
     sender: Mutex<ServiceBusSender>,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> NewInstanceSender<W> for AzureServiceBusNewInstanceSender<W> {
+impl<P: Project> NewInstanceSender<P> for AzureServiceBusNewInstanceSender<P> {
     type Error = AzureAdapterError;
 
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
@@ -186,7 +186,7 @@ impl<W: Workflow> NewInstanceSender<W> for AzureServiceBusNewInstanceSender<W> {
     }
 }
 
-impl<W: Workflow> AzureServiceBusNewInstanceSender<W> {
+impl<P: Project> AzureServiceBusNewInstanceSender<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -207,12 +207,12 @@ impl<W: Workflow> AzureServiceBusNewInstanceSender<W> {
 ////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct AzureServiceBusFailedInstanceSender<W: Workflow> {
+pub struct AzureServiceBusFailedInstanceSender<P: Project> {
     sender: Mutex<ServiceBusSender>,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> FailedInstanceSender<W> for AzureServiceBusFailedInstanceSender<W> {
+impl<P: Project> FailedInstanceSender<P> for AzureServiceBusFailedInstanceSender<P> {
     type Error = AzureAdapterError;
 
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
@@ -228,7 +228,7 @@ impl<W: Workflow> FailedInstanceSender<W> for AzureServiceBusFailedInstanceSende
     }
 }
 
-impl<W: Workflow> AzureServiceBusFailedInstanceSender<W> {
+impl<P: Project> AzureServiceBusFailedInstanceSender<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -249,12 +249,12 @@ impl<W: Workflow> AzureServiceBusFailedInstanceSender<W> {
 ////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct AzureServiceBusCompletedInstanceSender<W: Workflow> {
+pub struct AzureServiceBusCompletedInstanceSender<P: Project> {
     sender: Mutex<ServiceBusSender>,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> CompletedInstanceSender<W> for AzureServiceBusCompletedInstanceSender<W> {
+impl<P: Project> CompletedInstanceSender<P> for AzureServiceBusCompletedInstanceSender<P> {
     type Error = AzureAdapterError;
 
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
@@ -270,7 +270,7 @@ impl<W: Workflow> CompletedInstanceSender<W> for AzureServiceBusCompletedInstanc
     }
 }
 
-impl<W: Workflow> AzureServiceBusCompletedInstanceSender<W> {
+impl<P: Project> AzureServiceBusCompletedInstanceSender<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,
@@ -290,15 +290,15 @@ impl<W: Workflow> AzureServiceBusCompletedInstanceSender<W> {
 ////////////////////////////////////////
 ////////////////////////////////////////
 #[derive(Debug)]
-pub struct AzureServiceBusCompletedStepSender<W: Workflow> {
+pub struct AzureServiceBusCompletedStepSender<P: Project> {
     sender: ServiceBusSender,
-    _marker: PhantomData<W>,
+    _marker: PhantomData<P>,
 }
 
-impl<W: Workflow> CompletedStepSender<W> for AzureServiceBusCompletedStepSender<W> {
+impl<P: Project> CompletedStepSender<P> for AzureServiceBusCompletedStepSender<P> {
     type Error = AzureAdapterError;
 
-    async fn send(&mut self, step: FullyQualifiedStep<W>) -> Result<(), Self::Error> {
+    async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message(serde_json::to_vec(&step).map_err(AzureAdapterError::SerializeError)?)
@@ -308,7 +308,7 @@ impl<W: Workflow> CompletedStepSender<W> for AzureServiceBusCompletedStepSender<
     }
 }
 
-impl<W: Workflow> AzureServiceBusCompletedStepSender<W> {
+impl<P: Project> AzureServiceBusCompletedStepSender<P> {
     pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
         service_bus_client: &mut ServiceBusClient<RP>,
         queue_name: &str,

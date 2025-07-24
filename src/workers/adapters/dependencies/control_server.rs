@@ -2,6 +2,7 @@ use crate::{
     workers::adapters::{managers::WorkflowInstanceManager, senders::EventSender},
     workflows::Project,
 };
+use std::future::Future;
 
 pub struct ControlServerDependencies<P: Project, C: ControlServerContext<P>> {
     pub event_sender: C::EventSender,

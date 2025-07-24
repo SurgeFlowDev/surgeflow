@@ -28,7 +28,7 @@ use crate::{
             },
         },
     },
-    workflows::Workflow,
+    workflows::Project,
 };
 
 pub mod active_step_worker;
@@ -132,15 +132,15 @@ impl AzureDependencyManager {
     }
 }
 
-impl<W: Workflow> CompletedInstanceWorkerDependencyProvider<W> for AzureDependencyManager {
-    type CompletedInstanceReceiver = AzureServiceBusCompletedInstanceReceiver<W>;
+impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AzureDependencyManager {
+    type CompletedInstanceReceiver = AzureServiceBusCompletedInstanceReceiver<P>;
     type Error = anyhow::Error;
 
     async fn completed_instance_worker_dependencies(
         &mut self,
-    ) -> anyhow::Result<CompletedInstanceWorkerDependencies<W, Self::CompletedInstanceReceiver>>
+    ) -> anyhow::Result<CompletedInstanceWorkerDependencies<P, Self::CompletedInstanceReceiver>>
     {
-        let completed_instance_queue = format!("{}-completed-instances", W::NAME);
+        let completed_instance_queue = self.config.completed_instance_queue_suffix.clone();
 
         let instance_receiver = AzureServiceBusCompletedInstanceReceiver::new(
             self.service_bus_client().await,
@@ -152,9 +152,9 @@ impl<W: Workflow> CompletedInstanceWorkerDependencyProvider<W> for AzureDependen
     }
 }
 
-impl<W: Workflow> CompletedStepWorkerDependencyProvider<W> for AzureDependencyManager {
-    type CompletedStepReceiver = AzureServiceBusCompletedStepReceiver<W>;
-    type NextStepSender = AzureServiceBusNextStepSender<W>;
+impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AzureDependencyManager {
+    type CompletedStepReceiver = AzureServiceBusCompletedStepReceiver<P>;
+    type NextStepSender = AzureServiceBusNextStepSender<P>;
     type PersistentStepManager = AzurePersistentStepManager;
     type Error = anyhow::Error;
 
@@ -162,22 +162,22 @@ impl<W: Workflow> CompletedStepWorkerDependencyProvider<W> for AzureDependencyMa
         &mut self,
     ) -> anyhow::Result<
         CompletedStepWorkerDependencies<
-            W,
+            P,
             Self::CompletedStepReceiver,
             Self::NextStepSender,
             Self::PersistentStepManager,
         >,
     > {
-        let completed_steps_queue = format!("{}-completed-steps", W::NAME);
-        let next_steps_queue = format!("{}-next-steps", W::NAME);
+        let completed_steps_queue = self.config.completed_step_queue_suffix.clone();
+        let next_steps_queue = self.config.next_step_queue_suffix.clone();
 
-        let completed_step_receiver = AzureServiceBusCompletedStepReceiver::<W>::new(
+        let completed_step_receiver = AzureServiceBusCompletedStepReceiver::<P>::new(
             self.service_bus_client().await,
             &completed_steps_queue,
         )
         .await?;
 
-        let next_step_sender = AzureServiceBusNextStepSender::<W>::new(
+        let next_step_sender = AzureServiceBusNextStepSender::<P>::new(
             self.service_bus_client().await,
             &next_steps_queue,
         )
@@ -194,11 +194,11 @@ impl<W: Workflow> CompletedStepWorkerDependencyProvider<W> for AzureDependencyMa
     }
 }
 
-impl<W: Workflow> ActiveStepWorkerDependencyProvider<W> for AzureDependencyManager {
-    type ActiveStepReceiver = AzureServiceBusActiveStepReceiver<W>;
-    type ActiveStepSender = AzureServiceBusActiveStepSender<W>;
-    type FailedStepSender = AzureServiceBusFailedStepSender<W>;
-    type CompletedStepSender = AzureServiceBusCompletedStepSender<W>;
+impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AzureDependencyManager {
+    type ActiveStepReceiver = AzureServiceBusActiveStepReceiver<P>;
+    type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
+    type FailedStepSender = AzureServiceBusFailedStepSender<P>;
+    type CompletedStepSender = AzureServiceBusCompletedStepSender<P>;
     type PersistentStepManager = AzurePersistentStepManager;
     type Error = anyhow::Error;
 
@@ -206,7 +206,7 @@ impl<W: Workflow> ActiveStepWorkerDependencyProvider<W> for AzureDependencyManag
         &mut self,
     ) -> Result<
         crate::workers::adapters::dependencies::active_step_worker::ActiveStepWorkerDependencies<
-            W,
+            P,
             Self::ActiveStepReceiver,
             Self::ActiveStepSender,
             Self::FailedStepSender,
@@ -215,25 +215,24 @@ impl<W: Workflow> ActiveStepWorkerDependencyProvider<W> for AzureDependencyManag
         >,
         Self::Error,
     > {
-        let active_steps_queue = format!("{}{}", W::NAME, self.config.active_step_queue_suffix);
-        let failed_steps_queue = format!("{}{}", W::NAME, self.config.failed_step_queue_suffix);
-        let completed_steps_queue =
-            format!("{}{}", W::NAME, self.config.completed_step_queue_suffix);
+        let active_steps_queue = self.config.active_step_queue_suffix.clone();
+        let failed_steps_queue = self.config.failed_step_queue_suffix.clone();
+        let completed_steps_queue = self.config.completed_step_queue_suffix.clone();
         let service_bus_client = self.service_bus_client().await;
 
         let active_step_receiver =
-            AzureServiceBusActiveStepReceiver::<W>::new(service_bus_client, &active_steps_queue)
+            AzureServiceBusActiveStepReceiver::<P>::new(service_bus_client, &active_steps_queue)
                 .await?;
 
         let active_step_sender =
-            AzureServiceBusActiveStepSender::<W>::new(service_bus_client, &active_steps_queue)
+            AzureServiceBusActiveStepSender::<P>::new(service_bus_client, &active_steps_queue)
                 .await?;
 
         let failed_step_sender =
-            AzureServiceBusFailedStepSender::<W>::new(service_bus_client, &failed_steps_queue)
+            AzureServiceBusFailedStepSender::<P>::new(service_bus_client, &failed_steps_queue)
                 .await?;
 
-        let completed_step_sender = AzureServiceBusCompletedStepSender::<W>::new(
+        let completed_step_sender = AzureServiceBusCompletedStepSender::<P>::new(
             service_bus_client,
             &completed_steps_queue,
         )
@@ -252,20 +251,19 @@ impl<W: Workflow> ActiveStepWorkerDependencyProvider<W> for AzureDependencyManag
     }
 }
 
-impl<W: Workflow> FailedInstanceWorkerDependencyProvider<W> for AzureDependencyManager {
-    type FailedInstanceReceiver = AzureServiceBusFailedInstanceReceiver<W>;
+impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AzureDependencyManager {
+    type FailedInstanceReceiver = AzureServiceBusFailedInstanceReceiver<P>;
     type Error = anyhow::Error;
 
     async fn failed_instance_worker_dependencies(
         &mut self,
     ) -> Result<
-        crate::workers::adapters::dependencies::failed_instance_worker::FailedInstanceWorkerDependencies<W, Self::FailedInstanceReceiver>,
+        crate::workers::adapters::dependencies::failed_instance_worker::FailedInstanceWorkerDependencies<P, Self::FailedInstanceReceiver>,
         Self::Error,
     >{
-        let failed_instances_queue =
-            format!("{}{}", W::NAME, self.config.failed_instance_queue_suffix);
+        let failed_instances_queue = self.config.failed_instance_queue_suffix.clone();
 
-        let failed_instance_receiver = AzureServiceBusFailedInstanceReceiver::<W>::new(
+        let failed_instance_receiver = AzureServiceBusFailedInstanceReceiver::<P>::new(
             self.service_bus_client().await,
             &failed_instances_queue,
         )
@@ -277,9 +275,9 @@ impl<W: Workflow> FailedInstanceWorkerDependencyProvider<W> for AzureDependencyM
     }
 }
 
-impl<W: Workflow> FailedStepWorkerDependencyProvider<W> for AzureDependencyManager {
-    type FailedStepReceiver = AzureServiceBusFailedStepReceiver<W>;
-    type FailedInstanceSender = AzureServiceBusFailedInstanceSender<W>;
+impl<P: Project> FailedStepWorkerDependencyProvider<P> for AzureDependencyManager {
+    type FailedStepReceiver = AzureServiceBusFailedStepReceiver<P>;
+    type FailedInstanceSender = AzureServiceBusFailedInstanceSender<P>;
     type PersistentStepManager = AzurePersistentStepManager;
     type Error = anyhow::Error;
 
@@ -287,23 +285,22 @@ impl<W: Workflow> FailedStepWorkerDependencyProvider<W> for AzureDependencyManag
         &mut self,
     ) -> Result<
         crate::workers::adapters::dependencies::failed_step_worker::FailedStepWorkerDependencies<
-            W,
+            P,
             Self::FailedStepReceiver,
             Self::FailedInstanceSender,
             Self::PersistentStepManager,
         >,
         Self::Error,
     > {
-        let failed_steps_queue = format!("{}{}", W::NAME, self.config.failed_step_queue_suffix);
-        let failed_instances_queue =
-            format!("{}{}", W::NAME, self.config.failed_instance_queue_suffix);
+        let failed_steps_queue = self.config.failed_step_queue_suffix.clone();
+        let failed_instances_queue = self.config.failed_instance_queue_suffix.clone();
         let service_bus_client = self.service_bus_client().await;
 
         let failed_step_receiver =
-            AzureServiceBusFailedStepReceiver::<W>::new(service_bus_client, &failed_steps_queue)
+            AzureServiceBusFailedStepReceiver::<P>::new(service_bus_client, &failed_steps_queue)
                 .await?;
 
-        let failed_instance_sender = AzureServiceBusFailedInstanceSender::<W>::new(
+        let failed_instance_sender = AzureServiceBusFailedInstanceSender::<P>::new(
             service_bus_client,
             &failed_instances_queue,
         )
@@ -320,38 +317,38 @@ impl<W: Workflow> FailedStepWorkerDependencyProvider<W> for AzureDependencyManag
     }
 }
 
-impl<W: Workflow> NewEventWorkerDependencyProvider<W> for AzureDependencyManager {
-    type ActiveStepSender = AzureServiceBusActiveStepSender<W>;
-    type EventReceiver = AzureServiceBusEventReceiver<W>;
-    type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<W>;
+impl<P: Project> NewEventWorkerDependencyProvider<P> for AzureDependencyManager {
+    type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
+    type EventReceiver = AzureServiceBusEventReceiver<P>;
+    type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<P>;
     type Error = anyhow::Error;
 
     async fn new_event_worker_dependencies(
         &mut self,
     ) -> Result<
         crate::workers::adapters::dependencies::new_event_worker::NewEventWorkerDependencies<
-            W,
+            P,
             Self::ActiveStepSender,
             Self::EventReceiver,
             Self::StepsAwaitingEventManager,
         >,
         Self::Error,
     > {
-        let new_event_queue = format!("{}{}", W::NAME, self.config.new_event_queue_suffix);
-        let active_steps_queue = format!("{}{}", W::NAME, self.config.active_step_queue_suffix);
+        let new_event_queue = self.config.new_event_queue_suffix.clone();
+        let active_steps_queue = self.config.active_step_queue_suffix.clone();
         let service_bus_client = self.service_bus_client().await;
 
         let event_receiver =
-            AzureServiceBusEventReceiver::<W>::new(service_bus_client, &new_event_queue).await?;
+            AzureServiceBusEventReceiver::<P>::new(service_bus_client, &new_event_queue).await?;
 
         let active_step_sender =
-            AzureServiceBusActiveStepSender::<W>::new(service_bus_client, &active_steps_queue)
+            AzureServiceBusActiveStepSender::<P>::new(service_bus_client, &active_steps_queue)
                 .await?;
 
         let cosmos_client = self.cosmos_client();
 
         let steps_awaiting_event_manager =
-            AzureServiceBusStepsAwaitingEventManager::<W>::new(cosmos_client);
+            AzureServiceBusStepsAwaitingEventManager::<P>::new(cosmos_client);
 
         Ok(crate::workers::adapters::dependencies::new_event_worker::NewEventWorkerDependencies::new(
             active_step_sender,
@@ -361,31 +358,31 @@ impl<W: Workflow> NewEventWorkerDependencyProvider<W> for AzureDependencyManager
     }
 }
 
-impl<W: Workflow> NewInstanceWorkerDependencyProvider<W> for AzureDependencyManager {
-    type NextStepSender = AzureServiceBusNextStepSender<W>;
-    type NewInstanceReceiver = AzureServiceBusNewInstanceReceiver<W>;
+impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AzureDependencyManager {
+    type NextStepSender = AzureServiceBusNextStepSender<P>;
+    type NewInstanceReceiver = AzureServiceBusNewInstanceReceiver<P>;
     type Error = anyhow::Error;
 
     async fn new_instance_worker_dependencies(
         &mut self,
     ) -> Result<
         crate::workers::adapters::dependencies::new_instance_worker::NewInstanceWorkerDependencies<
-            W,
+            P,
             Self::NextStepSender,
             Self::NewInstanceReceiver,
         >,
         Self::Error,
     > {
-        let new_instance_queue = format!("{}{}", W::NAME, self.config.new_instance_queue_suffix);
-        let next_steps_queue = format!("{}{}", W::NAME, self.config.next_step_queue_suffix);
+        let new_instance_queue = self.config.new_instance_queue_suffix.clone();
+        let next_steps_queue = self.config.next_step_queue_suffix.clone();
         let service_bus_client = self.service_bus_client().await;
 
         let new_instance_receiver =
-            AzureServiceBusNewInstanceReceiver::<W>::new(service_bus_client, &new_instance_queue)
+            AzureServiceBusNewInstanceReceiver::<P>::new(service_bus_client, &new_instance_queue)
                 .await?;
 
         let next_step_sender =
-            AzureServiceBusNextStepSender::<W>::new(service_bus_client, &next_steps_queue).await?;
+            AzureServiceBusNextStepSender::<P>::new(service_bus_client, &next_steps_queue).await?;
 
         Ok(crate::workers::adapters::dependencies::new_instance_worker::NewInstanceWorkerDependencies::new(
             next_step_sender,
@@ -394,10 +391,10 @@ impl<W: Workflow> NewInstanceWorkerDependencyProvider<W> for AzureDependencyMana
     }
 }
 
-impl<W: Workflow> NextStepWorkerDependencyProvider<W> for AzureDependencyManager {
-    type NextStepReceiver = AzureServiceBusNextStepReceiver<W>;
-    type ActiveStepSender = AzureServiceBusActiveStepSender<W>;
-    type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<W>;
+impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager {
+    type NextStepReceiver = AzureServiceBusNextStepReceiver<P>;
+    type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
+    type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<P>;
     type PersistentStepManager = AzurePersistentStepManager;
     type Error = anyhow::Error;
 
@@ -405,7 +402,7 @@ impl<W: Workflow> NextStepWorkerDependencyProvider<W> for AzureDependencyManager
         &mut self,
     ) -> Result<
         crate::workers::adapters::dependencies::next_step_worker::NextStepWorkerDependencies<
-            W,
+            P,
             Self::NextStepReceiver,
             Self::ActiveStepSender,
             Self::StepsAwaitingEventManager,
@@ -413,22 +410,22 @@ impl<W: Workflow> NextStepWorkerDependencyProvider<W> for AzureDependencyManager
         >,
         Self::Error,
     > {
-        let next_steps_queue = format!("{}{}", W::NAME, self.config.next_step_queue_suffix);
-        let active_steps_queue = format!("{}{}", W::NAME, self.config.active_step_queue_suffix);
+        let next_steps_queue = self.config.next_step_queue_suffix.clone();
+        let active_steps_queue = self.config.active_step_queue_suffix.clone();
         let service_bus_client = self.service_bus_client().await;
 
         let next_step_receiver =
-            AzureServiceBusNextStepReceiver::<W>::new(service_bus_client, &next_steps_queue)
+            AzureServiceBusNextStepReceiver::<P>::new(service_bus_client, &next_steps_queue)
                 .await?;
 
         let active_step_sender =
-            AzureServiceBusActiveStepSender::<W>::new(service_bus_client, &active_steps_queue)
+            AzureServiceBusActiveStepSender::<P>::new(service_bus_client, &active_steps_queue)
                 .await?;
 
         let cosmos_client = self.cosmos_client();
 
         let steps_awaiting_event_manager =
-            AzureServiceBusStepsAwaitingEventManager::<W>::new(cosmos_client);
+            AzureServiceBusStepsAwaitingEventManager::<P>::new(cosmos_client);
 
         let persistent_step_manager =
             AzurePersistentStepManager::new(self.sqlx_pool().await.clone());
@@ -442,6 +439,6 @@ impl<W: Workflow> NextStepWorkerDependencyProvider<W> for AzureDependencyManager
     }
 }
 
-impl<W: Workflow> DependencyManager<W> for AzureDependencyManager {
+impl<P: Project> DependencyManager<P> for AzureDependencyManager {
     type Error = anyhow::Error;
 }
