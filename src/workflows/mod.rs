@@ -222,10 +222,15 @@ impl<T: Workflow> WorkflowControl for T {}
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait Project: Sized + Send + Sync + 'static {
+pub trait Project: Sized + Send + Sync + 'static + Clone {
     type Step: ProjectStep<Project = Self>;
     type Event: ProjectEvent<Project = Self>;
     type Workflow: ProjectWorkflow<Project = Self>;
+
+    fn workflow_for_step(
+        &self,
+        step: &Self::Step,
+    ) -> Self::Workflow;
 }
 
 pub trait ProjectStep:
@@ -239,8 +244,6 @@ pub trait ProjectStep:
         &self,
         wf: <Self::Project as Project>::Workflow,
         event: Option<<Self::Project as Project>::Event>,
-        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
-        // where we can get the WorkflowStep type from
     ) -> impl std::future::Future<
         Output = Result<Option<StepWithSettings<Self::Project>>, StepError>,
     > + Send;

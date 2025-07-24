@@ -1,4 +1,3 @@
-use aide::openapi::{Info, OpenApi};
 use rust_workflow_2::workers::active_step_worker;
 use rust_workflow_2::workers::adapters::dependencies::ControlServerDependencyProvider;
 use rust_workflow_2::workers::completed_instance_worker;
@@ -12,7 +11,7 @@ use rust_workflow_2::workers::next_step_worker;
 use rust_workflow_2::workflows::workflow_1::MyProject;
 
 use rust_workflow_2::workflows::Project;
-use rust_workflow_2::workflows::workflow_1::{MyProjectWorkflow, Workflow1};
+use rust_workflow_2::workflows::workflow_1::Workflow1;
 use tokio::try_join;
 
 #[tokio::main]
@@ -20,22 +19,13 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    main_handler::<MyProject>(MyProjectWorkflow::Workflow1(Workflow1)).await?;
+    main_handler::<MyProject>(MyProject {
+        workflow_1: Workflow1,
+    })
+    .await?;
     Ok(())
 }
 
-pub fn base_open_api() -> OpenApi {
-    OpenApi {
-        info: Info {
-            description: Some("API".to_string()),
-            ..Info::default()
-        },
-        ..OpenApi::default()
-    }
-}
-
-// TODO: testing with MyProject instead of generic Project
-// async fn main_handler<P: Project>(project_workflow: P::Workflow) -> anyhow::Result<()>
 #[cfg(any(
     feature = "active_step_worker",
     feature = "new_instance_worker",
@@ -47,7 +37,7 @@ pub fn base_open_api() -> OpenApi {
     feature = "completed_instance_worker",
     feature = "control_server"
 ))]
-async fn main_handler<P: Project>(project_workflow: P::Workflow) -> anyhow::Result<()> {
+async fn main_handler<P: Project>(project: P) -> anyhow::Result<()> {
     use rust_workflow_2::workers::adapters::dependencies::ActiveStepWorkerDependencyProvider;
     use rust_workflow_2::workers::adapters::dependencies::CompletedInstanceWorkerDependencyProvider;
     use rust_workflow_2::workers::adapters::dependencies::CompletedStepWorkerDependencyProvider;
@@ -91,7 +81,7 @@ async fn main_handler<P: Project>(project_workflow: P::Workflow) -> anyhow::Resu
                 .active_step_worker_dependencies()
                 .await
                 .expect("TODO: handle error"),
-            project_workflow.clone(),
+            project.clone(),
         ),
         #[cfg(feature = "new_instance_worker")]
         new_instance_worker::main::<P, _, _, _>(

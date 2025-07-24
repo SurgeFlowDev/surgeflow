@@ -74,7 +74,7 @@ pub async fn main<
         CompletedStepSenderT,
         PersistenceManagerT,
     >,
-    wf: <P as Project>::Workflow,
+    project: P,
 ) -> anyhow::Result<()>
 where
     P: Project,
@@ -84,8 +84,6 @@ where
     CompletedStepSenderT: CompletedStepSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    // tracing::info!("Active Step Worker started for project: {}", P::NAME);
-
     let mut active_step_receiver = dependencies.active_step_receiver;
     let mut active_step_sender = dependencies.active_step_sender;
     let mut failed_step_sender = dependencies.failed_step_sender;
@@ -97,6 +95,7 @@ where
             tracing::error!("Failed to receive next step");
             continue;
         };
+        let wf = project.workflow_for_step(&step.step.step);
 
         if let Err(err) = process::<
             P,

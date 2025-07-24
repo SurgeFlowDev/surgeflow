@@ -7,11 +7,21 @@ use crate::workflows::{
     Workflow, WorkflowControl, WorkflowEvent, WorkflowStep,
 };
 
-pub struct MyProject;
+#[derive(Clone)]
+pub struct MyProject {
+    pub workflow_1: Workflow1,
+}
+
 impl Project for MyProject {
     type Step = MyProjectStep;
     type Event = MyProjectEvent;
     type Workflow = MyProjectWorkflow;
+
+    fn workflow_for_step(&self, step: &Self::Step) -> Self::Workflow {
+        match step {
+            MyProjectStep::Workflow1(_) => MyProjectWorkflow::Workflow1(self.workflow_1.clone()),
+        }
+    }
 }
 
 #[derive(Clone)]
