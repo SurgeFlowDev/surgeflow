@@ -12,4 +12,4 @@ pub mod new_instance_worker;
 pub mod adapters;
 
 // pub mod rabbitmq_adapter;
-// pub mod azure_adapter;
+pub mod azure_adapter;
