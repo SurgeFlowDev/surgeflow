@@ -7,16 +7,16 @@ use typespec::{error::ErrorKind, http::StatusCode};
 use crate::{
     step::FullyQualifiedStep,
     workers::{adapters::managers::StepsAwaitingEventManager, azure_adapter::AzureAdapterError},
-    workflows::{Workflow, WorkflowInstanceId},
+    workflows::{Project, WorkflowInstanceId},
 };
 
 #[derive(Clone)]
-pub struct AzureServiceBusStepsAwaitingEventManager<W: Workflow> {
+pub struct AzureServiceBusStepsAwaitingEventManager<P: Project> {
     container_client: ContainerClient,
-    _phantom: PhantomData<W>,
+    _phantom: PhantomData<P>,
 }
 
-impl<W: Workflow> AzureServiceBusStepsAwaitingEventManager<W> {
+impl<P: Project> AzureServiceBusStepsAwaitingEventManager<P> {
     // TODO: should be private
     pub fn new(cosmos_client: &CosmosClient) -> Self {
         let container_client = cosmos_client
@@ -32,23 +32,23 @@ impl<W: Workflow> AzureServiceBusStepsAwaitingEventManager<W> {
     }
 }
 
-impl<W: Workflow> StepsAwaitingEventManager<W> for AzureServiceBusStepsAwaitingEventManager<W> {
+impl<P: Project> StepsAwaitingEventManager<P> for AzureServiceBusStepsAwaitingEventManager<P> {
     type Error = AzureAdapterError;
     async fn get_step(
         &mut self,
         instance_id: WorkflowInstanceId,
-    ) -> Result<Option<FullyQualifiedStep<W>>, Self::Error> {
+    ) -> Result<Option<FullyQualifiedStep<P>>, Self::Error> {
         let id = Self::make_key(instance_id);
-        let item = CosmosItem::<FullyQualifiedStep<W>>::read(&self.container_client, id).await?;
+        let item = CosmosItem::<FullyQualifiedStep<P>>::read(&self.container_client, id).await?;
 
         Ok(item.map(|item| item.data))
     }
     async fn delete_step(&mut self, instance_id: WorkflowInstanceId) -> Result<(), Self::Error> {
         let id = Self::make_key(instance_id);
-        CosmosItem::<FullyQualifiedStep<W>>::delete(&self.container_client, id).await?;
+        CosmosItem::<FullyQualifiedStep<P>>::delete(&self.container_client, id).await?;
         Ok(())
     }
-    async fn put_step(&mut self, step: FullyQualifiedStep<W>) -> Result<(), Self::Error> {
+    async fn put_step(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
         let id = Self::make_key(step.instance.external_id);
         let item = CosmosItem::new(step, id);
         item.create(&self.container_client).await?;
@@ -135,7 +135,7 @@ mod persistent_step_manager {
 
     use crate::{
         workers::adapters::managers::PersistentStepManager,
-        workflows::{StepId, Workflow, WorkflowInstanceId},
+        workflows::{StepId, Project, WorkflowInstanceId},
     };
 
     pub struct AzurePersistentStepManager {
@@ -163,11 +163,11 @@ mod persistent_step_manager {
             Ok(())
         }
 
-        async fn insert_step<W: Workflow>(
+        async fn insert_step<P: Project>(
             &self,
             workflow_instance_id: WorkflowInstanceId,
             step_id: StepId,
-            step: &W::Step,
+            step: &P::Step,
         ) -> Result<(), anyhow::Error> {
             let json_step = serde_json::to_value(step).expect("TODO: handle serialization error");
             query!(
@@ -185,10 +185,10 @@ mod persistent_step_manager {
             Ok(())
         }
 
-        async fn insert_step_output<W: Workflow>(
+        async fn insert_step_output<P: Project>(
             &self,
             step_id: StepId,
-            output: Option<&W::Step>,
+            output: Option<&P::Step>,
         ) -> Result<(), anyhow::Error> {
             let output = serde_json::to_value(output).expect("TODO: handle serialization error");
             query!(
@@ -225,25 +225,28 @@ mod workflow_instance_manager {
             },
             azure_adapter::{AzureAdapterError, senders::AzureServiceBusNewInstanceSender},
         },
-        workflows::Workflow,
+        workflows::Project,
     };
 
     // must be thread-safe
     #[derive(Debug)]
-    pub struct AzureServiceBusWorkflowInstanceManager<W: Workflow> {
-        sender: AzureServiceBusNewInstanceSender<W>,
-        _marker: PhantomData<W>,
+    pub struct AzureServiceBusWorkflowInstanceManager<P: Project> {
+        sender: AzureServiceBusNewInstanceSender<P>,
+        workflow_name: String,
+        _marker: PhantomData<P>,
     }
-    impl<W: Workflow> AzureServiceBusWorkflowInstanceManager<W> {
+    impl<P: Project> AzureServiceBusWorkflowInstanceManager<P> {
         pub async fn new<RP: ServiceBusRetryPolicyExt + 'static>(
             service_bus_client: &mut ServiceBusClient<RP>,
             instance_queue_name: &str,
+            workflow_name: String,
         ) -> anyhow::Result<Self> {
             let sender =
-                AzureServiceBusNewInstanceSender::<W>::new(service_bus_client, instance_queue_name)
+                AzureServiceBusNewInstanceSender::<P>::new(service_bus_client, instance_queue_name)
                     .await?;
             Ok(Self {
                 sender,
+                workflow_name,
                 _marker: PhantomData,
             })
         }
@@ -254,13 +257,13 @@ mod workflow_instance_manager {
         pub workflow_id: i32,
     }
 
-    impl<W: Workflow> WorkflowInstanceManager<W> for AzureServiceBusWorkflowInstanceManager<W> {
+    impl<P: Project> WorkflowInstanceManager<P> for AzureServiceBusWorkflowInstanceManager<P> {
         type Error = AzureAdapterError;
         async fn create_instance(
             &self,
             conn: &mut PgConnection,
         ) -> Result<WorkflowInstance, AzureAdapterError> {
-            tracing::info!("Creating workflow instance for: {}", W::NAME);
+            tracing::info!("Creating workflow instance for: {}", self.workflow_name);
             let res = query_as!(
                 WorkflowInstanceRecord,
                 r#"
@@ -270,7 +273,7 @@ mod workflow_instance_manager {
                     WHERE "name" = $1
                     RETURNING "external_id", "workflow_id";
                 "#,
-                W::NAME
+                self.workflow_name
             )
             .fetch_one(conn)
             .await
@@ -278,7 +281,7 @@ mod workflow_instance_manager {
 
             tracing::info!(
                 "Created workflow instance: {} with id: {}",
-                W::NAME,
+                self.workflow_name,
                 res.external_id
             );
 
@@ -288,7 +291,7 @@ mod workflow_instance_manager {
 
             tracing::info!(
                 "Sending workflow instance: {} with id: {} to Azure Service Bus",
-                W::NAME,
+                self.workflow_name,
                 res.external_id
             );
 
