@@ -53,20 +53,54 @@ where
     NewInstanceReceiverT: NewInstanceReceiver<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    let mut instance_receiver = dependencies.new_instance_receiver;
-    let mut next_step_sender = dependencies.next_step_sender;
-    let mut persistence_manager = dependencies.persistence_manager;
+    let instance_receiver = dependencies.new_instance_receiver;
+    let next_step_sender = dependencies.next_step_sender;
+    let persistence_manager = dependencies.persistence_manager;
 
     loop {
-        let Ok((step, handle)) = instance_receiver.receive().await else {
-            tracing::error!("Failed to receive next step");
-            continue;
-        };
+        if let Err(err) = receive_and_process::<P, NextStepSenderT, NewInstanceReceiverT, PersistenceManagerT>(
+            &instance_receiver,
+            &next_step_sender,
+            &persistence_manager,
+        )
+        .await
+        {
+            tracing::error!("Error processing new instance: {:?}", err);
+        }
+    }
+}
 
-        if let Err(err) = process(&mut next_step_sender, &mut persistence_manager, step).await {
+async fn receive_and_process<P, NextStepSenderT, NewInstanceReceiverT, PersistenceManagerT>(
+    instance_receiver: &NewInstanceReceiverT,
+    next_step_sender: &NextStepSenderT,
+    persistence_manager: &PersistenceManagerT,
+) -> anyhow::Result<()>
+where
+    P: Project,
+    NextStepSenderT: NextStepSender<P>,
+    NewInstanceReceiverT: NewInstanceReceiver<P>,
+    PersistenceManagerT: PersistenceManager,
+{
+    let mut instance_receiver = instance_receiver.clone();
+
+    let (step, handle) = instance_receiver.receive().await?;
+    let next_step_sender = next_step_sender.clone();
+    let persistence_manager = persistence_manager.clone();
+
+    tokio::spawn(async move {
+        if let Err(err) = process(&mut next_step_sender.clone(), &mut persistence_manager.clone(), step).await {
             tracing::error!("Error processing workflow instance: {:?}", err);
         }
 
-        instance_receiver.accept(handle).await?;
-    }
+        tracing::info!("acknowledging new instance");
+        instance_receiver
+            .accept(handle)
+            .await
+            .inspect_err(|e| {
+                tracing::error!("Failed to acknowledge new instance: {:?}", e);
+            })
+            .unwrap();
+        tracing::info!("acknowledged new instance");
+    });
+    Ok(())
 }

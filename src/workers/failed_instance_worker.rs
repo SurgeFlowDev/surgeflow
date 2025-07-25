@@ -19,18 +19,44 @@ where
     P: Project,
     FailedInstanceReceiverT: FailedInstanceReceiver<P>,
 {
-    let mut failed_instance_receiver = dependencies.failed_instance_receiver;
+    let failed_instance_receiver = dependencies.failed_instance_receiver;
 
     loop {
-        let Ok((step, handle)) = failed_instance_receiver.receive().await else {
-            tracing::error!("Failed to receive next step");
-            continue;
-        };
+        if let Err(err) = receive_and_process::<P, FailedInstanceReceiverT>(
+            &failed_instance_receiver,
+        )
+        .await
+        {
+            tracing::error!("Error processing failed instance: {:?}", err);
+        }
+    }
+}
 
+async fn receive_and_process<P, FailedInstanceReceiverT>(
+    failed_instance_receiver: &FailedInstanceReceiverT,
+) -> anyhow::Result<()>
+where
+    P: Project,
+    FailedInstanceReceiverT: FailedInstanceReceiver<P>,
+{
+    let mut failed_instance_receiver = failed_instance_receiver.clone();
+
+    let (step, handle) = failed_instance_receiver.receive().await?;
+
+    tokio::spawn(async move {
         if let Err(err) = process(step).await {
             tracing::error!("Error processing workflow instance: {:?}", err);
         }
 
-        failed_instance_receiver.accept(handle).await?;
-    }
+        tracing::info!("acknowledging failed instance");
+        failed_instance_receiver
+            .accept(handle)
+            .await
+            .inspect_err(|e| {
+                tracing::error!("Failed to acknowledge failed instance: {:?}", e);
+            })
+            .unwrap();
+        tracing::info!("acknowledged failed instance");
+    });
+    Ok(())
 }

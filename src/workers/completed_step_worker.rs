@@ -22,15 +22,15 @@ where
     NextStepSenderT: NextStepSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    let mut completed_step_receiver = dependencies.completed_step_receiver;
-    let mut next_step_sender = dependencies.next_step_sender;
-    let mut persistence_manager = dependencies.persistence_manager;
+    let completed_step_receiver = dependencies.completed_step_receiver;
+    let next_step_sender = dependencies.next_step_sender;
+    let persistence_manager = dependencies.persistence_manager;
 
     loop {
         if let Err(err) = receive_and_process(
-            &mut completed_step_receiver,
-            &mut next_step_sender,
-            &mut persistence_manager,
+            &completed_step_receiver,
+            &next_step_sender,
+            &persistence_manager,
         )
         .await
         {
@@ -45,23 +45,36 @@ async fn receive_and_process<
     NextStepSenderT,
     PersistenceManagerT,
 >(
-    completed_step_receiver: &mut CompletedStepReceiverT,
-    next_step_sender: &mut NextStepSenderT,
-    persistence_manager: &mut PersistenceManagerT,
+    completed_step_receiver: &CompletedStepReceiverT,
+    next_step_sender: &NextStepSenderT,
+    persistence_manager: &PersistenceManagerT,
 ) -> anyhow::Result<()>
 where
     CompletedStepReceiverT: CompletedStepReceiver<P>,
     NextStepSenderT: NextStepSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
+    let mut completed_step_receiver = completed_step_receiver.clone();
+
     let (step, handle) = completed_step_receiver.receive().await?;
+    let next_step_sender = next_step_sender.clone();
+    let persistence_manager = persistence_manager.clone();
 
-    if let Err(err) = process(next_step_sender, persistence_manager, step).await {
-        tracing::error!("Error processing completed step: {:?}", err);
-    }
+    tokio::spawn(async move {
+        if let Err(err) = process(&mut next_step_sender.clone(), &mut persistence_manager.clone(), step).await {
+            tracing::error!("Error processing completed step: {:?}", err);
+        }
 
-    completed_step_receiver.accept(handle).await?;
-
+        tracing::info!("acknowledging completed step for instance");
+        completed_step_receiver
+            .accept(handle)
+            .await
+            .inspect_err(|e| {
+                tracing::error!("Failed to acknowledge completed step: {:?}", e);
+            })
+            .unwrap();
+        tracing::info!("acknowledged completed step for instance");
+    });
     Ok(())
 }
 

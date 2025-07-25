@@ -89,17 +89,68 @@ where
     CompletedStepSenderT: CompletedStepSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    let mut active_step_receiver = dependencies.active_step_receiver;
-    let mut active_step_sender = dependencies.active_step_sender;
-    let mut failed_step_sender = dependencies.failed_step_sender;
-    let mut completed_step_sender = dependencies.completed_step_sender;
-    let mut persistence_manager = dependencies.persistence_manager;
+    let active_step_receiver = dependencies.active_step_receiver;
+    let active_step_sender = dependencies.active_step_sender;
+    let failed_step_sender = dependencies.failed_step_sender;
+    let completed_step_sender = dependencies.completed_step_sender;
+    let persistence_manager = dependencies.persistence_manager;
 
     loop {
-        let Ok((step, handle)) = active_step_receiver.receive().await else {
-            tracing::error!("Failed to receive next step");
-            continue;
-        };
+        if let Err(err) = receive_and_process::<
+            P,
+            ActiveStepReceiverT,
+            ActiveStepSenderT,
+            FailedStepSenderT,
+            CompletedStepSenderT,
+            PersistenceManagerT,
+        >(
+            &active_step_receiver,
+            &active_step_sender,
+            &failed_step_sender,
+            &completed_step_sender,
+            &persistence_manager,
+            &project,
+        )
+        .await
+        {
+            tracing::error!("Error processing active step: {:?}", err);
+        }
+    }
+}
+
+async fn receive_and_process<
+    P,
+    ActiveStepReceiverT,
+    ActiveStepSenderT,
+    FailedStepSenderT,
+    CompletedStepSenderT,
+    PersistenceManagerT,
+>(
+    active_step_receiver: &ActiveStepReceiverT,
+    active_step_sender: &ActiveStepSenderT,
+    failed_step_sender: &FailedStepSenderT,
+    completed_step_sender: &CompletedStepSenderT,
+    persistence_manager: &PersistenceManagerT,
+    project: &P,
+) -> anyhow::Result<()>
+where
+    P: Project,
+    ActiveStepReceiverT: ActiveStepReceiver<P>,
+    ActiveStepSenderT: ActiveStepSender<P>,
+    FailedStepSenderT: FailedStepSender<P>,
+    CompletedStepSenderT: CompletedStepSender<P>,
+    PersistenceManagerT: PersistenceManager,
+{
+    let mut active_step_receiver = active_step_receiver.clone();
+
+    let (step, handle) = active_step_receiver.receive().await?;
+    let active_step_sender = active_step_sender.clone();
+    let failed_step_sender = failed_step_sender.clone();
+    let completed_step_sender = completed_step_sender.clone();
+    let persistence_manager = persistence_manager.clone();
+    let project = project.clone();
+
+    tokio::spawn(async move {
         let wf = project.workflow_for_step(&step.step.step);
 
         if let Err(err) = process::<
@@ -110,17 +161,26 @@ where
             PersistenceManagerT,
         >(
             wf.clone(),
-            &mut active_step_sender,
-            &mut failed_step_sender,
-            &mut completed_step_sender,
-            &mut persistence_manager,
+            &mut active_step_sender.clone(),
+            &mut failed_step_sender.clone(),
+            &mut completed_step_sender.clone(),
+            &mut persistence_manager.clone(),
             step,
         )
         .await
         {
-            tracing::error!("Error processing next step: {:?}", err);
+            tracing::error!("Error processing active step: {:?}", err);
         }
 
-        active_step_receiver.accept(handle).await?;
-    }
+        tracing::info!("acknowledging active step for instance");
+        active_step_receiver
+            .accept(handle)
+            .await
+            .inspect_err(|e| {
+                tracing::error!("Failed to acknowledge active step: {:?}", e);
+            })
+            .unwrap();
+        tracing::info!("acknowledged active step for instance");
+    });
+    Ok(())
 }

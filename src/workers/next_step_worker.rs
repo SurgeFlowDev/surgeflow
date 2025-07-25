@@ -33,10 +33,10 @@ where
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    let mut next_step_receiver = dependencies.next_step_receiver;
-    let mut active_step_sender = dependencies.active_step_sender;
-    let mut steps_awaiting_event_manager = dependencies.steps_awaiting_event_manager;
-    let mut persistence_manager = dependencies.persistence_manager;
+    let next_step_receiver = dependencies.next_step_receiver;
+    let active_step_sender = dependencies.active_step_sender;
+    let steps_awaiting_event_manager = dependencies.steps_awaiting_event_manager;
+    let persistence_manager = dependencies.persistence_manager;
 
     loop {
         if let Err(err) = receive_and_process::<
@@ -46,10 +46,10 @@ where
             StepsAwaitingEventManagerT,
             PersistenceManagerT,
         >(
-            &mut next_step_receiver,
-            &mut active_step_sender,
-            &mut steps_awaiting_event_manager,
-            &mut persistence_manager,
+            &next_step_receiver,
+            &active_step_sender,
+            &steps_awaiting_event_manager,
+            &persistence_manager,
         )
         .await
         {
@@ -65,10 +65,10 @@ async fn receive_and_process<
     StepsAwaitingEventManagerT,
     PersistenceManagerT,
 >(
-    next_step_receiver: &mut NextStepReceiverT,
-    active_step_sender: &mut ActiveStepSenderT,
-    steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
-    persistence_manager: &mut PersistenceManagerT,
+    next_step_receiver: &NextStepReceiverT,
+    active_step_sender: &ActiveStepSenderT,
+    steps_awaiting_event_manager: &StepsAwaitingEventManagerT,
+    persistence_manager: &PersistenceManagerT,
 ) -> anyhow::Result<()>
 where
     P: Project,
@@ -77,22 +77,36 @@ where
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
     PersistenceManagerT: PersistenceManager,
 {
+    let mut next_step_receiver = next_step_receiver.clone();
+
     let (step, handle) = next_step_receiver.receive().await?;
+    let active_step_sender = active_step_sender.clone();
+    let steps_awaiting_event_manager = steps_awaiting_event_manager.clone();
+    let persistence_manager = persistence_manager.clone();
 
-    if let Err(err) =
-        process::<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceManagerT>(
-            active_step_sender,
-            steps_awaiting_event_manager,
-            persistence_manager,
-            step,
-        )
-        .await
-    {
-        tracing::error!("Error processing next step: {:?}", err);
-    }
+    tokio::spawn(async move {
+        if let Err(err) =
+            process::<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceManagerT>(
+                &mut active_step_sender.clone(),
+                &mut steps_awaiting_event_manager.clone(),
+                &mut persistence_manager.clone(),
+                step,
+            )
+            .await
+        {
+            tracing::error!("Error processing next step: {:?}", err);
+        }
 
-    next_step_receiver.accept(handle).await?;
-
+        tracing::info!("acknowledging next step for instance");
+        next_step_receiver
+            .accept(handle)
+            .await
+            .inspect_err(|e| {
+                tracing::error!("Failed to acknowledge next step: {:?}", e);
+            })
+            .unwrap();
+        tracing::info!("acknowledged next step for instance");
+    });
     Ok(())
 }
 

@@ -22,22 +22,62 @@ where
     EventReceiverT: EventReceiver<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
 {
-    let mut active_step_sender = dependencies.active_step_sender;
-    let mut event_receiver = dependencies.event_receiver;
-    let mut steps_awaiting_event = dependencies.steps_awaiting_event_manager;
+    let active_step_sender = dependencies.active_step_sender;
+    let event_receiver = dependencies.event_receiver;
+    let steps_awaiting_event = dependencies.steps_awaiting_event_manager;
 
     loop {
-        let (instance_event, handle) = event_receiver.receive().await?;
-
-        process::<P, ActiveStepSenderT, StepsAwaitingEventManagerT>(
-            instance_event,
-            &mut active_step_sender,
-            &mut steps_awaiting_event,
+        if let Err(err) = receive_and_process::<P, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>(
+            &active_step_sender,
+            &event_receiver,
+            &steps_awaiting_event,
         )
-        .await?;
-
-        event_receiver.accept(handle).await?;
+        .await
+        {
+            tracing::error!("Error processing new event: {:?}", err);
+        }
     }
+}
+
+async fn receive_and_process<P, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>(
+    active_step_sender: &ActiveStepSenderT,
+    event_receiver: &EventReceiverT,
+    steps_awaiting_event: &StepsAwaitingEventManagerT,
+) -> anyhow::Result<()>
+where
+    P: Project,
+    ActiveStepSenderT: ActiveStepSender<P>,
+    EventReceiverT: EventReceiver<P>,
+    StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
+{
+    let mut event_receiver = event_receiver.clone();
+
+    let (instance_event, handle) = event_receiver.receive().await?;
+    let active_step_sender = active_step_sender.clone();
+    let steps_awaiting_event = steps_awaiting_event.clone();
+
+    tokio::spawn(async move {
+        if let Err(err) = process::<P, ActiveStepSenderT, StepsAwaitingEventManagerT>(
+            instance_event,
+            &mut active_step_sender.clone(),
+            &mut steps_awaiting_event.clone(),
+        )
+        .await
+        {
+            tracing::error!("Error processing new event: {:?}", err);
+        }
+
+        tracing::info!("acknowledging new event");
+        event_receiver
+            .accept(handle)
+            .await
+            .inspect_err(|e| {
+                tracing::error!("Failed to acknowledge new event: {:?}", e);
+            })
+            .unwrap();
+        tracing::info!("acknowledged new event");
+    });
+    Ok(())
 }
 
 async fn process<P, ActiveStepSenderT, StepsAwaitingEventManagerT>(
