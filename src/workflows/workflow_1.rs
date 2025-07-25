@@ -82,7 +82,7 @@ impl ProjectWorkflow for MyProjectWorkflow {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, From, TryInto)]
 pub enum MyProjectStep {
     Workflow1(Workflow1Step),
 }
@@ -158,24 +158,6 @@ impl WorkflowStep for Workflow1Step {
     }
 }
 
-impl From<Workflow1Step> for MyProjectStep {
-    fn from(step: Workflow1Step) -> Self {
-        MyProjectStep::Workflow1(step)
-    }
-}
-
-impl TryFrom<MyProjectStep> for Workflow1Step {
-    type Error = ();
-
-    fn try_from(step: MyProjectStep) -> Result<Self, Self::Error> {
-        if let MyProjectStep::Workflow1(workflow_step) = step {
-            Ok(workflow_step)
-        } else {
-            Err(())
-        }
-    }
-}
-
 ///// Steps
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -228,7 +210,7 @@ impl Step for Step1 {
 
 // events
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, From)]
 pub enum MyProjectEvent {
     Workflow1(Workflow1Event),
     #[serde(skip)]
@@ -237,12 +219,6 @@ pub enum MyProjectEvent {
 
 impl ProjectEvent for MyProjectEvent {
     type Project = MyProject;
-}
-
-impl From<Immediate> for MyProjectEvent {
-    fn from(immediate: Immediate) -> Self {
-        MyProjectEvent::Immediate(immediate)
-    }
 }
 
 impl TryFrom<MyProjectEvent> for Immediate {
@@ -261,12 +237,6 @@ pub enum Workflow1Event {
     Event0(Event0),
     #[serde(skip)]
     Immediate(Immediate),
-}
-
-impl From<Workflow1Event> for MyProjectEvent {
-    fn from(event: Workflow1Event) -> Self {
-        MyProjectEvent::Workflow1(event)
-    }
 }
 
 impl WorkflowEvent for Workflow1Event {
