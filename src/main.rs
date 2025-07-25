@@ -1,4 +1,5 @@
 use rust_workflow_2::workers::active_step_worker;
+use rust_workflow_2::workers::adapters::dependencies::DependencyManager;
 use rust_workflow_2::workers::completed_instance_worker;
 use rust_workflow_2::workers::completed_step_worker;
 use rust_workflow_2::workers::control_server;
@@ -68,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
 ))]
 async fn main_handler<P: Project, D>(project: P, mut dependency_manager: D) -> anyhow::Result<()>
 where
-    D: rust_workflow_2::workers::adapters::dependencies::DependencyManager<P>,
+    D: DependencyManager<P>,
 {
     try_join!(
         #[cfg(feature = "control_server")]
