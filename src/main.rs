@@ -16,14 +16,9 @@ use rust_workflow_2::workflows::workflow_1::Workflow1;
 use rust_workflow_2::workflows::workflow_2::Workflow2;
 use rust_workflow_2::workflows::{MyProject, Project};
 use tokio::try_join;
+use tracing::Level;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    dotenvy::dotenv().ok();
-    tracing_subscriber::fmt()
-        // .with_max_level(Level::DEBUG)
-        .init();
-
+fn get_aws_adapter_config() -> anyhow::Result<AzureAdapterConfig> {
     let config = Config::builder()
         // .add_source(File::with_name("config/default")) // e.g. default.toml
         // .add_source(File::with_name("config/local").required(false))
@@ -33,6 +28,18 @@ async fn main() -> anyhow::Result<()> {
     let config = config
         .try_deserialize::<AzureAdapterConfig>()
         .expect("Failed to deserialize AzureAdapterConfig from environment variables");
+
+    Ok(config)
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok();
+    tracing_subscriber::fmt()
+        .with_max_level(Level::DEBUG)
+        .init();
+
+    let config = get_aws_adapter_config()?;
 
     let dependency_manager = AzureDependencyManager::new(config);
 
