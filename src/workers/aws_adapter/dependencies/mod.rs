@@ -16,7 +16,7 @@ use crate::{
             completed_step_worker::CompletedStepWorkerDependencies,
             control_server::ControlServerDependencies,
         },
-        aws::{
+        aws_adapter::{
             managers::{AzurePersistenceManager, AzureServiceBusStepsAwaitingEventManager},
             receivers::{
                 AzureServiceBusActiveStepReceiver, AzureServiceBusCompletedInstanceReceiver,
