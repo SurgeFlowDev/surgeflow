@@ -28,9 +28,9 @@ pub mod workflow_2;
 )]
 pub struct WorkflowInstanceId(Uuid);
 
-impl Into<[u8; 16]> for WorkflowInstanceId {
-    fn into(self) -> [u8; 16] {
-        self.0.into_bytes()
+impl From<WorkflowInstanceId> for [u8; 16] {
+    fn from(val: WorkflowInstanceId) -> Self {
+        val.0.into_bytes()
     }
 }
 
@@ -451,7 +451,6 @@ impl ProjectWorkflow for MyProjectWorkflow {
 
     // TODO: this should be based on some sort of enum, not a string
     fn entrypoint(workflow_name: WorkflowName) -> crate::step::StepWithSettings<Self::Project> {
-
         if workflow_name == Workflow1::NAME.into() {
             Workflow1::entrypoint()
         } else if workflow_name == Workflow2::NAME.into() {

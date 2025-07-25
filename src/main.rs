@@ -37,8 +37,8 @@ async fn main() -> anyhow::Result<()> {
     let dependency_manager = AzureDependencyManager::new(config);
 
     let project = MyProject {
-        workflow_1: Workflow1,
-        workflow_2: Workflow2,
+        workflow_1: Workflow1 {},
+        workflow_2: Workflow2 {},
     };
 
     main_handler(project, dependency_manager).await?;

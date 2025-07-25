@@ -1,4 +1,3 @@
-use aide::axum::ApiRouter;
 use derive_more::{From, TryInto};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -15,7 +14,7 @@ use crate::{
 ///////////////
 
 #[derive(Clone, Debug)]
-pub struct Workflow2;
+pub struct Workflow2 {}
 
 impl Workflow for Workflow2 {
     type Project = MyProject;

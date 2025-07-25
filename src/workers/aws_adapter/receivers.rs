@@ -39,8 +39,7 @@ impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstan
 
         let msg = out
             .messages
-            .map(|vec| vec.into_iter().next())
-            .flatten()
+            .and_then(|vec| vec.into_iter().next())
             .ok_or(AzureAdapterError::NoMessagesReceived)?;
 
         let handle = msg
@@ -108,8 +107,7 @@ impl<P: Project> FailedInstanceReceiver<P> for AzureServiceBusFailedInstanceRece
 
         let msg = out
             .messages
-            .map(|vec| vec.into_iter().next())
-            .flatten()
+            .and_then(|vec| vec.into_iter().next())
             .ok_or(AzureAdapterError::NoMessagesReceived)?;
 
         let handle = msg
@@ -177,8 +175,7 @@ impl<P: Project> NewInstanceReceiver<P> for AzureServiceBusNewInstanceReceiver<P
 
         let msg = out
             .messages
-            .map(|vec| vec.into_iter().next())
-            .flatten()
+            .and_then(|vec| vec.into_iter().next())
             .ok_or(AzureAdapterError::NoMessagesReceived)?;
 
         let handle = msg
@@ -242,8 +239,7 @@ impl<P: Project> EventReceiver<P> for AzureServiceBusEventReceiver<P> {
 
         let msg = out
             .messages
-            .map(|vec| vec.into_iter().next())
-            .flatten()
+            .and_then(|vec| vec.into_iter().next())
             .ok_or(AzureAdapterError::NoMessagesReceived)?;
 
         let handle = msg
@@ -306,8 +302,7 @@ impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
 
         let msg = out
             .messages
-            .map(|vec| vec.into_iter().next())
-            .flatten()
+            .and_then(|vec| vec.into_iter().next())
             .ok_or(AzureAdapterError::NoMessagesReceived)?;
 
         let handle = msg
@@ -375,8 +370,7 @@ impl<P: Project> CompletedStepReceiver<P> for AzureServiceBusCompletedStepReceiv
 
         let msg = out
             .messages
-            .map(|vec| vec.into_iter().next())
-            .flatten()
+            .and_then(|vec| vec.into_iter().next())
             .ok_or(AzureAdapterError::NoMessagesReceived)?;
 
         let handle = msg
@@ -444,8 +438,7 @@ impl<P: Project> FailedStepReceiver<P> for AzureServiceBusFailedStepReceiver<P> 
 
         let msg = out
             .messages
-            .map(|vec| vec.into_iter().next())
-            .flatten()
+            .and_then(|vec| vec.into_iter().next())
             .ok_or(AzureAdapterError::NoMessagesReceived)?;
 
         let handle = msg
@@ -513,8 +506,7 @@ impl<P: Project> ActiveStepReceiver<P> for AzureServiceBusActiveStepReceiver<P> 
 
         let msg = out
             .messages
-            .map(|vec| vec.into_iter().next())
-            .flatten()
+            .and_then(|vec| vec.into_iter().next())
             .ok_or(AzureAdapterError::NoMessagesReceived)?;
 
         let handle = msg

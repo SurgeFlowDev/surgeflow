@@ -74,7 +74,7 @@ pub mod dynamo_kv {
             .send()
             .await?;
 
-        if let Some(_) = resp.attributes {
+        if resp.attributes.is_some() {
         } else {
             tracing::debug!("Item not found for key: {:?}", key);
             return Err(DynamoKvError::NotFound);

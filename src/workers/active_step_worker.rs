@@ -1,5 +1,5 @@
 use crate::event::Immediate;
-use crate::workflows::{ProjectEvent, ProjectStep, WorkflowEvent};
+use crate::workflows::ProjectStep;
 use crate::{
     step::FullyQualifiedStep,
     workers::adapters::{
