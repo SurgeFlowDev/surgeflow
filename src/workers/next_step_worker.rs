@@ -97,7 +97,7 @@ where
             tracing::error!("Error processing next step: {:?}", err);
         }
 
-        tracing::info!("acknowledging next step for instance");
+        tracing::debug!("acknowledging next step for instance");
         next_step_receiver
             .accept(handle)
             .await
@@ -105,7 +105,7 @@ where
                 tracing::error!("Failed to acknowledge next step: {:?}", e);
             })
             .unwrap();
-        tracing::info!("acknowledged next step for instance");
+        tracing::debug!("acknowledged next step for instance");
     });
     Ok(())
 }
@@ -141,7 +141,7 @@ where
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    tracing::info!(
+    tracing::debug!(
         "received next step for instance: {}",
         step.instance.external_id
     );

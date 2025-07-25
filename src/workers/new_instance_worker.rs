@@ -92,7 +92,7 @@ where
             tracing::error!("Error processing workflow instance: {:?}", err);
         }
 
-        tracing::info!("acknowledging new instance");
+        tracing::debug!("acknowledging new instance");
         instance_receiver
             .accept(handle)
             .await
@@ -100,7 +100,7 @@ where
                 tracing::error!("Failed to acknowledge new instance: {:?}", e);
             })
             .unwrap();
-        tracing::info!("acknowledged new instance");
+        tracing::debug!("acknowledged new instance");
     });
     Ok(())
 }

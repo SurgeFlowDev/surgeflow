@@ -65,7 +65,7 @@ where
             tracing::error!("Error processing completed step: {:?}", err);
         }
 
-        tracing::info!("acknowledging completed step for instance");
+        tracing::debug!("acknowledging completed step for instance");
         completed_step_receiver
             .accept(handle)
             .await
@@ -73,7 +73,7 @@ where
                 tracing::error!("Failed to acknowledge completed step: {:?}", e);
             })
             .unwrap();
-        tracing::info!("acknowledged completed step for instance");
+        tracing::debug!("acknowledged completed step for instance");
     });
     Ok(())
 }
@@ -96,7 +96,7 @@ where
     NextStepSenderT: NextStepSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    tracing::info!(
+    tracing::debug!(
         "received completed step for instance: {}",
         step.instance.external_id
     );
@@ -138,7 +138,7 @@ where
             .map_err(CompletedStepWorkerError::SendNextStepError)?;
     } else {
         // TODO: push to instance completed queue ?
-        tracing::info!("Instance {} completed", step.instance.external_id);
+        tracing::debug!("Instance {} completed", step.instance.external_id);
 
         persistence_manager
             .insert_step_output::<P>(step.step_id, None)

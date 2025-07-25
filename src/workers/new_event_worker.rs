@@ -67,7 +67,7 @@ where
             tracing::error!("Error processing new event: {:?}", err);
         }
 
-        tracing::info!("acknowledging new event");
+        tracing::debug!("acknowledging new event");
         event_receiver
             .accept(handle)
             .await
@@ -75,7 +75,7 @@ where
                 tracing::error!("Failed to acknowledge new event: {:?}", e);
             })
             .unwrap();
-        tracing::info!("acknowledged new event");
+        tracing::debug!("acknowledged new event");
     });
     Ok(())
 }
@@ -92,7 +92,7 @@ where
 {
     let step = steps_awaiting_event.get_step(instance_id).await?;
     let Some(step) = step else {
-        tracing::info!("No step awaiting event for instance {}", instance_id);
+        tracing::debug!("No step awaiting event for instance {}", instance_id);
         return Ok(());
     };
     if step.step.step.is_project_event(&event) {

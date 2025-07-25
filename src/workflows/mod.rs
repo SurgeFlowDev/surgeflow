@@ -201,7 +201,7 @@ pub trait WorkflowControl: Workflow {
             _: PostWorkflowInstance,
             State(ArcAppState(state)): State<ArcAppState<T::Project, E, N>>,
         ) -> Result<Json<WorkflowInstanceId>, PostWorkflowInstanceError> {
-            tracing::info!("creating instance...");
+            tracing::debug!("creating instance...");
             let external_id = WorkflowInstanceId::new();
             state
                 .dependencies

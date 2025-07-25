@@ -32,7 +32,7 @@ where
     CompletedStepSenderT: CompletedStepSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    tracing::info!("Received new step");
+    tracing::debug!("Received new step");
     persistence_manager
         .set_step_status(step.step_id, 3)
         .await
@@ -49,13 +49,13 @@ where
             .send(FullyQualifiedStep { next_step, ..step })
             .await?;
     } else {
-        // tracing::info!("Failed to run step: {:?}", step.step);
+        // tracing::debug!("Failed to run step: {:?}", step.step);
 
         if step.retry_count <= step.step.settings.max_retries {
-            tracing::info!("Retrying step. Retry count: {}", step.retry_count);
+            tracing::debug!("Retrying step. Retry count: {}", step.retry_count);
             active_step_sender.send(step).await?;
         } else {
-            tracing::info!("Max retries reached for step: {}", step.step_id);
+            tracing::debug!("Max retries reached for step: {}", step.step_id);
             failed_step_sender.send(step).await?;
         }
     }
@@ -172,7 +172,7 @@ where
             tracing::error!("Error processing active step: {:?}", err);
         }
 
-        tracing::info!("acknowledging active step for instance");
+        tracing::debug!("acknowledging active step for instance");
         active_step_receiver
             .accept(handle)
             .await
@@ -180,7 +180,7 @@ where
                 tracing::error!("Failed to acknowledge active step: {:?}", e);
             })
             .unwrap();
-        tracing::info!("acknowledged active step for instance");
+        tracing::debug!("acknowledged active step for instance");
     });
     Ok(())
 }

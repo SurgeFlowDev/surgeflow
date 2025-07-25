@@ -7,7 +7,7 @@ use crate::{
 };
 
 async fn process(instance: WorkflowInstance) -> anyhow::Result<()> {
-    tracing::info!("Failed instance: {:?}", instance);
+    tracing::debug!("Failed instance: {:?}", instance);
 
     Ok(())
 }
@@ -48,7 +48,7 @@ where
             tracing::error!("Error processing workflow instance: {:?}", err);
         }
 
-        tracing::info!("acknowledging failed instance");
+        tracing::debug!("acknowledging failed instance");
         failed_instance_receiver
             .accept(handle)
             .await
@@ -56,7 +56,7 @@ where
                 tracing::error!("Failed to acknowledge failed instance: {:?}", e);
             })
             .unwrap();
-        tracing::info!("acknowledged failed instance");
+        tracing::debug!("acknowledged failed instance");
     });
     Ok(())
 }

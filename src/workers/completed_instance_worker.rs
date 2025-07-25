@@ -7,7 +7,7 @@ use crate::{
 };
 
 async fn process(instance: WorkflowInstance) -> anyhow::Result<()> {
-    tracing::info!("Completed instance: {:?}", instance);
+    tracing::debug!("Completed instance: {:?}", instance);
 
     Ok(())
 }
@@ -40,7 +40,7 @@ async fn receive_and_process<P: Project, CompletedInstanceReceiverT: CompletedIn
             tracing::error!("Error processing workflow instance: {:?}", err);
         }
 
-        tracing::info!("acknowledging completed instance");
+        tracing::debug!("acknowledging completed instance");
         completed_instance_receiver
             .accept(handle)
             .await
@@ -48,7 +48,7 @@ async fn receive_and_process<P: Project, CompletedInstanceReceiverT: CompletedIn
                 tracing::error!("Failed to acknowledge completed instance: {:?}", e);
             })
             .unwrap();
-        tracing::info!("acknowledged completed instance");
+        tracing::debug!("acknowledged completed instance");
     });
     Ok(())
 }

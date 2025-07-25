@@ -13,11 +13,14 @@ use rust_workflow_2::workflows::workflow_1::MyProject;
 use rust_workflow_2::workflows::Project;
 use rust_workflow_2::workflows::workflow_1::Workflow1;
 use tokio::try_join;
+use tracing::Level;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        // .with_max_level(Level::DEBUG)
+        .init();
 
     main_handler::<MyProject>(MyProject {
         workflow_1: Workflow1,

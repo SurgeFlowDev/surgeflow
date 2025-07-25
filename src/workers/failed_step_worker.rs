@@ -72,7 +72,7 @@ where
             tracing::error!("Error processing failed step: {:?}", err);
         }
 
-        tracing::info!("acknowledging failed step for instance");
+        tracing::debug!("acknowledging failed step for instance");
         failed_step_receiver
             .accept(handle)
             .await
@@ -80,7 +80,7 @@ where
                 tracing::error!("Failed to acknowledge failed step: {:?}", e);
             })
             .unwrap();
-        tracing::info!("acknowledged failed step for instance");
+        tracing::debug!("acknowledged failed step for instance");
     });
     Ok(())
 }
@@ -108,7 +108,7 @@ where
     FailedInstanceSenderT: FailedInstanceSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    tracing::info!(
+    tracing::debug!(
         "received failed step for instance: {}",
         step.instance.external_id
     );
