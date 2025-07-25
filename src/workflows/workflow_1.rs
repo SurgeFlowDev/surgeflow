@@ -1,9 +1,11 @@
 use aide::axum::ApiRouter;
+use derive_more::{From, TryInto};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     event::Immediate,
+    step::{StepSettings, StepWithSettings},
     workflows::{
         Event, Project, ProjectEvent, ProjectStep, ProjectWorkflow, Step, TryAsRef, TryFromRef,
         Workflow, WorkflowControl, WorkflowEvent, WorkflowStep,
@@ -116,9 +118,10 @@ impl ProjectStep for MyProjectStep {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, TryInto, From)]
 pub enum Workflow1Step {
     Step0(Step0),
+    Step1(Step1),
 }
 
 impl WorkflowStep for Workflow1Step {
@@ -136,18 +139,21 @@ impl WorkflowStep for Workflow1Step {
     > {
         match self {
             Workflow1Step::Step0(step) => step.run_raw(wf, event.try_into().unwrap()).await,
+            Workflow1Step::Step1(step) => step.run_raw(wf, event.try_into().unwrap()).await,
         }
     }
 
     fn is_event<T: Event + 'static>(&self) -> bool {
         match self {
             Workflow1Step::Step0(_) => <Step0 as Step>::Event::is::<T>(),
+            Workflow1Step::Step1(_) => <Step1 as Step>::Event::is::<T>(),
         }
     }
 
     fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool {
         match self {
             Workflow1Step::Step0(_) => event.is_event::<<Step0 as Step>::Event>(),
+            Workflow1Step::Step1(_) => event.is_event::<<Step1 as Step>::Event>(),
         }
     }
 }
@@ -170,14 +176,10 @@ impl TryFrom<MyProjectStep> for Workflow1Step {
     }
 }
 
+///// Steps
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Step0;
-
-impl From<Step0> for Workflow1Step {
-    fn from(step: Step0) -> Self {
-        Workflow1Step::Step0(step)
-    }
-}
 
 impl Step for Step0 {
     type Event = Event0;
@@ -191,25 +193,36 @@ impl Step for Step0 {
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
     ) -> Result<
-        Option<crate::step::StepWithSettings<<Self::Workflow as Workflow>::Project>>,
+        Option<StepWithSettings<<Self::Workflow as Workflow>::Project>>,
         crate::step::StepError,
     > {
         tracing::info!("Running Step0 in Workflow1");
-        // Ok(None)
-        // test error
-        Err(crate::step::StepError::Unknown)
+        Ok(Some(StepWithSettings {
+            // TODO: this should just return Workflow1Step, right? It shouldn't be able to return steps from other workflows
+            step: MyProjectStep::Workflow1(Workflow1Step::Step1(Step1)),
+            settings: StepSettings { max_retries: 3 },
+        }))
     }
 }
 
-impl TryFrom<Workflow1Step> for Step0 {
-    type Error = ();
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct Step1;
 
-    fn try_from(step: Workflow1Step) -> Result<Self, Self::Error> {
-        if let Workflow1Step::Step0(step0) = step {
-            Ok(step0)
-        } else {
-            Err(())
-        }
+impl Step for Step1 {
+    type Event = Immediate;
+
+    type Workflow = Workflow1;
+
+    async fn run_raw(
+        &self,
+        wf: Self::Workflow,
+        event: Self::Event,
+    ) -> Result<
+        Option<crate::step::StepWithSettings<<Self::Workflow as Workflow>::Project>>,
+        crate::step::StepError,
+    > {
+        tracing::info!("Running Step1 in Workflow1");
+        Ok(None)
     }
 }
 
