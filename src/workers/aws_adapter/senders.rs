@@ -29,7 +29,6 @@ impl<P: Project> NextStepSender<P> for AzureServiceBusNextStepSender<P> {
     type Error = AzureAdapterError;
 
     async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
-        
         self.sender
             .send_message()
             .message_group_id(Uuid::new_v4().to_string())
@@ -63,7 +62,6 @@ pub struct AzureServiceBusActiveStepSender<P: Project> {
 impl<P: Project> ActiveStepSender<P> for AzureServiceBusActiveStepSender<P> {
     type Error = AzureAdapterError;
     async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
-        
         self.sender
             .send_message()
             .message_group_id(Uuid::new_v4().to_string())
@@ -99,7 +97,6 @@ impl<P: Project> FailedStepSender<P> for AzureServiceBusFailedStepSender<P> {
     type Error = AzureAdapterError;
 
     async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
-        
         self.sender
             .send_message()
             .message_group_id(Uuid::new_v4().to_string())
@@ -134,7 +131,6 @@ impl<P: Project> EventSender<P> for AzureServiceBusEventSender<P> {
     type Error = AzureAdapterError;
 
     async fn send(&self, step: InstanceEvent<P>) -> Result<(), Self::Error> {
-        
         self.sender
             .send_message()
             .message_group_id(Uuid::new_v4().to_string())
@@ -170,7 +166,6 @@ impl<P: Project> NewInstanceSender<P> for AzureServiceBusNewInstanceSender<P> {
     type Error = AzureAdapterError;
 
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
-        
         self.sender
             .send_message()
             .message_group_id(Uuid::new_v4().to_string())
@@ -213,7 +208,6 @@ impl<P: Project> FailedInstanceSender<P> for AzureServiceBusFailedInstanceSender
     type Error = AzureAdapterError;
 
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
-        
         self.sender
             .send_message()
             .message_group_id(Uuid::new_v4().to_string())
@@ -253,7 +247,6 @@ impl<P: Project> CompletedInstanceSender<P> for AzureServiceBusCompletedInstance
     type Error = AzureAdapterError;
 
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
-        
         self.sender
             .send_message()
             .message_group_id(Uuid::new_v4().to_string())
@@ -292,7 +285,6 @@ impl<P: Project> CompletedStepSender<P> for AzureServiceBusCompletedStepSender<P
     type Error = AzureAdapterError;
 
     async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
-        
         self.sender
             .send_message()
             .message_group_id(Uuid::new_v4().to_string())

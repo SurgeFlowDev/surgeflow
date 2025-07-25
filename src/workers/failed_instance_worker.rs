@@ -22,10 +22,8 @@ where
     let failed_instance_receiver = dependencies.failed_instance_receiver;
 
     loop {
-        if let Err(err) = receive_and_process::<P, FailedInstanceReceiverT>(
-            &failed_instance_receiver,
-        )
-        .await
+        if let Err(err) =
+            receive_and_process::<P, FailedInstanceReceiverT>(&failed_instance_receiver).await
         {
             tracing::error!("Error processing failed instance: {:?}", err);
         }

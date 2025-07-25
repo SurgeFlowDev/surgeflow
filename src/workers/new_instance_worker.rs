@@ -19,6 +19,7 @@ where
     NextStepSenderT: NextStepSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
+    let workflow_name = instance.workflow_name.clone();
     persistence_manager
         .insert_instance(instance.clone())
         .await
@@ -26,7 +27,7 @@ where
 
     let entrypoint = FullyQualifiedStep {
         instance,
-        step: <<P as Project>::Workflow as ProjectWorkflow>::entrypoint(),
+        step: <<P as Project>::Workflow as ProjectWorkflow>::entrypoint(workflow_name),
         retry_count: 0,
         step_id: StepId::new(),
         event: None,
@@ -58,11 +59,12 @@ where
     let persistence_manager = dependencies.persistence_manager;
 
     loop {
-        if let Err(err) = receive_and_process::<P, NextStepSenderT, NewInstanceReceiverT, PersistenceManagerT>(
-            &instance_receiver,
-            &next_step_sender,
-            &persistence_manager,
-        )
+        if let Err(err) = receive_and_process::<
+            P,
+            NextStepSenderT,
+            NewInstanceReceiverT,
+            PersistenceManagerT,
+        >(&instance_receiver, &next_step_sender, &persistence_manager)
         .await
         {
             tracing::error!("Error processing new instance: {:?}", err);
@@ -88,7 +90,13 @@ where
     let persistence_manager = persistence_manager.clone();
 
     tokio::spawn(async move {
-        if let Err(err) = process(&mut next_step_sender.clone(), &mut persistence_manager.clone(), step).await {
+        if let Err(err) = process(
+            &mut next_step_sender.clone(),
+            &mut persistence_manager.clone(),
+            step,
+        )
+        .await
+        {
             tracing::error!("Error processing workflow instance: {:?}", err);
         }
 

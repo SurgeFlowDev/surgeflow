@@ -27,11 +27,12 @@ where
     let steps_awaiting_event = dependencies.steps_awaiting_event_manager;
 
     loop {
-        if let Err(err) = receive_and_process::<P, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>(
-            &active_step_sender,
-            &event_receiver,
-            &steps_awaiting_event,
-        )
+        if let Err(err) = receive_and_process::<
+            P,
+            ActiveStepSenderT,
+            EventReceiverT,
+            StepsAwaitingEventManagerT,
+        >(&active_step_sender, &event_receiver, &steps_awaiting_event)
         .await
         {
             tracing::error!("Error processing new event: {:?}", err);

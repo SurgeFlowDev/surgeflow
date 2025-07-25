@@ -153,5 +153,5 @@ REVOKE INSERT, UPDATE ON workflow_step_versions FROM app_user;
 INSERT INTO
     workflows ("name")
 VALUES
-    ('workflow_0'),
-    ('workflow_1');
+    ('workflow_1'),
+    ('workflow_2');

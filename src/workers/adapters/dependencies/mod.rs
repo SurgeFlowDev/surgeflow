@@ -177,7 +177,12 @@ pub trait NewInstanceWorkerDependencyProvider<P: Project> {
         &mut self,
     ) -> impl std::future::Future<
         Output = Result<
-            NewInstanceWorkerDependencies<P, Self::NextStepSender, Self::NewInstanceReceiver, Self::PersistenceManager>,
+            NewInstanceWorkerDependencies<
+                P,
+                Self::NextStepSender,
+                Self::NewInstanceReceiver,
+                Self::PersistenceManager,
+            >,
             Self::Error,
         >,
     > + Send;

@@ -12,7 +12,7 @@ pub mod dynamo_kv {
     use aws_sdk_dynamodb::{
         Client,
         error::SdkError,
-        operation::{delete_item::DeleteItemError, put_item::PutItemError},
+        operation::{delete_item::DeleteItemError, get_item::GetItemError, put_item::PutItemError},
         types::{AttributeValue, ReturnValue},
     };
     use aws_sdk_sqs::config::http::HttpResponse;
@@ -23,11 +23,15 @@ pub mod dynamo_kv {
         #[error("Item not found")]
         NotFound,
         #[error("Unexpected type for attribute value")]
-        UnexpectedType,
+        UnexpectedValueType,
+        #[error("Missing value")]
+        MissingValue,
         #[error("Put item error: {0}")]
         PutItem(#[from] SdkError<PutItemError, HttpResponse>),
         #[error("Delete item error: {0}")]
         DeleteItem(#[from] SdkError<DeleteItemError, HttpResponse>),
+        #[error("Get item error: {0}")]
+        GetItem(#[from] SdkError<GetItemError, HttpResponse>),
         #[error("Serialization error: {0}")]
         SerializeError(#[source] serde_json::Error),
         #[error("Deserialization error: {0}")]
@@ -57,11 +61,11 @@ pub mod dynamo_kv {
         Ok(())
     }
 
-    pub async fn get_and_delete_item<V: for<'de> Deserialize<'de>>(
+    pub async fn delete_item<V: for<'de> Deserialize<'de>>(
         client: &Client,
         table_name: String,
         key: &[u8],
-    ) -> Result<Option<V>, DynamoKvError> {
+    ) -> Result<(), DynamoKvError> {
         let resp = client
             .delete_item()
             .table_name(table_name)
@@ -70,20 +74,44 @@ pub mod dynamo_kv {
             .send()
             .await?;
 
-        if let Some(mut attrs) = resp.attributes {
-            if let Some(old_val) = attrs.remove("Value") {
-                if let AttributeValue::B(ref blob) = old_val {
-                    return Ok(Some(
-                        serde_json::from_slice(blob.as_ref())
-                            .map_err(DynamoKvError::DeserializeError)?,
-                    ));
-                } else {
-                    return Err(DynamoKvError::UnexpectedType);
-                }
-            }
+        if let Some(_) = resp.attributes {
+        } else {
+            tracing::debug!("Item not found for key: {:?}", key);
+            return Err(DynamoKvError::NotFound);
         }
 
-        Ok(None)
+        Ok(())
+    }
+
+    pub async fn try_get_item<V: for<'de> Deserialize<'de>>(
+        client: &Client,
+        table_name: String,
+        key: &[u8],
+    ) -> Result<Option<V>, DynamoKvError> {
+        let resp = client
+            .get_item()
+            .table_name(table_name)
+            .key("PK", AttributeValue::B(key.into()))
+            .send()
+            .await?;
+
+        let item = match resp.item {
+            Some(item) => item,
+            None => {
+                // this is a try_***, so we return None if the item is not found
+                return Ok(None);
+            }
+        };
+        let item = item
+            .get("Value")
+            .ok_or(DynamoKvError::MissingValue)?
+            .as_b()
+            .map_err(|_| DynamoKvError::UnexpectedValueType)?;
+
+        let item =
+            serde_json::from_slice(item.as_ref()).map_err(DynamoKvError::DeserializeError)?;
+
+        Ok(Some(item))
     }
 }
 
@@ -116,7 +144,7 @@ impl<P: Project> StepsAwaitingEventManager<P> for AzureServiceBusStepsAwaitingEv
         instance_id: WorkflowInstanceId,
     ) -> Result<Option<FullyQualifiedStep<P>>, Self::Error> {
         let key = Self::make_key(instance_id);
-        match dynamo_kv::get_and_delete_item::<FullyQualifiedStep<P>>(
+        match dynamo_kv::try_get_item::<FullyQualifiedStep<P>>(
             &self.dynamo_client,
             self.table_name.clone(),
             &key,
@@ -131,7 +159,7 @@ impl<P: Project> StepsAwaitingEventManager<P> for AzureServiceBusStepsAwaitingEv
 
     async fn delete_step(&mut self, instance_id: WorkflowInstanceId) -> Result<(), Self::Error> {
         let key = Self::make_key(instance_id);
-        dynamo_kv::get_and_delete_item::<FullyQualifiedStep<P>>(
+        dynamo_kv::delete_item::<FullyQualifiedStep<P>>(
             &self.dynamo_client,
             self.table_name.clone(),
             &key,

@@ -61,7 +61,13 @@ where
     let persistence_manager = persistence_manager.clone();
 
     tokio::spawn(async move {
-        if let Err(err) = process(&mut next_step_sender.clone(), &mut persistence_manager.clone(), step).await {
+        if let Err(err) = process(
+            &mut next_step_sender.clone(),
+            &mut persistence_manager.clone(),
+            step,
+        )
+        .await
+        {
             tracing::error!("Error processing completed step: {:?}", err);
         }
 

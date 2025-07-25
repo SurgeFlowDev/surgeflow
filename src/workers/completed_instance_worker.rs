@@ -18,17 +18,18 @@ pub async fn main<P: Project, CompletedInstanceReceiverT: CompletedInstanceRecei
     let completed_instance_receiver = dependencies.completed_instance_receiver;
 
     loop {
-        if let Err(err) = receive_and_process::<P, CompletedInstanceReceiverT>(
-            &completed_instance_receiver,
-        )
-        .await
+        if let Err(err) =
+            receive_and_process::<P, CompletedInstanceReceiverT>(&completed_instance_receiver).await
         {
             tracing::error!("Error processing completed instance: {:?}", err);
         }
     }
 }
 
-async fn receive_and_process<P: Project, CompletedInstanceReceiverT: CompletedInstanceReceiver<P>>(
+async fn receive_and_process<
+    P: Project,
+    CompletedInstanceReceiverT: CompletedInstanceReceiver<P>,
+>(
     completed_instance_receiver: &CompletedInstanceReceiverT,
 ) -> anyhow::Result<()> {
     let mut completed_instance_receiver = completed_instance_receiver.clone();

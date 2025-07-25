@@ -7,8 +7,7 @@ use crate::{
     event::Immediate,
     step::{StepSettings, StepWithSettings},
     workflows::{
-        Event, MyProject, MyProjectEvent, MyProjectStep, Project, ProjectEvent, ProjectStep,
-        ProjectWorkflow, Step, TryAsRef, TryFromRef, Workflow, WorkflowControl, WorkflowEvent,
+        Event, MyProject, MyProjectEvent, MyProjectStep, Step, TryFromRef, Workflow, WorkflowEvent,
         WorkflowStep,
     },
 };
@@ -16,33 +15,33 @@ use crate::{
 ///////////////
 
 #[derive(Clone, Debug)]
-pub struct Workflow1;
+pub struct Workflow2;
 
-impl Workflow for Workflow1 {
+impl Workflow for Workflow2 {
     type Project = MyProject;
 
-    type Event = Workflow1Event;
+    type Event = Workflow2Event;
 
-    type Step = Workflow1Step;
+    type Step = Workflow2Step;
 
-    const NAME: &'static str = "workflow_1";
+    const NAME: &'static str = "workflow_2";
 
     fn entrypoint() -> crate::step::StepWithSettings<Self::Project> {
         crate::step::StepWithSettings {
-            step: MyProjectStep::Workflow1(Workflow1Step::Step0(Step0)),
+            step: MyProjectStep::Workflow2(Workflow2Step::Step0(Step0)),
             settings: crate::step::StepSettings { max_retries: 3 },
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, TryInto, From)]
-pub enum Workflow1Step {
+pub enum Workflow2Step {
     Step0(Step0),
     Step1(Step1),
 }
 
-impl WorkflowStep for Workflow1Step {
-    type Workflow = Workflow1;
+impl WorkflowStep for Workflow2Step {
+    type Workflow = Workflow2;
 
     async fn run_raw(
         &self,
@@ -55,22 +54,22 @@ impl WorkflowStep for Workflow1Step {
         crate::step::StepError,
     > {
         match self {
-            Workflow1Step::Step0(step) => step.run_raw(wf, event.try_into().unwrap()).await,
-            Workflow1Step::Step1(step) => step.run_raw(wf, event.try_into().unwrap()).await,
+            Workflow2Step::Step0(step) => step.run_raw(wf, event.try_into().unwrap()).await,
+            Workflow2Step::Step1(step) => step.run_raw(wf, event.try_into().unwrap()).await,
         }
     }
 
     fn is_event<T: Event + 'static>(&self) -> bool {
         match self {
-            Workflow1Step::Step0(_) => <Step0 as Step>::Event::is::<T>(),
-            Workflow1Step::Step1(_) => <Step1 as Step>::Event::is::<T>(),
+            Workflow2Step::Step0(_) => <Step0 as Step>::Event::is::<T>(),
+            Workflow2Step::Step1(_) => <Step1 as Step>::Event::is::<T>(),
         }
     }
 
     fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool {
         match self {
-            Workflow1Step::Step0(_) => event.is_event::<<Step0 as Step>::Event>(),
-            Workflow1Step::Step1(_) => event.is_event::<<Step1 as Step>::Event>(),
+            Workflow2Step::Step0(_) => event.is_event::<<Step0 as Step>::Event>(),
+            Workflow2Step::Step1(_) => event.is_event::<<Step1 as Step>::Event>(),
         }
     }
 }
@@ -83,7 +82,7 @@ pub struct Step0;
 impl Step for Step0 {
     type Event = Event0;
 
-    type Workflow = Workflow1;
+    type Workflow = Workflow2;
 
     async fn run_raw(
         &self,
@@ -95,10 +94,10 @@ impl Step for Step0 {
         Option<StepWithSettings<<Self::Workflow as Workflow>::Project>>,
         crate::step::StepError,
     > {
-        tracing::info!("Running Step0 in Workflow1");
+        tracing::info!("Running Step0 in Workflow2");
         Ok(Some(StepWithSettings {
-            // TODO: this should just return Workflow1Step, right? It shouldn't be able to return steps from other workflows
-            step: MyProjectStep::Workflow1(Workflow1Step::Step1(Step1)),
+            // TODO: this should just return Workflow2Step, right? It shouldn't be able to return steps from other workflows
+            step: MyProjectStep::Workflow2(Workflow2Step::Step1(Step1)),
             settings: StepSettings { max_retries: 3 },
         }))
     }
@@ -110,7 +109,7 @@ pub struct Step1;
 impl Step for Step1 {
     type Event = Immediate;
 
-    type Workflow = Workflow1;
+    type Workflow = Workflow2;
 
     async fn run_raw(
         &self,
@@ -120,7 +119,7 @@ impl Step for Step1 {
         Option<crate::step::StepWithSettings<<Self::Workflow as Workflow>::Project>>,
         crate::step::StepError,
     > {
-        tracing::info!("Running Step1 in Workflow1");
+        tracing::info!("Running Step1 in Workflow2");
         Ok(None)
     }
 }
@@ -128,45 +127,45 @@ impl Step for Step1 {
 // events
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub enum Workflow1Event {
+pub enum Workflow2Event {
     Event0(Event0),
     #[serde(skip)]
     Immediate(Immediate),
 }
 
-impl WorkflowEvent for Workflow1Event {
-    type Workflow = Workflow1;
+impl WorkflowEvent for Workflow2Event {
+    type Workflow = Workflow2;
 
     fn is_event<T: Event + 'static>(&self) -> bool {
         match self {
-            Workflow1Event::Event0(_) => Event0::is::<T>(),
-            Workflow1Event::Immediate(_) => Immediate::is::<T>(),
+            Workflow2Event::Event0(_) => Event0::is::<T>(),
+            Workflow2Event::Immediate(_) => Immediate::is::<T>(),
         }
     }
 }
 
-impl TryFrom<Workflow1Event> for Immediate {
+impl TryFrom<Workflow2Event> for Immediate {
     type Error = ();
 
-    fn try_from(event: Workflow1Event) -> Result<Self, Self::Error> {
+    fn try_from(event: Workflow2Event) -> Result<Self, Self::Error> {
         match event {
-            Workflow1Event::Immediate(immediate) => Ok(immediate),
+            Workflow2Event::Immediate(immediate) => Ok(immediate),
             _ => Err(()),
         }
     }
 }
 
-impl From<Immediate> for Workflow1Event {
+impl From<Immediate> for Workflow2Event {
     fn from(immediate: Immediate) -> Self {
-        Workflow1Event::Immediate(immediate)
+        Workflow2Event::Immediate(immediate)
     }
 }
 
-impl TryFrom<Workflow1Event> for Event0 {
+impl TryFrom<Workflow2Event> for Event0 {
     type Error = ();
 
-    fn try_from(event: Workflow1Event) -> Result<Self, Self::Error> {
-        if let Workflow1Event::Event0(event0) = event {
+    fn try_from(event: Workflow2Event) -> Result<Self, Self::Error> {
+        if let Workflow2Event::Event0(event0) = event {
             Ok(event0)
         } else {
             Err(())
@@ -174,24 +173,24 @@ impl TryFrom<Workflow1Event> for Event0 {
     }
 }
 
-impl TryFrom<MyProjectEvent> for Workflow1Event {
+impl TryFrom<MyProjectEvent> for Workflow2Event {
     type Error = ();
 
     fn try_from(event: MyProjectEvent) -> Result<Self, Self::Error> {
         match event {
-            MyProjectEvent::Workflow1(workflow_event) => Ok(workflow_event),
-            MyProjectEvent::Immediate(immediate) => Ok(Workflow1Event::Immediate(immediate)),
+            MyProjectEvent::Workflow2(workflow_event) => Ok(workflow_event),
+            MyProjectEvent::Immediate(immediate) => Ok(Workflow2Event::Immediate(immediate)),
             _ => Err(()),
         }
     }
 }
 
-impl TryFromRef<MyProjectEvent> for Workflow1Event {
+impl TryFromRef<MyProjectEvent> for Workflow2Event {
     type Error = ();
 
     fn try_from_ref(event: &MyProjectEvent) -> Result<&Self, Self::Error> {
         match event {
-            MyProjectEvent::Workflow1(workflow_event) => Ok(workflow_event),
+            MyProjectEvent::Workflow2(workflow_event) => Ok(workflow_event),
             MyProjectEvent::Immediate(_) => Err(()),
             _ => Err(()),
         }
@@ -201,9 +200,9 @@ impl TryFromRef<MyProjectEvent> for Workflow1Event {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Event0 {}
 
-impl From<Event0> for Workflow1Event {
+impl From<Event0> for Workflow2Event {
     fn from(event: Event0) -> Self {
-        Workflow1Event::Event0(event)
+        Workflow2Event::Event0(event)
     }
 }
 

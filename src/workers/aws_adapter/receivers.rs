@@ -46,7 +46,7 @@ impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstan
         let handle = msg
             .receipt_handle
             .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
-        
+
         let event =
             match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
@@ -115,7 +115,7 @@ impl<P: Project> FailedInstanceReceiver<P> for AzureServiceBusFailedInstanceRece
         let handle = msg
             .receipt_handle
             .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
-        
+
         let event =
             match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
@@ -184,7 +184,7 @@ impl<P: Project> NewInstanceReceiver<P> for AzureServiceBusNewInstanceReceiver<P
         let handle = msg
             .receipt_handle
             .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
-        
+
         let event =
             match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
@@ -249,7 +249,7 @@ impl<P: Project> EventReceiver<P> for AzureServiceBusEventReceiver<P> {
         let handle = msg
             .receipt_handle
             .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
-        
+
         let event =
             match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
@@ -313,7 +313,7 @@ impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
         let handle = msg
             .receipt_handle
             .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
-        
+
         let event =
             match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
@@ -382,7 +382,7 @@ impl<P: Project> CompletedStepReceiver<P> for AzureServiceBusCompletedStepReceiv
         let handle = msg
             .receipt_handle
             .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
-        
+
         let event =
             match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
@@ -451,7 +451,7 @@ impl<P: Project> FailedStepReceiver<P> for AzureServiceBusFailedStepReceiver<P> 
         let handle = msg
             .receipt_handle
             .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
-        
+
         let event =
             match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
@@ -520,7 +520,7 @@ impl<P: Project> ActiveStepReceiver<P> for AzureServiceBusActiveStepReceiver<P> 
         let handle = msg
             .receipt_handle
             .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
-        
+
         let event =
             match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,

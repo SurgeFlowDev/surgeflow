@@ -20,17 +20,18 @@ pub trait StepsAwaitingEventManager<P: Project>: Sized + Send + 'static + Clone 
         &mut self,
         step: FullyQualifiedStep<P>,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
-
-    
 }
 
 mod persistence_manager {
     use std::fmt::{Debug, Display};
 
-    use crate::{workers::adapters::managers::WorkflowInstance, workflows::{Project, StepId, WorkflowInstanceId}};
+    use crate::{
+        workers::adapters::managers::WorkflowInstance,
+        workflows::{Project, StepId, WorkflowInstanceId},
+    };
 
     // TODO: should these take references instead of ownership?
-    pub trait PersistenceManager: Sized + Send + 'static + Clone  {
+    pub trait PersistenceManager: Sized + Send + 'static + Clone {
         type Error: Send + Sync + 'static + Debug + Display;
         fn set_step_status(
             &self,
@@ -52,9 +53,9 @@ mod persistence_manager {
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
         fn insert_instance(
-        &self,
-        workflow_instance: WorkflowInstance,
-    ) -> impl Future<Output = Result<WorkflowInstanceId, Self::Error>> + Send;
+            &self,
+            workflow_instance: WorkflowInstance,
+        ) -> impl Future<Output = Result<WorkflowInstanceId, Self::Error>> + Send;
     }
 }
 
@@ -72,7 +73,7 @@ mod workflow_instance_manager {
         pub external_id: WorkflowInstanceId,
         pub workflow_name: WorkflowName,
     }
-    #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone, From, Into)]
+    #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone, From, Into, PartialEq, Eq)]
     #[serde(transparent)]
     pub struct WorkflowName(String);
 

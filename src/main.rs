@@ -12,9 +12,9 @@ use rust_workflow_2::workers::failed_step_worker;
 use rust_workflow_2::workers::new_event_worker;
 use rust_workflow_2::workers::new_instance_worker;
 use rust_workflow_2::workers::next_step_worker;
-use rust_workflow_2::workflows::Project;
-use rust_workflow_2::workflows::workflow_1::MyProject;
 use rust_workflow_2::workflows::workflow_1::Workflow1;
+use rust_workflow_2::workflows::workflow_2::Workflow2;
+use rust_workflow_2::workflows::{MyProject, Project};
 use tokio::try_join;
 
 #[tokio::main]
@@ -30,13 +30,15 @@ async fn main() -> anyhow::Result<()> {
         .add_source(Environment::with_prefix("SURGEFLOW"))
         .build()?;
 
-    let config = config.try_deserialize::<AzureAdapterConfig>()
+    let config = config
+        .try_deserialize::<AzureAdapterConfig>()
         .expect("Failed to deserialize AzureAdapterConfig from environment variables");
 
     let dependency_manager = AzureDependencyManager::new(config);
 
     let project = MyProject {
         workflow_1: Workflow1,
+        workflow_2: Workflow2,
     };
 
     main_handler(project, dependency_manager).await?;
