@@ -1,12 +1,11 @@
 // TODO: review this file. a senders/receivers/managers are receiveing &str queue names when they should receive String to avoid one extra allocation
 
-use std::env;
-
 use aws_config::SdkConfig;
 use aws_credential_types::Credentials;
 use aws_sdk_dynamodb::Client as DynamoClient;
 use aws_sdk_sqs::{Client as SqsClient, config::SharedCredentialsProvider};
 use aws_types::region::Region;
+use serde::Deserialize;
 use sqlx::PgPool;
 
 use crate::{
@@ -20,11 +19,6 @@ use crate::{
             completed_instance_worker::CompletedInstanceWorkerDependencies,
             completed_step_worker::CompletedStepWorkerDependencies,
             control_server::ControlServerDependencies,
-            failed_instance_worker::FailedInstanceWorkerDependencies,
-            failed_step_worker::FailedStepWorkerDependencies,
-            new_event_worker::NewEventWorkerDependencies,
-            new_instance_worker::NewInstanceWorkerDependencies,
-            next_step_worker::NextStepWorkerDependencies,
         },
         aws_adapter::{
             managers::{AzurePersistenceManager, AzureServiceBusStepsAwaitingEventManager},
@@ -45,7 +39,8 @@ use crate::{
     workflows::Project,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AzureAdapterConfig {
     /// The URL for the new instance queue
     pub new_instance_queue_url: String,
@@ -68,6 +63,12 @@ pub struct AzureAdapterConfig {
     pub pg_connection_string: String,
     /// The DynamoDB table name for steps awaiting events
     pub dynamodb_table_name: String,
+    /// AWS access key
+    pub aws_secret_access_key: String,
+    /// AWS access key ID
+    pub aws_access_key_id: String,
+    /// AWS region
+    pub aws_region: String,
 }
 
 #[derive(Debug)]
@@ -90,19 +91,18 @@ impl AzureDependencyManager {
         }
     }
 
-    async fn get_sdk_config(&mut self) -> &SdkConfig {
+    fn get_sdk_config(&mut self) -> &SdkConfig {
         if self.sdk_config.is_none() {
-            let region = env::var("AWS_REGION").expect("AWS_REGION not set");
-            let access_key_id = env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID not set");
-            let secret_access_key =
-                env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY not set");
-
-            let credentials = Credentials::from_keys(access_key_id, secret_access_key, None);
+            let credentials = Credentials::from_keys(
+                self.config.aws_access_key_id.clone(),
+                self.config.aws_secret_access_key.clone(),
+                None,
+            );
 
             self.sdk_config = Some(
                 aws_config::SdkConfig::builder()
                     .credentials_provider(SharedCredentialsProvider::new(credentials))
-                    .region(Region::new(region))
+                    .region(Region::new(self.config.aws_region.clone()))
                     .build(),
             );
         }
@@ -114,7 +114,7 @@ impl AzureDependencyManager {
 impl AzureDependencyManager {
     async fn sqs_client(&mut self) -> &SqsClient {
         if self.sqs_client.is_none() {
-            let config = self.get_sdk_config().await;
+            let config = self.get_sdk_config();
             self.sqs_client = Some(SqsClient::new(config));
         }
         self.sqs_client.as_ref().unwrap()
@@ -122,7 +122,7 @@ impl AzureDependencyManager {
 
     async fn dynamo_client(&mut self) -> &DynamoClient {
         if self.dynamo_client.is_none() {
-            let config = self.get_sdk_config().await;
+            let config = self.get_sdk_config();
             self.dynamo_client = Some(DynamoClient::new(config));
         }
         self.dynamo_client.as_ref().unwrap()
