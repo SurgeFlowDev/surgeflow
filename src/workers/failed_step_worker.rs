@@ -61,7 +61,7 @@ where
     let failed_instance_sender = failed_instance_sender.clone();
     let persistence_manager = persistence_manager.clone();
 
-    let block = async move {
+    tokio::spawn(async move {
         if let Err(err) = process::<P, FailedInstanceSenderT, PersistenceManagerT>(
             failed_instance_sender,
             persistence_manager,
@@ -81,8 +81,7 @@ where
             })
             .unwrap();
         tracing::info!("acknowledged failed step for instance");
-    };
-    tokio::spawn(block);
+    });
     Ok(())
 }
 
