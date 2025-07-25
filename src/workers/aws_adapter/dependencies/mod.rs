@@ -1,7 +1,12 @@
 // TODO: review this file. a senders/receivers/managers are receiveing &str queue names when they should receive String to avoid one extra allocation
 
-use aws_sdk_sqs::Client as SqsClient;
+use std::env;
+
+use aws_config::SdkConfig;
+use aws_credential_types::Credentials;
 use aws_sdk_dynamodb::Client as DynamoClient;
+use aws_sdk_sqs::{Client as SqsClient, config::SharedCredentialsProvider};
+use aws_types::region::Region;
 use sqlx::PgPool;
 
 use crate::{
@@ -15,6 +20,11 @@ use crate::{
             completed_instance_worker::CompletedInstanceWorkerDependencies,
             completed_step_worker::CompletedStepWorkerDependencies,
             control_server::ControlServerDependencies,
+            failed_instance_worker::FailedInstanceWorkerDependencies,
+            failed_step_worker::FailedStepWorkerDependencies,
+            new_event_worker::NewEventWorkerDependencies,
+            new_instance_worker::NewInstanceWorkerDependencies,
+            next_step_worker::NextStepWorkerDependencies,
         },
         aws_adapter::{
             managers::{AzurePersistenceManager, AzureServiceBusStepsAwaitingEventManager},
@@ -66,6 +76,7 @@ pub struct AzureDependencyManager {
     dynamo_client: Option<DynamoClient>,
     sqlx_pool: Option<PgPool>,
     config: AzureAdapterConfig,
+    sdk_config: Option<SdkConfig>,
 }
 
 impl AzureDependencyManager {
@@ -75,23 +86,44 @@ impl AzureDependencyManager {
             dynamo_client: None,
             sqlx_pool: None,
             config,
+            sdk_config: None,
         }
+    }
+
+    async fn get_sdk_config(&mut self) -> &SdkConfig {
+        if self.sdk_config.is_none() {
+            let region = env::var("AWS_REGION").expect("AWS_REGION not set");
+            let access_key_id = env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID not set");
+            let secret_access_key =
+                env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY not set");
+
+            let credentials = Credentials::from_keys(access_key_id, secret_access_key, None);
+
+            self.sdk_config = Some(
+                aws_config::SdkConfig::builder()
+                    .credentials_provider(SharedCredentialsProvider::new(credentials))
+                    .region(Region::new(region))
+                    .build(),
+            );
+        }
+
+        self.sdk_config.as_ref().unwrap()
     }
 }
 
 impl AzureDependencyManager {
     async fn sqs_client(&mut self) -> &SqsClient {
         if self.sqs_client.is_none() {
-            let config = aws_config::load_from_env().await;
-            self.sqs_client = Some(SqsClient::new(&config));
+            let config = self.get_sdk_config().await;
+            self.sqs_client = Some(SqsClient::new(config));
         }
         self.sqs_client.as_ref().unwrap()
     }
 
     async fn dynamo_client(&mut self) -> &DynamoClient {
         if self.dynamo_client.is_none() {
-            let config = aws_config::load_from_env().await;
-            self.dynamo_client = Some(DynamoClient::new(&config));
+            let config = self.get_sdk_config().await;
+            self.dynamo_client = Some(DynamoClient::new(config));
         }
         self.dynamo_client.as_ref().unwrap()
     }
@@ -118,7 +150,11 @@ impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AzureDependenc
     {
         let sqs_client = self.sqs_client().await.clone();
 
-        let instance_receiver = AzureServiceBusCompletedInstanceReceiver::new(sqs_client).await?;
+        let instance_receiver = AzureServiceBusCompletedInstanceReceiver::new(
+            sqs_client,
+            self.config.completed_instance_queue_url.clone(),
+        )
+        .await?;
 
         Ok(CompletedInstanceWorkerDependencies::new(instance_receiver))
     }
@@ -142,12 +178,17 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AzureDependencyMan
     > {
         let sqs_client = self.sqs_client().await.clone();
 
-        let completed_step_receiver = AzureServiceBusCompletedStepReceiver::<P>::new(sqs_client.clone()).await?;
+        let completed_step_receiver = AzureServiceBusCompletedStepReceiver::<P>::new(
+            sqs_client.clone(),
+            self.config.completed_step_queue_url.clone(),
+        )
+        .await?;
 
         let next_step_sender = AzureServiceBusNextStepSender::<P>::new(
             sqs_client,
             self.config.next_step_queue_url.clone(),
-        ).await?;
+        )
+        .await?;
 
         let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -182,23 +223,29 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AzureDependencyManage
     > {
         let sqs_client = self.sqs_client().await.clone();
 
-        let active_step_receiver =
-            AzureServiceBusActiveStepReceiver::<P>::new(sqs_client.clone()).await?;
+        let active_step_receiver = AzureServiceBusActiveStepReceiver::<P>::new(
+            sqs_client.clone(),
+            self.config.active_step_queue_url.clone(),
+        )
+        .await?;
 
         let active_step_sender = AzureServiceBusActiveStepSender::<P>::new(
             sqs_client.clone(),
             self.config.active_step_queue_url.clone(),
-        ).await?;
+        )
+        .await?;
 
         let failed_step_sender = AzureServiceBusFailedStepSender::<P>::new(
             sqs_client.clone(),
             self.config.failed_step_queue_url.clone(),
-        ).await?;
+        )
+        .await?;
 
         let completed_step_sender = AzureServiceBusCompletedStepSender::<P>::new(
             sqs_client,
             self.config.completed_step_queue_url.clone(),
-        ).await?;
+        )
+        .await?;
 
         let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -224,7 +271,11 @@ impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AzureDependencyMa
     >{
         let sqs_client = self.sqs_client().await.clone();
 
-        let failed_instance_receiver = AzureServiceBusFailedInstanceReceiver::<P>::new(sqs_client).await?;
+        let failed_instance_receiver = AzureServiceBusFailedInstanceReceiver::<P>::new(
+            sqs_client,
+            self.config.failed_instance_queue_url.clone(),
+        )
+        .await?;
 
         Ok(crate::workers::adapters::dependencies::failed_instance_worker::FailedInstanceWorkerDependencies::new(
             failed_instance_receiver,
@@ -251,13 +302,17 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AzureDependencyManage
     > {
         let sqs_client = self.sqs_client().await.clone();
 
-        let failed_step_receiver =
-            AzureServiceBusFailedStepReceiver::<P>::new(sqs_client.clone()).await?;
+        let failed_step_receiver = AzureServiceBusFailedStepReceiver::<P>::new(
+            sqs_client.clone(),
+            self.config.failed_step_queue_url.clone(),
+        )
+        .await?;
 
         let failed_instance_sender = AzureServiceBusFailedInstanceSender::<P>::new(
             sqs_client,
             self.config.failed_instance_queue_url.clone(),
-        ).await?;
+        )
+        .await?;
 
         let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -289,16 +344,22 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AzureDependencyManager 
         let sqs_client = self.sqs_client().await.clone();
         let dynamo_client = self.dynamo_client().await.clone();
 
-        let event_receiver =
-            AzureServiceBusEventReceiver::<P>::new(sqs_client.clone()).await?;
+        let event_receiver = AzureServiceBusEventReceiver::<P>::new(
+            sqs_client.clone(),
+            self.config.new_event_queue_url.clone(),
+        )
+        .await?;
 
         let active_step_sender = AzureServiceBusActiveStepSender::<P>::new(
             sqs_client,
             self.config.active_step_queue_url.clone(),
-        ).await?;
+        )
+        .await?;
 
-        let steps_awaiting_event_manager =
-            AzureServiceBusStepsAwaitingEventManager::<P>::new(dynamo_client, self.config.dynamodb_table_name.clone());
+        let steps_awaiting_event_manager = AzureServiceBusStepsAwaitingEventManager::<P>::new(
+            dynamo_client,
+            self.config.dynamodb_table_name.clone(),
+        );
 
         Ok(crate::workers::adapters::dependencies::new_event_worker::NewEventWorkerDependencies::new(
             active_step_sender,
@@ -327,13 +388,17 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AzureDependencyManag
     > {
         let sqs_client = self.sqs_client().await.clone();
 
-        let new_instance_receiver =
-            AzureServiceBusNewInstanceReceiver::<P>::new(sqs_client.clone()).await?;
+        let new_instance_receiver = AzureServiceBusNewInstanceReceiver::<P>::new(
+            sqs_client.clone(),
+            self.config.new_instance_queue_url.clone(),
+        )
+        .await?;
 
         let next_step_sender = AzureServiceBusNextStepSender::<P>::new(
             sqs_client,
             self.config.next_step_queue_url.clone(),
-        ).await?;
+        )
+        .await?;
 
         let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -367,16 +432,22 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager 
         let sqs_client = self.sqs_client().await.clone();
         let dynamo_client = self.dynamo_client().await.clone();
 
-        let next_step_receiver =
-            AzureServiceBusNextStepReceiver::<P>::new(sqs_client.clone()).await?;
+        let next_step_receiver = AzureServiceBusNextStepReceiver::<P>::new(
+            sqs_client.clone(),
+            self.config.next_step_queue_url.clone(),
+        )
+        .await?;
 
         let active_step_sender = AzureServiceBusActiveStepSender::<P>::new(
             sqs_client,
             self.config.active_step_queue_url.clone(),
-        ).await?;
+        )
+        .await?;
 
-        let steps_awaiting_event_manager =
-            AzureServiceBusStepsAwaitingEventManager::<P>::new(dynamo_client, self.config.dynamodb_table_name.clone());
+        let steps_awaiting_event_manager = AzureServiceBusStepsAwaitingEventManager::<P>::new(
+            dynamo_client,
+            self.config.dynamodb_table_name.clone(),
+        );
 
         let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -399,16 +470,18 @@ impl<P: Project> ControlServerDependencyProvider<P> for AzureDependencyManager {
     ) -> Result<ControlServerDependencies<P, Self::EventSender, Self::NewInstanceSender>, Self::Error>
     {
         let sqs_client = self.sqs_client().await.clone();
-        
+
         let event_sender = AzureServiceBusEventSender::<P>::new(
             sqs_client.clone(),
             self.config.new_event_queue_url.clone(),
-        ).await?;
-        
+        )
+        .await?;
+
         let new_instance_sender = AzureServiceBusNewInstanceSender::<P>::new(
             sqs_client,
             self.config.new_instance_queue_url.clone(),
-        ).await?;
+        )
+        .await?;
 
         Ok(ControlServerDependencies::new(
             event_sender,

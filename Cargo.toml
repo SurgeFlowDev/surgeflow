@@ -14,8 +14,14 @@ aide = { git = "https://github.com/Zizico2/aide.git", branch = "feat/typed-routi
 ] }
 anyhow = { version = "1.0.98" }
 aws-config = { version = "1.8.3", features = ["behavior-version-latest"] }
-aws-sdk-dynamodb = "1.85.0"
-aws-sdk-sqs = "1.77.0"
+aws-credential-types = { version = "1.2.4", features = [
+    "hardcoded-credentials",
+] }
+aws-sdk-dynamodb = { version = "1.85.0", features = [
+    "behavior-version-latest",
+] }
+aws-sdk-sqs = { version = "1.77.0", features = ["behavior-version-latest"] }
+aws-types = { version = "1.3.8" }
 axum = { version = "0.8.4", features = ["http2", "macros", "multipart"] }
 axum-extra = { version = "0.10.1", features = ["typed-routing"] }
 # axum-sqlx-tx = "0.10.0"

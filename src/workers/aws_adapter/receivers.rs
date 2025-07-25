@@ -15,12 +15,12 @@ use crate::{
     workflows::Project,
 };
 use aws_sdk_sqs::Client;
-use std::{marker::PhantomData, sync::Arc};
-use tokio::sync::Mutex;
+use std::marker::PhantomData;
 
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusCompletedInstanceReceiver<P: Project> {
     receiver: Client,
+    queue_url: String,
     _marker: PhantomData<P>,
 }
 
@@ -31,6 +31,7 @@ impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstan
         let out = self
             .receiver
             .receive_message()
+            .queue_url(&self.queue_url)
             .max_number_of_messages(1)
             .send()
             .await
@@ -61,6 +62,7 @@ impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstan
     async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
             .delete_message()
+            .queue_url(&self.queue_url)
             .receipt_handle(handle)
             .send()
             .await
@@ -71,9 +73,10 @@ impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstan
 }
 
 impl<P: Project> AzureServiceBusCompletedInstanceReceiver<P> {
-    pub async fn new(client: Client) -> anyhow::Result<Self> {
+    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
+            queue_url,
             _marker: PhantomData,
         })
     }
@@ -86,6 +89,7 @@ impl<P: Project> AzureServiceBusCompletedInstanceReceiver<P> {
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusFailedInstanceReceiver<P: Project> {
     receiver: Client,
+    queue_url: String,
     _marker: PhantomData<P>,
 }
 
@@ -96,6 +100,7 @@ impl<P: Project> FailedInstanceReceiver<P> for AzureServiceBusFailedInstanceRece
         let out = self
             .receiver
             .receive_message()
+            .queue_url(&self.queue_url)
             .max_number_of_messages(1)
             .send()
             .await
@@ -126,6 +131,7 @@ impl<P: Project> FailedInstanceReceiver<P> for AzureServiceBusFailedInstanceRece
     async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
             .delete_message()
+            .queue_url(&self.queue_url)
             .receipt_handle(handle)
             .send()
             .await
@@ -136,9 +142,10 @@ impl<P: Project> FailedInstanceReceiver<P> for AzureServiceBusFailedInstanceRece
 }
 
 impl<P: Project> AzureServiceBusFailedInstanceReceiver<P> {
-    pub async fn new(client: Client) -> anyhow::Result<Self> {
+    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
+            queue_url,
             _marker: PhantomData,
         })
     }
@@ -151,6 +158,7 @@ impl<P: Project> AzureServiceBusFailedInstanceReceiver<P> {
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusNewInstanceReceiver<P: Project> {
     receiver: Client,
+    queue_url: String,
     _marker: PhantomData<P>,
 }
 
@@ -161,6 +169,7 @@ impl<P: Project> NewInstanceReceiver<P> for AzureServiceBusNewInstanceReceiver<P
         let out = self
             .receiver
             .receive_message()
+            .queue_url(&self.queue_url)
             .max_number_of_messages(1)
             .send()
             .await
@@ -191,6 +200,7 @@ impl<P: Project> NewInstanceReceiver<P> for AzureServiceBusNewInstanceReceiver<P
     async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
             .delete_message()
+            .queue_url(&self.queue_url)
             .receipt_handle(handle)
             .send()
             .await
@@ -201,9 +211,10 @@ impl<P: Project> NewInstanceReceiver<P> for AzureServiceBusNewInstanceReceiver<P
 }
 
 impl<P: Project> AzureServiceBusNewInstanceReceiver<P> {
-    pub async fn new(client: Client) -> anyhow::Result<Self> {
+    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
+            queue_url,
             _marker: PhantomData,
         })
     }
@@ -212,6 +223,7 @@ impl<P: Project> AzureServiceBusNewInstanceReceiver<P> {
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusEventReceiver<P: Project> {
     receiver: Client,
+    queue_url: String,
     _marker: PhantomData<P>,
 }
 
@@ -222,6 +234,7 @@ impl<P: Project> EventReceiver<P> for AzureServiceBusEventReceiver<P> {
         let out = self
             .receiver
             .receive_message()
+            .queue_url(&self.queue_url)
             .max_number_of_messages(1)
             .send()
             .await
@@ -252,6 +265,7 @@ impl<P: Project> EventReceiver<P> for AzureServiceBusEventReceiver<P> {
     async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
             .delete_message()
+            .queue_url(&self.queue_url)
             .receipt_handle(handle)
             .send()
             .await
@@ -262,9 +276,10 @@ impl<P: Project> EventReceiver<P> for AzureServiceBusEventReceiver<P> {
 }
 
 impl<P: Project> AzureServiceBusEventReceiver<P> {
-    pub async fn new(client: Client) -> anyhow::Result<Self> {
+    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
+            queue_url,
             _marker: PhantomData,
         })
     }
@@ -272,6 +287,7 @@ impl<P: Project> AzureServiceBusEventReceiver<P> {
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusNextStepReceiver<P: Project> {
     receiver: Client,
+    queue_url: String,
     _marker: PhantomData<P>,
 }
 
@@ -282,6 +298,7 @@ impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
         let out = self
             .receiver
             .receive_message()
+            .queue_url(&self.queue_url)
             .max_number_of_messages(1)
             .send()
             .await
@@ -312,6 +329,7 @@ impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
     async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
             .delete_message()
+            .queue_url(&self.queue_url)
             .receipt_handle(handle)
             .send()
             .await
@@ -322,9 +340,10 @@ impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
 }
 
 impl<P: Project> AzureServiceBusNextStepReceiver<P> {
-    pub async fn new(client: Client) -> anyhow::Result<Self> {
+    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
+            queue_url,
             _marker: PhantomData,
         })
     }
@@ -337,6 +356,7 @@ impl<P: Project> AzureServiceBusNextStepReceiver<P> {
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusCompletedStepReceiver<P: Project> {
     receiver: Client,
+    queue_url: String,
     _marker: PhantomData<P>,
 }
 
@@ -347,6 +367,7 @@ impl<P: Project> CompletedStepReceiver<P> for AzureServiceBusCompletedStepReceiv
         let out = self
             .receiver
             .receive_message()
+            .queue_url(&self.queue_url)
             .max_number_of_messages(1)
             .send()
             .await
@@ -377,6 +398,7 @@ impl<P: Project> CompletedStepReceiver<P> for AzureServiceBusCompletedStepReceiv
     async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
             .delete_message()
+            .queue_url(&self.queue_url)
             .receipt_handle(handle)
             .send()
             .await
@@ -387,9 +409,10 @@ impl<P: Project> CompletedStepReceiver<P> for AzureServiceBusCompletedStepReceiv
 }
 
 impl<P: Project> AzureServiceBusCompletedStepReceiver<P> {
-    pub async fn new(client: Client) -> anyhow::Result<Self> {
+    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
+            queue_url,
             _marker: PhantomData,
         })
     }
@@ -401,7 +424,8 @@ impl<P: Project> AzureServiceBusCompletedStepReceiver<P> {
 
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusFailedStepReceiver<P: Project> {
-    receiver: Arc<Mutex<Client>>,
+    receiver: Client,
+    queue_url: String,
     _marker: PhantomData<P>,
 }
 
@@ -411,9 +435,8 @@ impl<P: Project> FailedStepReceiver<P> for AzureServiceBusFailedStepReceiver<P> 
     async fn receive(&mut self) -> Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error> {
         let out = self
             .receiver
-            .lock()
-            .await
             .receive_message()
+            .queue_url(&self.queue_url)
             .max_number_of_messages(1)
             .send()
             .await
@@ -443,9 +466,8 @@ impl<P: Project> FailedStepReceiver<P> for AzureServiceBusFailedStepReceiver<P> 
 
     async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
-            .lock()
-            .await
             .delete_message()
+            .queue_url(&self.queue_url)
             .receipt_handle(handle)
             .send()
             .await
@@ -456,9 +478,10 @@ impl<P: Project> FailedStepReceiver<P> for AzureServiceBusFailedStepReceiver<P> 
 }
 
 impl<P: Project> AzureServiceBusFailedStepReceiver<P> {
-    pub async fn new(client: Client) -> anyhow::Result<Self> {
+    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
-            receiver: Arc::new(Mutex::new(client)),
+            receiver: client,
+            queue_url,
             _marker: PhantomData,
         })
     }
@@ -471,6 +494,7 @@ impl<P: Project> AzureServiceBusFailedStepReceiver<P> {
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusActiveStepReceiver<P: Project> {
     receiver: Client,
+    queue_url: String,
     _marker: PhantomData<P>,
 }
 
@@ -481,6 +505,7 @@ impl<P: Project> ActiveStepReceiver<P> for AzureServiceBusActiveStepReceiver<P> 
         let out = self
             .receiver
             .receive_message()
+            .queue_url(&self.queue_url)
             .max_number_of_messages(1)
             .send()
             .await
@@ -511,6 +536,7 @@ impl<P: Project> ActiveStepReceiver<P> for AzureServiceBusActiveStepReceiver<P> 
     async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
             .delete_message()
+            .queue_url(&self.queue_url)
             .receipt_handle(handle)
             .send()
             .await
@@ -521,9 +547,10 @@ impl<P: Project> ActiveStepReceiver<P> for AzureServiceBusActiveStepReceiver<P> 
 }
 
 impl<P: Project> AzureServiceBusActiveStepReceiver<P> {
-    pub async fn new(client: Client) -> anyhow::Result<Self> {
+    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
+            queue_url,
             _marker: PhantomData,
         })
     }

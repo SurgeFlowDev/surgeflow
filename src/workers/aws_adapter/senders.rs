@@ -1,5 +1,6 @@
 use aws_sdk_sqs::Client;
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
+use uuid::Uuid;
 
 use crate::{
     event::InstanceEvent,
@@ -16,7 +17,6 @@ use crate::{
     },
     workflows::Project,
 };
-use tokio::sync::Mutex;
 
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusNextStepSender<P: Project> {
@@ -32,6 +32,8 @@ impl<P: Project> NextStepSender<P> for AzureServiceBusNextStepSender<P> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message()
+            .message_group_id(Uuid::new_v4().to_string())
+            .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
             .message_body(serde_json::to_string(&step).map_err(AzureAdapterError::SerializeError)?)
             .send()
@@ -64,6 +66,8 @@ impl<P: Project> ActiveStepSender<P> for AzureServiceBusActiveStepSender<P> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message()
+            .message_group_id(Uuid::new_v4().to_string())
+            .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
             .message_body(serde_json::to_string(&step).map_err(AzureAdapterError::SerializeError)?)
             .send()
@@ -98,6 +102,8 @@ impl<P: Project> FailedStepSender<P> for AzureServiceBusFailedStepSender<P> {
         // TODO: using json, could use bincode in production
         self.sender
             .send_message()
+            .message_group_id(Uuid::new_v4().to_string())
+            .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
             .message_body(serde_json::to_string(&step).map_err(AzureAdapterError::SerializeError)?)
             .send()
@@ -119,7 +125,7 @@ impl<P: Project> AzureServiceBusFailedStepSender<P> {
 
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusEventSender<P: Project> {
-    sender: Arc<Mutex<Client>>,
+    sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
@@ -130,9 +136,9 @@ impl<P: Project> EventSender<P> for AzureServiceBusEventSender<P> {
     async fn send(&self, step: InstanceEvent<P>) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
-            .lock()
-            .await
             .send_message()
+            .message_group_id(Uuid::new_v4().to_string())
+            .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
             .message_body(serde_json::to_string(&step).map_err(AzureAdapterError::SerializeError)?)
             .send()
@@ -146,7 +152,7 @@ impl<P: Project> EventSender<P> for AzureServiceBusEventSender<P> {
 impl<P: Project> AzureServiceBusEventSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
-            sender: Arc::new(Mutex::new(client)),
+            sender: client,
             queue_url,
             _marker: PhantomData,
         })
@@ -155,7 +161,7 @@ impl<P: Project> AzureServiceBusEventSender<P> {
 
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusNewInstanceSender<P: Project> {
-    sender: Arc<Mutex<Client>>,
+    sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
@@ -166,13 +172,16 @@ impl<P: Project> NewInstanceSender<P> for AzureServiceBusNewInstanceSender<P> {
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
-            .lock()
-            .await
             .send_message()
+            .message_group_id(Uuid::new_v4().to_string())
+            .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
             .message_body(serde_json::to_string(step).map_err(AzureAdapterError::SerializeError)?)
             .send()
             .await
+            .inspect_err(|e| {
+                tracing::error!("Failed to send message: {:?}", e);
+            })
             .map_err(AzureAdapterError::SendMessageError)?;
 
         Ok(())
@@ -182,7 +191,7 @@ impl<P: Project> NewInstanceSender<P> for AzureServiceBusNewInstanceSender<P> {
 impl<P: Project> AzureServiceBusNewInstanceSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
-            sender: Arc::new(Mutex::new(client)),
+            sender: client,
             queue_url,
             _marker: PhantomData,
         })
@@ -195,7 +204,7 @@ impl<P: Project> AzureServiceBusNewInstanceSender<P> {
 
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusFailedInstanceSender<P: Project> {
-    sender: Arc<Mutex<Client>>,
+    sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
@@ -206,9 +215,9 @@ impl<P: Project> FailedInstanceSender<P> for AzureServiceBusFailedInstanceSender
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
-            .lock()
-            .await
             .send_message()
+            .message_group_id(Uuid::new_v4().to_string())
+            .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
             .message_body(serde_json::to_string(step).map_err(AzureAdapterError::SerializeError)?)
             .send()
@@ -222,7 +231,7 @@ impl<P: Project> FailedInstanceSender<P> for AzureServiceBusFailedInstanceSender
 impl<P: Project> AzureServiceBusFailedInstanceSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
-            sender: Arc::new(Mutex::new(client)),
+            sender: client,
             queue_url,
             _marker: PhantomData,
         })
@@ -235,7 +244,7 @@ impl<P: Project> AzureServiceBusFailedInstanceSender<P> {
 
 #[derive(Debug, Clone)]
 pub struct AzureServiceBusCompletedInstanceSender<P: Project> {
-    sender: Arc<Mutex<Client>>,
+    sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
@@ -246,9 +255,9 @@ impl<P: Project> CompletedInstanceSender<P> for AzureServiceBusCompletedInstance
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
         // TODO: using json, could use bincode in production
         self.sender
-            .lock()
-            .await
             .send_message()
+            .message_group_id(Uuid::new_v4().to_string())
+            .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
             .message_body(serde_json::to_string(step).map_err(AzureAdapterError::SerializeError)?)
             .send()
@@ -262,7 +271,7 @@ impl<P: Project> CompletedInstanceSender<P> for AzureServiceBusCompletedInstance
 impl<P: Project> AzureServiceBusCompletedInstanceSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
-            sender: Arc::new(Mutex::new(client)),
+            sender: client,
             queue_url,
             _marker: PhantomData,
         })
@@ -286,6 +295,8 @@ impl<P: Project> CompletedStepSender<P> for AzureServiceBusCompletedStepSender<P
         // TODO: using json, could use bincode in production
         self.sender
             .send_message()
+            .message_group_id(Uuid::new_v4().to_string())
+            .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
             .message_body(serde_json::to_string(&step).map_err(AzureAdapterError::SerializeError)?)
             .send()
