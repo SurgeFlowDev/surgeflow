@@ -37,7 +37,7 @@ impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstan
             .await
             .map_err(AzureAdapterError::ServiceBusError)?;
 
-        // TODO: using json, could use bincode in production
+        
         let event = match serde_json::from_slice(
             msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
         ) {
@@ -98,7 +98,7 @@ impl<P: Project> FailedInstanceReceiver<P> for AzureServiceBusFailedInstanceRece
             .await
             .map_err(AzureAdapterError::ServiceBusError)?;
 
-        // TODO: using json, could use bincode in production
+        
         let event = match serde_json::from_slice(
             msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
         ) {
@@ -159,7 +159,7 @@ impl<P: Project> NewInstanceReceiver<P> for AzureServiceBusNewInstanceReceiver<P
             .await
             .map_err(AzureAdapterError::ServiceBusError)?;
 
-        // TODO: using json, could use bincode in production
+        
         let event = match serde_json::from_slice(
             msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
         ) {
@@ -216,7 +216,7 @@ impl<P: Project> EventReceiver<P> for AzureServiceBusEventReceiver<P> {
             .await
             .map_err(AzureAdapterError::ServiceBusError)?;
 
-        // TODO: using json, could use bincode in production
+        
         let event = match serde_json::from_slice(
             msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
         ) {
@@ -272,7 +272,7 @@ impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
             .await
             .map_err(AzureAdapterError::ServiceBusError)?;
 
-        // TODO: using json, could use bincode in production
+        
         let event = match serde_json::from_slice(
             msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
         ) {
@@ -333,7 +333,7 @@ impl<P: Project> CompletedStepReceiver<P> for AzureServiceBusCompletedStepReceiv
             .await
             .map_err(AzureAdapterError::ServiceBusError)?;
 
-        // TODO: using json, could use bincode in production
+        
         let event = match serde_json::from_slice(
             msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
         ) {
@@ -396,7 +396,7 @@ impl<P: Project> FailedStepReceiver<P> for AzureServiceBusFailedStepReceiver<P> 
             .await
             .map_err(AzureAdapterError::ServiceBusError)?;
 
-        // TODO: using json, could use bincode in production
+        
         let event = match serde_json::from_slice(
             msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
         ) {
@@ -461,7 +461,7 @@ impl<P: Project> ActiveStepReceiver<P> for AzureServiceBusActiveStepReceiver<P> 
             .await
             .map_err(AzureAdapterError::ServiceBusError)?;
 
-        // TODO: using json, could use bincode in production
+        
         let event = match serde_json::from_slice(
             msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
         ) {

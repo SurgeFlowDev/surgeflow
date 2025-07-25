@@ -324,14 +324,16 @@ pub trait WorkflowStep:
 }
 
 pub trait WorkflowEvent:
-    Serialize + for<'de> Deserialize<'de> + Debug + Send + Clone
+    Serialize
+    + for<'de> Deserialize<'de>
+    + Debug
+    + Send
+    + Clone
     + Into<<<Self::Workflow as Workflow>::Project as Project>::Event>
     + TryFrom<<<Self::Workflow as Workflow>::Project as Project>::Event>
     + TryFromRef<<<Self::Workflow as Workflow>::Project as Project>::Event>
-     + From<Immediate>
-     + TryInto<Immediate>
-    // JsonSchema should probably be implemented as an extension trait. JsonSchema doesn't matter for the 
-    // inner workings of the workflow, but it is useful for API documentation
+    + From<Immediate>
+    + TryInto<Immediate>
     + JsonSchema
 {
     type Workflow: Workflow<Event = Self>;
