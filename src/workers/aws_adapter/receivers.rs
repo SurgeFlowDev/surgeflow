@@ -10,55 +10,63 @@ use crate::{
                 NextStepReceiver,
             },
         },
-        azure_adapter::AzureAdapterError,
+        aws_adapter::AzureAdapterError,
     },
     workflows::Project,
 };
-use azservicebus::{
-    ServiceBusClient, ServiceBusReceivedMessage, ServiceBusReceiver, ServiceBusReceiverOptions,
-    primitives::service_bus_retry_policy::ServiceBusRetryPolicyExt, receiver::DeadLetterOptions,
-};
+use aws_sdk_sqs::Client;
 use std::{marker::PhantomData, sync::Arc};
 use tokio::sync::Mutex;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AzureServiceBusCompletedInstanceReceiver<P: Project> {
-    receiver: ServiceBusReceiver,
+    receiver: Client,
     _marker: PhantomData<P>,
 }
 
 impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstanceReceiver<P> {
-    type Handle = ServiceBusReceivedMessage;
+    type Handle = String;
     type Error = AzureAdapterError;
     async fn receive(&mut self) -> Result<(WorkflowInstance, Self::Handle), Self::Error> {
-        let msg = self
+        let out = self
             .receiver
             .receive_message()
+            .max_number_of_messages(1)
+            .send()
             .await
-            .map_err(AzureAdapterError::ServiceBusError)?;
+            .map_err(AzureAdapterError::ReceiveMessageError)?;
 
+        let msg = out
+            .messages
+            .map(|vec| vec.into_iter().next())
+            .flatten()
+            .ok_or(AzureAdapterError::NoMessagesReceived)?;
+
+        let handle = msg
+            .receipt_handle
+            .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
         // TODO: using json, could use bincode in production
-        let event = match serde_json::from_slice(
-            msg.body().map_err(AzureAdapterError::AmqpMessageError)?,
-        ) {
-            Ok(event) => event,
-            Err(e) => {
-                self.receiver
-                    .dead_letter_message(msg, DeadLetterOptions::default())
-                    .await
-                    .map_err(AzureAdapterError::ServiceBusError)?;
+        let event =
+            match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
+                Ok(event) => event,
+                Err(e) => {
+                    // TODO: handle dead-lettering
 
-                return Err(AzureAdapterError::DeserializeError(e));
-            }
-        };
-        Ok((event, msg))
+                    return Err(AzureAdapterError::DeserializeError(e));
+                }
+            };
+        Ok((event, handle))
     }
 
     async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
         self.receiver
-            .complete_message(handle)
+            .delete_message()
+            .receipt_handle(handle)
+            .send()
             .await
-            .map_err(AzureAdapterError::ServiceBusError)
+            .unwrap();
+
+        Ok(())
     }
 }
 

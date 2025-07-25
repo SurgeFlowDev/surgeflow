@@ -5,7 +5,7 @@ use crate::{
     workflows::{Project, WorkflowInstanceId},
 };
 
-pub trait StepsAwaitingEventManager<P: Project>: Sized {
+pub trait StepsAwaitingEventManager<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
     fn get_step(
         &mut self,
@@ -30,7 +30,7 @@ mod persistence_manager {
     use crate::{workers::adapters::managers::WorkflowInstance, workflows::{Project, StepId, WorkflowInstanceId}};
 
     // TODO: should these take references instead of ownership?
-    pub trait PersistenceManager {
+    pub trait PersistenceManager: Sized + Send + 'static + Clone  {
         type Error: Send + Sync + 'static + Debug + Display;
         fn set_step_status(
             &self,

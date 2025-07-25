@@ -7,9 +7,9 @@ use crate::{
 
 // Steps
 
-pub trait NextStepReceiver<P: Project>: Sized {
+pub trait NextStepReceiver<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
-    type Handle;
+    type Handle: Send + Sync + 'static;
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error>> + Send;
@@ -19,9 +19,9 @@ pub trait NextStepReceiver<P: Project>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait ActiveStepReceiver<P: Project>: Sized {
+pub trait ActiveStepReceiver<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
-    type Handle;
+    type Handle: Send + Sync + 'static;
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error>> + Send;
@@ -31,9 +31,9 @@ pub trait ActiveStepReceiver<P: Project>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait CompletedStepReceiver<P: Project>: Sized {
+pub trait CompletedStepReceiver<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
-    type Handle;
+    type Handle: Send + Sync + 'static;
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error>> + Send;
@@ -43,9 +43,9 @@ pub trait CompletedStepReceiver<P: Project>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait FailedStepReceiver<P: Project>: Sized {
+pub trait FailedStepReceiver<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
-    type Handle;
+    type Handle: Send;
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error>> + Send;
@@ -57,9 +57,9 @@ pub trait FailedStepReceiver<P: Project>: Sized {
 
 // Events
 
-pub trait EventReceiver<P: Project>: Sized {
+pub trait EventReceiver<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
-    type Handle;
+    type Handle: Send + Sync + 'static;
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(InstanceEvent<P>, Self::Handle), Self::Error>> + Send;
@@ -71,9 +71,9 @@ pub trait EventReceiver<P: Project>: Sized {
 
 // Instances
 
-pub trait NewInstanceReceiver<P: Project>: Sized {
+pub trait NewInstanceReceiver<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
-    type Handle;
+    type Handle: Send + Sync + 'static;
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(WorkflowInstance, Self::Handle), Self::Error>> + Send;
@@ -83,9 +83,9 @@ pub trait NewInstanceReceiver<P: Project>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait CompletedInstanceReceiver<P: Project>: Sized {
+pub trait CompletedInstanceReceiver<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
-    type Handle;
+    type Handle: Send + Sync + 'static;
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(WorkflowInstance, Self::Handle), Self::Error>> + Send;
@@ -95,9 +95,9 @@ pub trait CompletedInstanceReceiver<P: Project>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait FailedInstanceReceiver<P: Project>: Sized {
+pub trait FailedInstanceReceiver<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
-    type Handle;
+    type Handle: Send + Sync + 'static;
     fn receive(
         &mut self,
     ) -> impl Future<Output = Result<(WorkflowInstance, Self::Handle), Self::Error>> + Send;

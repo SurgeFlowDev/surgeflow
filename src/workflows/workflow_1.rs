@@ -195,7 +195,9 @@ impl Step for Step0 {
         crate::step::StepError,
     > {
         tracing::info!("Running Step0 in Workflow1");
-        Ok(None)
+        // Ok(None)
+        // test error
+        Err(crate::step::StepError::Unknown)
     }
 }
 

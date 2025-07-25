@@ -7,7 +7,7 @@ use crate::{
 
 // Steps
 
-pub trait NextStepSender<P: Project>: Sized {
+pub trait NextStepSender<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
@@ -15,7 +15,7 @@ pub trait NextStepSender<P: Project>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait ActiveStepSender<P: Project>: Sized {
+pub trait ActiveStepSender<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
@@ -23,7 +23,7 @@ pub trait ActiveStepSender<P: Project>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait FailedStepSender<P: Project>: Sized {
+pub trait FailedStepSender<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
@@ -31,7 +31,7 @@ pub trait FailedStepSender<P: Project>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait CompletedStepSender<P: Project>: Sized {
+pub trait CompletedStepSender<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &mut self,
@@ -57,7 +57,7 @@ pub trait NewInstanceSender<P: Project>:  Sized + Send + Sync + 'static {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait CompletedInstanceSender<P: Project>: Sized {
+pub trait CompletedInstanceSender<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,
@@ -65,7 +65,7 @@ pub trait CompletedInstanceSender<P: Project>: Sized {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-pub trait FailedInstanceSender<P: Project>: Sized {
+pub trait FailedInstanceSender<P: Project>: Sized + Send + 'static + Clone  {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,

@@ -22,9 +22,9 @@ where
     FailedInstanceSenderT: FailedInstanceSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
-    let mut failed_step_receiver = dependencies.failed_step_receiver;
-    let mut failed_instance_sender = dependencies.failed_instance_sender;
-    let mut persistence_manager = dependencies.persistence_manager;
+    let failed_step_receiver = dependencies.failed_step_receiver;
+    let failed_instance_sender = dependencies.failed_instance_sender;
+    let persistence_manager = dependencies.persistence_manager;
 
     loop {
         if let Err(err) = receive_and_process::<
@@ -33,9 +33,9 @@ where
             FailedInstanceSenderT,
             PersistenceManagerT,
         >(
-            &mut failed_step_receiver,
-            &mut failed_instance_sender,
-            &mut persistence_manager,
+            &failed_step_receiver,
+            &failed_instance_sender,
+            &persistence_manager,
         )
         .await
         {
@@ -45,9 +45,9 @@ where
 }
 
 async fn receive_and_process<P, FailedStepReceiverT, FailedInstanceSenderT, PersistenceManagerT>(
-    failed_step_receiver: &mut FailedStepReceiverT,
-    failed_instance_sender: &mut FailedInstanceSenderT,
-    persistence_manager: &mut PersistenceManagerT,
+    failed_step_receiver: &FailedStepReceiverT,
+    failed_instance_sender: &FailedInstanceSenderT,
+    persistence_manager: &PersistenceManagerT,
 ) -> anyhow::Result<()>
 where
     P: Project,
@@ -55,20 +55,34 @@ where
     FailedInstanceSenderT: FailedInstanceSender<P>,
     PersistenceManagerT: PersistenceManager,
 {
+    let mut failed_step_receiver = failed_step_receiver.clone();
+
     let (step, handle) = failed_step_receiver.receive().await?;
+    let failed_instance_sender = failed_instance_sender.clone();
+    let persistence_manager = persistence_manager.clone();
 
-    if let Err(err) = process::<P, FailedInstanceSenderT, PersistenceManagerT>(
-        failed_instance_sender,
-        persistence_manager,
-        step,
-    )
-    .await
-    {
-        tracing::error!("Error processing failed step: {:?}", err);
-    }
+    let block = async move {
+        if let Err(err) = process::<P, FailedInstanceSenderT, PersistenceManagerT>(
+            failed_instance_sender,
+            persistence_manager,
+            step,
+        )
+        .await
+        {
+            tracing::error!("Error processing failed step: {:?}", err);
+        }
 
-    failed_step_receiver.accept(handle).await?;
-
+        tracing::info!("acknowledging failed step for instance");
+        failed_step_receiver
+            .accept(handle)
+            .await
+            .inspect_err(|e| {
+                tracing::error!("Failed to acknowledge failed step: {:?}", e);
+            })
+            .unwrap();
+        tracing::info!("acknowledged failed step for instance");
+    };
+    tokio::spawn(block);
     Ok(())
 }
 
@@ -86,8 +100,8 @@ where
 }
 
 async fn process<P, FailedInstanceSenderT, PersistenceManagerT>(
-    failed_instance_sender: &mut FailedInstanceSenderT,
-    persistence_manager: &mut PersistenceManagerT,
+    failed_instance_sender: FailedInstanceSenderT,
+    persistence_manager: PersistenceManagerT,
     step: FullyQualifiedStep<P>,
 ) -> Result<(), FailedStepWorkerError<P, FailedInstanceSenderT, PersistenceManagerT>>
 where

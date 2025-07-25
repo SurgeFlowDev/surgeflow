@@ -10,5 +10,6 @@ pub mod control_server;
 
 pub mod adapters;
 
+pub mod aws_adapter;
 // pub mod rabbitmq_adapter;
-pub mod azure_adapter;
+// pub mod azure_adapter;
