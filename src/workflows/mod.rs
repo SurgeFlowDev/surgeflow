@@ -25,6 +25,12 @@ pub mod workflow_1;
 )]
 pub struct WorkflowInstanceId(Uuid);
 
+impl Into<[u8; 16]> for WorkflowInstanceId {
+    fn into(self) -> [u8; 16] {
+        self.0.into_bytes()
+    }
+}
+
 impl fmt::Display for WorkflowInstanceId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.hyphenated())

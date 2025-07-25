@@ -1,34 +1,111 @@
 use std::marker::PhantomData;
 
-use azure_data_cosmos::{CosmosClient, PartitionKey, clients::ContainerClient};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use typespec::{error::ErrorKind, http::StatusCode};
-
+use super::AzureAdapterError;
 use crate::{
     step::FullyQualifiedStep,
-    workers::{adapters::managers::StepsAwaitingEventManager, azure_adapter::AzureAdapterError},
+    workers::adapters::managers::StepsAwaitingEventManager,
     workflows::{Project, WorkflowInstanceId},
 };
 
+pub mod dynamo_kv {
+
+    use aws_sdk_dynamodb::{
+        Client,
+        error::SdkError,
+        operation::{delete_item::DeleteItemError, put_item::PutItemError},
+        types::{AttributeValue, ReturnValue},
+    };
+    use aws_sdk_sqs::config::http::HttpResponse;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, thiserror::Error)]
+    pub enum DynamoKvError {
+        #[error("Item not found")]
+        NotFound,
+        #[error("Unexpected type for attribute value")]
+        UnexpectedType,
+        #[error("Put item error: {0}")]
+        PutItem(#[from] SdkError<PutItemError, HttpResponse>),
+        #[error("Delete item error: {0}")]
+        DeleteItem(#[from] SdkError<DeleteItemError, HttpResponse>),
+        #[error("Serialization error: {0}")]
+        SerializeError(#[source] serde_json::Error),
+        #[error("Deserialization error: {0}")]
+        DeserializeError(#[source] serde_json::Error),
+    }
+
+    pub async fn put_item<V: Serialize>(
+        client: &Client,
+        table_name: String,
+        key: &[u8],
+        value: V,
+    ) -> Result<(), DynamoKvError> {
+        client
+            .put_item()
+            .table_name(table_name)
+            .item("PK", AttributeValue::B(key.into()))
+            .item(
+                "Value",
+                AttributeValue::B(
+                    serde_json::to_vec(&value)
+                        .map_err(DynamoKvError::SerializeError)?
+                        .into(),
+                ),
+            )
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_and_delete_item<V: for<'de> Deserialize<'de>>(
+        client: &Client,
+        table_name: String,
+        key: &[u8],
+    ) -> Result<Option<V>, DynamoKvError> {
+        let resp = client
+            .delete_item()
+            .table_name(table_name)
+            .key("PK", AttributeValue::B(key.into()))
+            .return_values(ReturnValue::AllOld)
+            .send()
+            .await?;
+
+        if let Some(mut attrs) = resp.attributes {
+            if let Some(old_val) = attrs.remove("Value") {
+                if let AttributeValue::B(ref blob) = old_val {
+                    return Ok(Some(
+                        serde_json::from_slice(blob.as_ref())
+                            .map_err(DynamoKvError::DeserializeError)?,
+                    ));
+                } else {
+                    return Err(DynamoKvError::UnexpectedType);
+                }
+            }
+        }
+
+        Ok(None)
+    }
+}
+
 #[derive(Clone)]
 pub struct AzureServiceBusStepsAwaitingEventManager<P: Project> {
-    container_client: ContainerClient,
+    dynamo_client: aws_sdk_dynamodb::Client,
+    table_name: String,
     _phantom: PhantomData<P>,
 }
 
 impl<P: Project> AzureServiceBusStepsAwaitingEventManager<P> {
     // TODO: should be private
-    pub fn new(cosmos_client: &CosmosClient) -> Self {
-        let container_client = cosmos_client
-            .database_client("events")
-            .container_client("events");
+    pub fn new(dynamo_client: aws_sdk_dynamodb::Client, table_name: String) -> Self {
         Self {
-            container_client,
+            dynamo_client,
+            table_name,
             _phantom: PhantomData,
         }
     }
-    fn make_key(instance_id: WorkflowInstanceId) -> String {
-        instance_id.to_string()
+
+    fn make_key(instance_id: WorkflowInstanceId) -> [u8; 16] {
+        instance_id.into()
     }
 }
 
@@ -38,94 +115,38 @@ impl<P: Project> StepsAwaitingEventManager<P> for AzureServiceBusStepsAwaitingEv
         &mut self,
         instance_id: WorkflowInstanceId,
     ) -> Result<Option<FullyQualifiedStep<P>>, Self::Error> {
-        let id = Self::make_key(instance_id);
-        let item = CosmosItem::<FullyQualifiedStep<P>>::read(&self.container_client, id).await?;
-
-        Ok(item.map(|item| item.data))
-    }
-    async fn delete_step(&mut self, instance_id: WorkflowInstanceId) -> Result<(), Self::Error> {
-        let id = Self::make_key(instance_id);
-        CosmosItem::<FullyQualifiedStep<P>>::delete(&self.container_client, id).await?;
-        Ok(())
-    }
-    async fn put_step(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
-        let id = Self::make_key(step.instance.external_id);
-        let item = CosmosItem::new(step, id);
-        item.create(&self.container_client).await?;
-        Ok(())
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct CosmosItem<T: Serialize + DeserializeOwned> {
-    id: String,
-    #[serde(flatten, bound = "")]
-    data: T,
-}
-
-impl<T: Serialize + for<'de> Deserialize<'de>> CosmosItem<T> {
-    fn new(data: T, id: String) -> Self {
-        Self { id, data }
-    }
-    async fn read(
-        container_client: &ContainerClient,
-        id: String,
-    ) -> Result<Option<Self>, AzureAdapterError> {
-        let response = try_read_item(container_client, &id, &id)
-            .await
-            .map_err(AzureAdapterError::CosmosDbError)?;
-        Ok(response)
-    }
-    async fn delete(
-        container_client: &ContainerClient,
-        id: String,
-    ) -> Result<(), AzureAdapterError> {
-        container_client
-            .delete_item(&id, &id, None)
-            .await
-            .map_err(AzureAdapterError::CosmosDbError)?;
-
-        Ok(())
-    }
-    async fn create(self, container_client: &ContainerClient) -> Result<(), AzureAdapterError> {
-        let id = self.id.clone();
-        container_client
-            .create_item(id, self, None)
-            .await
-            .map_err(AzureAdapterError::CosmosDbError)?;
-        Ok(())
-    }
-}
-
-/// Try to read an item; returns Ok(Some(item)) if found,
-/// Ok(None) if it wasn\u2019t there, or Err(_) on any other failure.
-pub async fn try_read_item<T>(
-    container: &ContainerClient,
-    pk: impl Into<PartitionKey>,
-    id: &str,
-) -> typespec::Result<Option<T>>
-where
-    T: serde::de::DeserializeOwned,
-{
-    match container.read_item::<T>(pk, id, None).await {
-        // if we got a 200, deserialize its body into T
-        Ok(response) => {
-            let item = response.into_body().await?;
-            Ok(Some(item))
-        }
-
-        // if we got a 404 Not Found, return Ok(None)
-        Err(e)
-            if matches!(
-                e.kind(),
-                ErrorKind::HttpResponse { status, .. } if *status == StatusCode::NotFound
-            ) =>
+        let key = Self::make_key(instance_id);
+        match dynamo_kv::get_and_delete_item::<FullyQualifiedStep<P>>(
+            &self.dynamo_client,
+            self.table_name.clone(),
+            &key,
+        )
+        .await
         {
-            Ok(None)
+            Ok(item) => Ok(item),
+            Err(dynamo_kv::DynamoKvError::NotFound) => Ok(None),
+            Err(e) => Err(AzureAdapterError::DynamoKvError(e)),
         }
+    }
 
-        // any other error, propagate
-        Err(e) => Err(e),
+    async fn delete_step(&mut self, instance_id: WorkflowInstanceId) -> Result<(), Self::Error> {
+        let key = Self::make_key(instance_id);
+        dynamo_kv::get_and_delete_item::<FullyQualifiedStep<P>>(
+            &self.dynamo_client,
+            self.table_name.clone(),
+            &key,
+        )
+        .await
+        .map_err(AzureAdapterError::DynamoKvError)?;
+        Ok(())
+    }
+
+    async fn put_step(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
+        let key = Self::make_key(step.instance.external_id);
+        dynamo_kv::put_item(&self.dynamo_client, self.table_name.clone(), &key, step)
+            .await
+            .map_err(AzureAdapterError::DynamoKvError)?;
+        Ok(())
     }
 }
 
@@ -218,7 +239,7 @@ mod persistence_manager {
                 WHERE "name" = $2
                 RETURNING "external_id"
                 "#,
-                Uuid::from(workflow_instance.external_id.clone()),
+                Uuid::from(workflow_instance.external_id),
                 String::from(workflow_instance.workflow_name)
             )
             .fetch_one(&self.sqlx_pool)

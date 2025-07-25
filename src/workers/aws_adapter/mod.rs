@@ -3,8 +3,8 @@ use aws_sdk_sqs::{
     operation::send_message::SendMessageError,
 };
 
-// pub mod dependencies;
-// pub mod managers;
+pub mod dependencies;
+pub mod managers;
 pub mod receivers;
 pub mod senders;
 
@@ -24,4 +24,6 @@ pub enum AzureAdapterError {
     DeserializeError(#[source] serde_json::Error),
     #[error("Failed to serialize step")]
     SerializeError(#[source] serde_json::Error),
+    #[error("DynamoDB KV error")]
+    DynamoKvError(#[from] managers::dynamo_kv::DynamoKvError),
 }
