@@ -72,7 +72,7 @@ pub struct AzureAdapterConfig {
 }
 
 #[derive(Debug)]
-pub struct AzureDependencyManager {
+pub struct AwsDependencyManager {
     sqs_client: Option<SqsClient>,
     dynamo_client: Option<DynamoClient>,
     sqlx_pool: Option<PgPool>,
@@ -80,7 +80,7 @@ pub struct AzureDependencyManager {
     sdk_config: Option<SdkConfig>,
 }
 
-impl AzureDependencyManager {
+impl AwsDependencyManager {
     pub fn new(config: AzureAdapterConfig) -> Self {
         Self {
             sqs_client: None,
@@ -111,7 +111,7 @@ impl AzureDependencyManager {
     }
 }
 
-impl AzureDependencyManager {
+impl AwsDependencyManager {
     async fn sqs_client(&mut self) -> &SqsClient {
         if self.sqs_client.is_none() {
             let config = self.get_sdk_config();
@@ -140,7 +140,7 @@ impl AzureDependencyManager {
     }
 }
 
-impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AzureDependencyManager {
+impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AwsDependencyManager {
     type CompletedInstanceReceiver = AzureServiceBusCompletedInstanceReceiver<P>;
     type Error = anyhow::Error;
 
@@ -160,7 +160,7 @@ impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AzureDependenc
     }
 }
 
-impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AzureDependencyManager {
+impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AwsDependencyManager {
     type CompletedStepReceiver = AzureServiceBusCompletedStepReceiver<P>;
     type NextStepSender = AzureServiceBusNextStepSender<P>;
     type PersistenceManager = AzurePersistenceManager;
@@ -200,7 +200,7 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AzureDependencyMan
     }
 }
 
-impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AzureDependencyManager {
+impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AwsDependencyManager {
     type ActiveStepReceiver = AzureServiceBusActiveStepReceiver<P>;
     type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
     type FailedStepSender = AzureServiceBusFailedStepSender<P>;
@@ -259,7 +259,7 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AzureDependencyManage
     }
 }
 
-impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AzureDependencyManager {
+impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AwsDependencyManager {
     type FailedInstanceReceiver = AzureServiceBusFailedInstanceReceiver<P>;
     type Error = anyhow::Error;
 
@@ -283,7 +283,7 @@ impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AzureDependencyMa
     }
 }
 
-impl<P: Project> FailedStepWorkerDependencyProvider<P> for AzureDependencyManager {
+impl<P: Project> FailedStepWorkerDependencyProvider<P> for AwsDependencyManager {
     type FailedStepReceiver = AzureServiceBusFailedStepReceiver<P>;
     type FailedInstanceSender = AzureServiceBusFailedInstanceSender<P>;
     type PersistenceManager = AzurePersistenceManager;
@@ -324,7 +324,7 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AzureDependencyManage
     }
 }
 
-impl<P: Project> NewEventWorkerDependencyProvider<P> for AzureDependencyManager {
+impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager {
     type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
     type EventReceiver = AzureServiceBusEventReceiver<P>;
     type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<P>;
@@ -369,7 +369,7 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AzureDependencyManager 
     }
 }
 
-impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AzureDependencyManager {
+impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AwsDependencyManager {
     type NextStepSender = AzureServiceBusNextStepSender<P>;
     type NewInstanceReceiver = AzureServiceBusNewInstanceReceiver<P>;
     type PersistenceManager = AzurePersistenceManager;
@@ -410,7 +410,7 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AzureDependencyManag
     }
 }
 
-impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager {
+impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager {
     type NextStepReceiver = AzureServiceBusNextStepReceiver<P>;
     type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
     type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<P>;
@@ -460,7 +460,7 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AzureDependencyManager 
     }
 }
 
-impl<P: Project> ControlServerDependencyProvider<P> for AzureDependencyManager {
+impl<P: Project> ControlServerDependencyProvider<P> for AwsDependencyManager {
     type EventSender = AzureServiceBusEventSender<P>;
     type NewInstanceSender = AzureServiceBusNewInstanceSender<P>;
     type Error = anyhow::Error;
@@ -490,6 +490,6 @@ impl<P: Project> ControlServerDependencyProvider<P> for AzureDependencyManager {
     }
 }
 
-impl<P: Project> DependencyManager<P> for AzureDependencyManager {
+impl<P: Project> DependencyManager<P> for AwsDependencyManager {
     type Error = anyhow::Error;
 }

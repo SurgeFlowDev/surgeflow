@@ -2,7 +2,7 @@ use config::{Config, Environment};
 use rust_workflow_2::workers::active_step_worker;
 use rust_workflow_2::workers::adapters::dependencies::DependencyManager;
 use rust_workflow_2::workers::aws_adapter::dependencies::{
-    AzureAdapterConfig, AzureDependencyManager,
+    AzureAdapterConfig, AwsDependencyManager,
 };
 use rust_workflow_2::workers::completed_instance_worker;
 use rust_workflow_2::workers::completed_step_worker;
@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
 
     let config = get_aws_adapter_config()?;
 
-    let dependency_manager = AzureDependencyManager::new(config);
+    let dependency_manager = AwsDependencyManager::new(config);
 
     let project = MyProject {
         workflow_1: Workflow1 {},
