@@ -10,7 +10,7 @@ use crate::{
                 NextStepReceiver,
             },
         },
-        aws_adapter::AzureAdapterError,
+        aws_adapter::AwsAdapterError,
     },
     workflows::Project,
 };
@@ -18,15 +18,15 @@ use aws_sdk_sqs::Client;
 use std::marker::PhantomData;
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusCompletedInstanceReceiver<P: Project> {
+pub struct AwsSqsCompletedInstanceReceiver<P: Project> {
     receiver: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstanceReceiver<P> {
+impl<P: Project> CompletedInstanceReceiver<P> for AwsSqsCompletedInstanceReceiver<P> {
     type Handle = String;
-    type Error = AzureAdapterError;
+    type Error = AwsAdapterError;
     async fn receive(&mut self) -> Result<(WorkflowInstance, Self::Handle), Self::Error> {
         let out = self
             .receiver
@@ -35,24 +35,24 @@ impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstan
             .max_number_of_messages(1)
             .send()
             .await
-            .map_err(AzureAdapterError::ReceiveMessageError)?;
+            .map_err(AwsAdapterError::ReceiveMessageError)?;
 
         let msg = out
             .messages
             .and_then(|vec| vec.into_iter().next())
-            .ok_or(AzureAdapterError::NoMessagesReceived)?;
+            .ok_or(AwsAdapterError::NoMessagesReceived)?;
 
         let handle = msg
             .receipt_handle
-            .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
+            .ok_or(AwsAdapterError::MessageWithoutReceptHandle)?;
 
         let event =
-            match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
+            match serde_json::from_str(&msg.body.ok_or(AwsAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
                 Err(e) => {
                     // TODO: handle dead-lettering
 
-                    return Err(AzureAdapterError::DeserializeError(e));
+                    return Err(AwsAdapterError::DeserializeError(e));
                 }
             };
         Ok((event, handle))
@@ -71,7 +71,7 @@ impl<P: Project> CompletedInstanceReceiver<P> for AzureServiceBusCompletedInstan
     }
 }
 
-impl<P: Project> AzureServiceBusCompletedInstanceReceiver<P> {
+impl<P: Project> AwsSqsCompletedInstanceReceiver<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
@@ -86,15 +86,15 @@ impl<P: Project> AzureServiceBusCompletedInstanceReceiver<P> {
 ///////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusFailedInstanceReceiver<P: Project> {
+pub struct AwsSqsFailedInstanceReceiver<P: Project> {
     receiver: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> FailedInstanceReceiver<P> for AzureServiceBusFailedInstanceReceiver<P> {
+impl<P: Project> FailedInstanceReceiver<P> for AwsSqsFailedInstanceReceiver<P> {
     type Handle = String;
-    type Error = AzureAdapterError;
+    type Error = AwsAdapterError;
     async fn receive(&mut self) -> Result<(WorkflowInstance, Self::Handle), Self::Error> {
         let out = self
             .receiver
@@ -103,24 +103,24 @@ impl<P: Project> FailedInstanceReceiver<P> for AzureServiceBusFailedInstanceRece
             .max_number_of_messages(1)
             .send()
             .await
-            .map_err(AzureAdapterError::ReceiveMessageError)?;
+            .map_err(AwsAdapterError::ReceiveMessageError)?;
 
         let msg = out
             .messages
             .and_then(|vec| vec.into_iter().next())
-            .ok_or(AzureAdapterError::NoMessagesReceived)?;
+            .ok_or(AwsAdapterError::NoMessagesReceived)?;
 
         let handle = msg
             .receipt_handle
-            .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
+            .ok_or(AwsAdapterError::MessageWithoutReceptHandle)?;
 
         let event =
-            match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
+            match serde_json::from_str(&msg.body.ok_or(AwsAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
                 Err(e) => {
                     // TODO: handle dead-lettering
 
-                    return Err(AzureAdapterError::DeserializeError(e));
+                    return Err(AwsAdapterError::DeserializeError(e));
                 }
             };
         Ok((event, handle))
@@ -139,7 +139,7 @@ impl<P: Project> FailedInstanceReceiver<P> for AzureServiceBusFailedInstanceRece
     }
 }
 
-impl<P: Project> AzureServiceBusFailedInstanceReceiver<P> {
+impl<P: Project> AwsSqsFailedInstanceReceiver<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
@@ -154,15 +154,15 @@ impl<P: Project> AzureServiceBusFailedInstanceReceiver<P> {
 ///////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusNewInstanceReceiver<P: Project> {
+pub struct AwsSqsNewInstanceReceiver<P: Project> {
     receiver: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> NewInstanceReceiver<P> for AzureServiceBusNewInstanceReceiver<P> {
+impl<P: Project> NewInstanceReceiver<P> for AwsSqsNewInstanceReceiver<P> {
     type Handle = String;
-    type Error = AzureAdapterError;
+    type Error = AwsAdapterError;
     async fn receive(&mut self) -> Result<(WorkflowInstance, Self::Handle), Self::Error> {
         let out = self
             .receiver
@@ -171,24 +171,24 @@ impl<P: Project> NewInstanceReceiver<P> for AzureServiceBusNewInstanceReceiver<P
             .max_number_of_messages(1)
             .send()
             .await
-            .map_err(AzureAdapterError::ReceiveMessageError)?;
+            .map_err(AwsAdapterError::ReceiveMessageError)?;
 
         let msg = out
             .messages
             .and_then(|vec| vec.into_iter().next())
-            .ok_or(AzureAdapterError::NoMessagesReceived)?;
+            .ok_or(AwsAdapterError::NoMessagesReceived)?;
 
         let handle = msg
             .receipt_handle
-            .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
+            .ok_or(AwsAdapterError::MessageWithoutReceptHandle)?;
 
         let event =
-            match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
+            match serde_json::from_str(&msg.body.ok_or(AwsAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
                 Err(e) => {
                     // TODO: handle dead-lettering
 
-                    return Err(AzureAdapterError::DeserializeError(e));
+                    return Err(AwsAdapterError::DeserializeError(e));
                 }
             };
         Ok((event, handle))
@@ -207,7 +207,7 @@ impl<P: Project> NewInstanceReceiver<P> for AzureServiceBusNewInstanceReceiver<P
     }
 }
 
-impl<P: Project> AzureServiceBusNewInstanceReceiver<P> {
+impl<P: Project> AwsSqsNewInstanceReceiver<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
@@ -218,14 +218,14 @@ impl<P: Project> AzureServiceBusNewInstanceReceiver<P> {
 }
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusEventReceiver<P: Project> {
+pub struct AwsSqsEventReceiver<P: Project> {
     receiver: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> EventReceiver<P> for AzureServiceBusEventReceiver<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> EventReceiver<P> for AwsSqsEventReceiver<P> {
+    type Error = AwsAdapterError;
     type Handle = String;
     async fn receive(&mut self) -> Result<(InstanceEvent<P>, Self::Handle), Self::Error> {
         let out = self
@@ -235,24 +235,24 @@ impl<P: Project> EventReceiver<P> for AzureServiceBusEventReceiver<P> {
             .max_number_of_messages(1)
             .send()
             .await
-            .map_err(AzureAdapterError::ReceiveMessageError)?;
+            .map_err(AwsAdapterError::ReceiveMessageError)?;
 
         let msg = out
             .messages
             .and_then(|vec| vec.into_iter().next())
-            .ok_or(AzureAdapterError::NoMessagesReceived)?;
+            .ok_or(AwsAdapterError::NoMessagesReceived)?;
 
         let handle = msg
             .receipt_handle
-            .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
+            .ok_or(AwsAdapterError::MessageWithoutReceptHandle)?;
 
         let event =
-            match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
+            match serde_json::from_str(&msg.body.ok_or(AwsAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
                 Err(e) => {
                     // TODO: handle dead-lettering
 
-                    return Err(AzureAdapterError::DeserializeError(e));
+                    return Err(AwsAdapterError::DeserializeError(e));
                 }
             };
         Ok((event, handle))
@@ -271,7 +271,7 @@ impl<P: Project> EventReceiver<P> for AzureServiceBusEventReceiver<P> {
     }
 }
 
-impl<P: Project> AzureServiceBusEventReceiver<P> {
+impl<P: Project> AwsSqsEventReceiver<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
@@ -281,14 +281,14 @@ impl<P: Project> AzureServiceBusEventReceiver<P> {
     }
 }
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusNextStepReceiver<P: Project> {
+pub struct AwsSqsNextStepReceiver<P: Project> {
     receiver: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> NextStepReceiver<P> for AwsSqsNextStepReceiver<P> {
+    type Error = AwsAdapterError;
     type Handle = String;
     async fn receive(&mut self) -> Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error> {
         let out = self
@@ -298,24 +298,24 @@ impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
             .max_number_of_messages(1)
             .send()
             .await
-            .map_err(AzureAdapterError::ReceiveMessageError)?;
+            .map_err(AwsAdapterError::ReceiveMessageError)?;
 
         let msg = out
             .messages
             .and_then(|vec| vec.into_iter().next())
-            .ok_or(AzureAdapterError::NoMessagesReceived)?;
+            .ok_or(AwsAdapterError::NoMessagesReceived)?;
 
         let handle = msg
             .receipt_handle
-            .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
+            .ok_or(AwsAdapterError::MessageWithoutReceptHandle)?;
 
         let event =
-            match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
+            match serde_json::from_str(&msg.body.ok_or(AwsAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
                 Err(e) => {
                     // TODO: handle dead-lettering
 
-                    return Err(AzureAdapterError::DeserializeError(e));
+                    return Err(AwsAdapterError::DeserializeError(e));
                 }
             };
         Ok((event, handle))
@@ -334,75 +334,7 @@ impl<P: Project> NextStepReceiver<P> for AzureServiceBusNextStepReceiver<P> {
     }
 }
 
-impl<P: Project> AzureServiceBusNextStepReceiver<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
-            receiver: client,
-            queue_url,
-            _marker: PhantomData,
-        })
-    }
-}
-
-/////////////////////////////////////////////////
-/////////////////////////////////////////////////
-/////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct AzureServiceBusCompletedStepReceiver<P: Project> {
-    receiver: Client,
-    queue_url: String,
-    _marker: PhantomData<P>,
-}
-
-impl<P: Project> CompletedStepReceiver<P> for AzureServiceBusCompletedStepReceiver<P> {
-    type Error = AzureAdapterError;
-    type Handle = String;
-    async fn receive(&mut self) -> Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error> {
-        let out = self
-            .receiver
-            .receive_message()
-            .queue_url(&self.queue_url)
-            .max_number_of_messages(1)
-            .send()
-            .await
-            .map_err(AzureAdapterError::ReceiveMessageError)?;
-
-        let msg = out
-            .messages
-            .and_then(|vec| vec.into_iter().next())
-            .ok_or(AzureAdapterError::NoMessagesReceived)?;
-
-        let handle = msg
-            .receipt_handle
-            .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
-
-        let event =
-            match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
-                Ok(event) => event,
-                Err(e) => {
-                    // TODO: handle dead-lettering
-
-                    return Err(AzureAdapterError::DeserializeError(e));
-                }
-            };
-        Ok((event, handle))
-    }
-
-    async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
-        self.receiver
-            .delete_message()
-            .queue_url(&self.queue_url)
-            .receipt_handle(handle)
-            .send()
-            .await
-            .unwrap();
-
-        Ok(())
-    }
-}
-
-impl<P: Project> AzureServiceBusCompletedStepReceiver<P> {
+impl<P: Project> AwsSqsNextStepReceiver<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
@@ -417,14 +349,14 @@ impl<P: Project> AzureServiceBusCompletedStepReceiver<P> {
 /////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusFailedStepReceiver<P: Project> {
+pub struct AwsSqsCompletedStepReceiver<P: Project> {
     receiver: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> FailedStepReceiver<P> for AzureServiceBusFailedStepReceiver<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> CompletedStepReceiver<P> for AwsSqsCompletedStepReceiver<P> {
+    type Error = AwsAdapterError;
     type Handle = String;
     async fn receive(&mut self) -> Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error> {
         let out = self
@@ -434,24 +366,24 @@ impl<P: Project> FailedStepReceiver<P> for AzureServiceBusFailedStepReceiver<P> 
             .max_number_of_messages(1)
             .send()
             .await
-            .map_err(AzureAdapterError::ReceiveMessageError)?;
+            .map_err(AwsAdapterError::ReceiveMessageError)?;
 
         let msg = out
             .messages
             .and_then(|vec| vec.into_iter().next())
-            .ok_or(AzureAdapterError::NoMessagesReceived)?;
+            .ok_or(AwsAdapterError::NoMessagesReceived)?;
 
         let handle = msg
             .receipt_handle
-            .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
+            .ok_or(AwsAdapterError::MessageWithoutReceptHandle)?;
 
         let event =
-            match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
+            match serde_json::from_str(&msg.body.ok_or(AwsAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
                 Err(e) => {
                     // TODO: handle dead-lettering
 
-                    return Err(AzureAdapterError::DeserializeError(e));
+                    return Err(AwsAdapterError::DeserializeError(e));
                 }
             };
         Ok((event, handle))
@@ -470,7 +402,7 @@ impl<P: Project> FailedStepReceiver<P> for AzureServiceBusFailedStepReceiver<P> 
     }
 }
 
-impl<P: Project> AzureServiceBusFailedStepReceiver<P> {
+impl<P: Project> AwsSqsCompletedStepReceiver<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,
@@ -485,14 +417,14 @@ impl<P: Project> AzureServiceBusFailedStepReceiver<P> {
 /////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusActiveStepReceiver<P: Project> {
+pub struct AwsSqsFailedStepReceiver<P: Project> {
     receiver: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> ActiveStepReceiver<P> for AzureServiceBusActiveStepReceiver<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> FailedStepReceiver<P> for AwsSqsFailedStepReceiver<P> {
+    type Error = AwsAdapterError;
     type Handle = String;
     async fn receive(&mut self) -> Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error> {
         let out = self
@@ -502,24 +434,24 @@ impl<P: Project> ActiveStepReceiver<P> for AzureServiceBusActiveStepReceiver<P> 
             .max_number_of_messages(1)
             .send()
             .await
-            .map_err(AzureAdapterError::ReceiveMessageError)?;
+            .map_err(AwsAdapterError::ReceiveMessageError)?;
 
         let msg = out
             .messages
             .and_then(|vec| vec.into_iter().next())
-            .ok_or(AzureAdapterError::NoMessagesReceived)?;
+            .ok_or(AwsAdapterError::NoMessagesReceived)?;
 
         let handle = msg
             .receipt_handle
-            .ok_or(AzureAdapterError::MessageWithoutReceptHandle)?;
+            .ok_or(AwsAdapterError::MessageWithoutReceptHandle)?;
 
         let event =
-            match serde_json::from_str(&msg.body.ok_or(AzureAdapterError::MessageWithoutBody)?) {
+            match serde_json::from_str(&msg.body.ok_or(AwsAdapterError::MessageWithoutBody)?) {
                 Ok(event) => event,
                 Err(e) => {
                     // TODO: handle dead-lettering
 
-                    return Err(AzureAdapterError::DeserializeError(e));
+                    return Err(AwsAdapterError::DeserializeError(e));
                 }
             };
         Ok((event, handle))
@@ -538,7 +470,75 @@ impl<P: Project> ActiveStepReceiver<P> for AzureServiceBusActiveStepReceiver<P> 
     }
 }
 
-impl<P: Project> AzureServiceBusActiveStepReceiver<P> {
+impl<P: Project> AwsSqsFailedStepReceiver<P> {
+    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
+        Ok(Self {
+            receiver: client,
+            queue_url,
+            _marker: PhantomData,
+        })
+    }
+}
+
+/////////////////////////////////////////////////
+/////////////////////////////////////////////////
+/////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct AwsSqsActiveStepReceiver<P: Project> {
+    receiver: Client,
+    queue_url: String,
+    _marker: PhantomData<P>,
+}
+
+impl<P: Project> ActiveStepReceiver<P> for AwsSqsActiveStepReceiver<P> {
+    type Error = AwsAdapterError;
+    type Handle = String;
+    async fn receive(&mut self) -> Result<(FullyQualifiedStep<P>, Self::Handle), Self::Error> {
+        let out = self
+            .receiver
+            .receive_message()
+            .queue_url(&self.queue_url)
+            .max_number_of_messages(1)
+            .send()
+            .await
+            .map_err(AwsAdapterError::ReceiveMessageError)?;
+
+        let msg = out
+            .messages
+            .and_then(|vec| vec.into_iter().next())
+            .ok_or(AwsAdapterError::NoMessagesReceived)?;
+
+        let handle = msg
+            .receipt_handle
+            .ok_or(AwsAdapterError::MessageWithoutReceptHandle)?;
+
+        let event =
+            match serde_json::from_str(&msg.body.ok_or(AwsAdapterError::MessageWithoutBody)?) {
+                Ok(event) => event,
+                Err(e) => {
+                    // TODO: handle dead-lettering
+
+                    return Err(AwsAdapterError::DeserializeError(e));
+                }
+            };
+        Ok((event, handle))
+    }
+
+    async fn accept(&mut self, handle: Self::Handle) -> Result<(), Self::Error> {
+        self.receiver
+            .delete_message()
+            .queue_url(&self.queue_url)
+            .receipt_handle(handle)
+            .send()
+            .await
+            .unwrap();
+
+        Ok(())
+    }
+}
+
+impl<P: Project> AwsSqsActiveStepReceiver<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             receiver: client,

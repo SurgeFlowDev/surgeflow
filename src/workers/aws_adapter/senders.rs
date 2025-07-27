@@ -13,20 +13,20 @@ use crate::{
                 FailedInstanceSender, FailedStepSender, NewInstanceSender, NextStepSender,
             },
         },
-        aws_adapter::AzureAdapterError,
+        aws_adapter::AwsAdapterError,
     },
     workflows::Project,
 };
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusNextStepSender<P: Project> {
+pub struct AwsSqsNextStepSender<P: Project> {
     sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> NextStepSender<P> for AzureServiceBusNextStepSender<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> NextStepSender<P> for AwsSqsNextStepSender<P> {
+    type Error = AwsAdapterError;
 
     async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
         self.sender
@@ -34,15 +34,15 @@ impl<P: Project> NextStepSender<P> for AzureServiceBusNextStepSender<P> {
             .message_group_id(Uuid::new_v4().to_string())
             .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
-            .message_body(serde_json::to_string(&step).map_err(AzureAdapterError::SerializeError)?)
+            .message_body(serde_json::to_string(&step).map_err(AwsAdapterError::SerializeError)?)
             .send()
             .await
-            .map_err(AzureAdapterError::SendMessageError)?;
+            .map_err(AwsAdapterError::SendMessageError)?;
         Ok(())
     }
 }
 
-impl<P: Project> AzureServiceBusNextStepSender<P> {
+impl<P: Project> AwsSqsNextStepSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             sender: client,
@@ -53,29 +53,29 @@ impl<P: Project> AzureServiceBusNextStepSender<P> {
 }
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusActiveStepSender<P: Project> {
+pub struct AwsSqsActiveStepSender<P: Project> {
     sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> ActiveStepSender<P> for AzureServiceBusActiveStepSender<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> ActiveStepSender<P> for AwsSqsActiveStepSender<P> {
+    type Error = AwsAdapterError;
     async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
         self.sender
             .send_message()
             .message_group_id(Uuid::new_v4().to_string())
             .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
-            .message_body(serde_json::to_string(&step).map_err(AzureAdapterError::SerializeError)?)
+            .message_body(serde_json::to_string(&step).map_err(AwsAdapterError::SerializeError)?)
             .send()
             .await
-            .map_err(AzureAdapterError::SendMessageError)?;
+            .map_err(AwsAdapterError::SendMessageError)?;
         Ok(())
     }
 }
 
-impl<P: Project> AzureServiceBusActiveStepSender<P> {
+impl<P: Project> AwsSqsActiveStepSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             sender: client,
@@ -87,14 +87,14 @@ impl<P: Project> AzureServiceBusActiveStepSender<P> {
 
 // TODO: fields should not be pub?
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusFailedStepSender<P: Project> {
+pub struct AwsSqsFailedStepSender<P: Project> {
     sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> FailedStepSender<P> for AzureServiceBusFailedStepSender<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> FailedStepSender<P> for AwsSqsFailedStepSender<P> {
+    type Error = AwsAdapterError;
 
     async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
         self.sender
@@ -102,15 +102,15 @@ impl<P: Project> FailedStepSender<P> for AzureServiceBusFailedStepSender<P> {
             .message_group_id(Uuid::new_v4().to_string())
             .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
-            .message_body(serde_json::to_string(&step).map_err(AzureAdapterError::SerializeError)?)
+            .message_body(serde_json::to_string(&step).map_err(AwsAdapterError::SerializeError)?)
             .send()
             .await
-            .map_err(AzureAdapterError::SendMessageError)?;
+            .map_err(AwsAdapterError::SendMessageError)?;
         Ok(())
     }
 }
 
-impl<P: Project> AzureServiceBusFailedStepSender<P> {
+impl<P: Project> AwsSqsFailedStepSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             sender: client,
@@ -121,14 +121,14 @@ impl<P: Project> AzureServiceBusFailedStepSender<P> {
 }
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusEventSender<P: Project> {
+pub struct AwsSqsEventSender<P: Project> {
     sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> EventSender<P> for AzureServiceBusEventSender<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> EventSender<P> for AwsSqsEventSender<P> {
+    type Error = AwsAdapterError;
 
     async fn send(&self, step: InstanceEvent<P>) -> Result<(), Self::Error> {
         self.sender
@@ -136,16 +136,16 @@ impl<P: Project> EventSender<P> for AzureServiceBusEventSender<P> {
             .message_group_id(Uuid::new_v4().to_string())
             .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
-            .message_body(serde_json::to_string(&step).map_err(AzureAdapterError::SerializeError)?)
+            .message_body(serde_json::to_string(&step).map_err(AwsAdapterError::SerializeError)?)
             .send()
             .await
-            .map_err(AzureAdapterError::SendMessageError)?;
+            .map_err(AwsAdapterError::SendMessageError)?;
 
         Ok(())
     }
 }
 
-impl<P: Project> AzureServiceBusEventSender<P> {
+impl<P: Project> AwsSqsEventSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             sender: client,
@@ -156,14 +156,14 @@ impl<P: Project> AzureServiceBusEventSender<P> {
 }
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusNewInstanceSender<P: Project> {
+pub struct AwsSqsNewInstanceSender<P: Project> {
     sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> NewInstanceSender<P> for AzureServiceBusNewInstanceSender<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> NewInstanceSender<P> for AwsSqsNewInstanceSender<P> {
+    type Error = AwsAdapterError;
 
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
         self.sender
@@ -171,19 +171,19 @@ impl<P: Project> NewInstanceSender<P> for AzureServiceBusNewInstanceSender<P> {
             .message_group_id(Uuid::new_v4().to_string())
             .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
-            .message_body(serde_json::to_string(step).map_err(AzureAdapterError::SerializeError)?)
+            .message_body(serde_json::to_string(step).map_err(AwsAdapterError::SerializeError)?)
             .send()
             .await
             .inspect_err(|e| {
                 tracing::error!("Failed to send message: {:?}", e);
             })
-            .map_err(AzureAdapterError::SendMessageError)?;
+            .map_err(AwsAdapterError::SendMessageError)?;
 
         Ok(())
     }
 }
 
-impl<P: Project> AzureServiceBusNewInstanceSender<P> {
+impl<P: Project> AwsSqsNewInstanceSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             sender: client,
@@ -198,14 +198,14 @@ impl<P: Project> AzureServiceBusNewInstanceSender<P> {
 ////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusFailedInstanceSender<P: Project> {
+pub struct AwsSqsFailedInstanceSender<P: Project> {
     sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> FailedInstanceSender<P> for AzureServiceBusFailedInstanceSender<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> FailedInstanceSender<P> for AwsSqsFailedInstanceSender<P> {
+    type Error = AwsAdapterError;
 
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
         self.sender
@@ -213,16 +213,16 @@ impl<P: Project> FailedInstanceSender<P> for AzureServiceBusFailedInstanceSender
             .message_group_id(Uuid::new_v4().to_string())
             .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
-            .message_body(serde_json::to_string(step).map_err(AzureAdapterError::SerializeError)?)
+            .message_body(serde_json::to_string(step).map_err(AwsAdapterError::SerializeError)?)
             .send()
             .await
-            .map_err(AzureAdapterError::SendMessageError)?;
+            .map_err(AwsAdapterError::SendMessageError)?;
 
         Ok(())
     }
 }
 
-impl<P: Project> AzureServiceBusFailedInstanceSender<P> {
+impl<P: Project> AwsSqsFailedInstanceSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             sender: client,
@@ -237,14 +237,14 @@ impl<P: Project> AzureServiceBusFailedInstanceSender<P> {
 ////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusCompletedInstanceSender<P: Project> {
+pub struct AwsSqsCompletedInstanceSender<P: Project> {
     sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> CompletedInstanceSender<P> for AzureServiceBusCompletedInstanceSender<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> CompletedInstanceSender<P> for AwsSqsCompletedInstanceSender<P> {
+    type Error = AwsAdapterError;
 
     async fn send(&self, step: &WorkflowInstance) -> Result<(), Self::Error> {
         self.sender
@@ -252,16 +252,16 @@ impl<P: Project> CompletedInstanceSender<P> for AzureServiceBusCompletedInstance
             .message_group_id(Uuid::new_v4().to_string())
             .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
-            .message_body(serde_json::to_string(step).map_err(AzureAdapterError::SerializeError)?)
+            .message_body(serde_json::to_string(step).map_err(AwsAdapterError::SerializeError)?)
             .send()
             .await
-            .map_err(AzureAdapterError::SendMessageError)?;
+            .map_err(AwsAdapterError::SendMessageError)?;
 
         Ok(())
     }
 }
 
-impl<P: Project> AzureServiceBusCompletedInstanceSender<P> {
+impl<P: Project> AwsSqsCompletedInstanceSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             sender: client,
@@ -275,14 +275,14 @@ impl<P: Project> AzureServiceBusCompletedInstanceSender<P> {
 ////////////////////////////////////////
 ////////////////////////////////////////
 #[derive(Debug, Clone)]
-pub struct AzureServiceBusCompletedStepSender<P: Project> {
+pub struct AwsSqsCompletedStepSender<P: Project> {
     sender: Client,
     queue_url: String,
     _marker: PhantomData<P>,
 }
 
-impl<P: Project> CompletedStepSender<P> for AzureServiceBusCompletedStepSender<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> CompletedStepSender<P> for AwsSqsCompletedStepSender<P> {
+    type Error = AwsAdapterError;
 
     async fn send(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
         self.sender
@@ -290,15 +290,15 @@ impl<P: Project> CompletedStepSender<P> for AzureServiceBusCompletedStepSender<P
             .message_group_id(Uuid::new_v4().to_string())
             .message_deduplication_id(Uuid::new_v4().to_string())
             .queue_url(&self.queue_url)
-            .message_body(serde_json::to_string(&step).map_err(AzureAdapterError::SerializeError)?)
+            .message_body(serde_json::to_string(&step).map_err(AwsAdapterError::SerializeError)?)
             .send()
             .await
-            .map_err(AzureAdapterError::SendMessageError)?;
+            .map_err(AwsAdapterError::SendMessageError)?;
         Ok(())
     }
 }
 
-impl<P: Project> AzureServiceBusCompletedStepSender<P> {
+impl<P: Project> AwsSqsCompletedStepSender<P> {
     pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
         Ok(Self {
             sender: client,

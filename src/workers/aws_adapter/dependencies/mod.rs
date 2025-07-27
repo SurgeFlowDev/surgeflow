@@ -21,18 +21,18 @@ use crate::{
             control_server::ControlServerDependencies,
         },
         aws_adapter::{
-            managers::{AzurePersistenceManager, AzureServiceBusStepsAwaitingEventManager},
+            managers::{AwsPersistenceManager, AwsSqsStepsAwaitingEventManager},
             receivers::{
-                AzureServiceBusActiveStepReceiver, AzureServiceBusCompletedInstanceReceiver,
-                AzureServiceBusCompletedStepReceiver, AzureServiceBusEventReceiver,
-                AzureServiceBusFailedInstanceReceiver, AzureServiceBusFailedStepReceiver,
-                AzureServiceBusNewInstanceReceiver, AzureServiceBusNextStepReceiver,
+                AwsSqsActiveStepReceiver, AwsSqsCompletedInstanceReceiver,
+                AwsSqsCompletedStepReceiver, AwsSqsEventReceiver,
+                AwsSqsFailedInstanceReceiver, AwsSqsFailedStepReceiver,
+                AwsSqsNewInstanceReceiver, AwsSqsNextStepReceiver,
             },
             senders::{
-                AzureServiceBusActiveStepSender, AzureServiceBusCompletedStepSender,
-                AzureServiceBusEventSender, AzureServiceBusFailedInstanceSender,
-                AzureServiceBusFailedStepSender, AzureServiceBusNewInstanceSender,
-                AzureServiceBusNextStepSender,
+                AwsSqsActiveStepSender, AwsSqsCompletedStepSender,
+                AwsSqsEventSender, AwsSqsFailedInstanceSender,
+                AwsSqsFailedStepSender, AwsSqsNewInstanceSender,
+                AwsSqsNextStepSender,
             },
         },
     },
@@ -41,7 +41,7 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct AzureAdapterConfig {
+pub struct AwsAdapterConfig {
     /// The URL for the new instance queue
     pub new_instance_queue_url: String,
     /// The URL for the next step queue
@@ -76,12 +76,12 @@ pub struct AwsDependencyManager {
     sqs_client: Option<SqsClient>,
     dynamo_client: Option<DynamoClient>,
     sqlx_pool: Option<PgPool>,
-    config: AzureAdapterConfig,
+    config: AwsAdapterConfig,
     sdk_config: Option<SdkConfig>,
 }
 
 impl AwsDependencyManager {
-    pub fn new(config: AzureAdapterConfig) -> Self {
+    pub fn new(config: AwsAdapterConfig) -> Self {
         Self {
             sqs_client: None,
             dynamo_client: None,
@@ -141,7 +141,7 @@ impl AwsDependencyManager {
 }
 
 impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AwsDependencyManager {
-    type CompletedInstanceReceiver = AzureServiceBusCompletedInstanceReceiver<P>;
+    type CompletedInstanceReceiver = AwsSqsCompletedInstanceReceiver<P>;
     type Error = anyhow::Error;
 
     async fn completed_instance_worker_dependencies(
@@ -150,7 +150,7 @@ impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AwsDependencyM
     {
         let sqs_client = self.sqs_client().await.clone();
 
-        let instance_receiver = AzureServiceBusCompletedInstanceReceiver::new(
+        let instance_receiver = AwsSqsCompletedInstanceReceiver::new(
             sqs_client,
             self.config.completed_instance_queue_url.clone(),
         )
@@ -161,9 +161,9 @@ impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AwsDependencyM
 }
 
 impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AwsDependencyManager {
-    type CompletedStepReceiver = AzureServiceBusCompletedStepReceiver<P>;
-    type NextStepSender = AzureServiceBusNextStepSender<P>;
-    type PersistenceManager = AzurePersistenceManager;
+    type CompletedStepReceiver = AwsSqsCompletedStepReceiver<P>;
+    type NextStepSender = AwsSqsNextStepSender<P>;
+    type PersistenceManager = AwsPersistenceManager;
     type Error = anyhow::Error;
 
     async fn completed_step_worker_dependencies(
@@ -178,19 +178,19 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AwsDependencyManag
     > {
         let sqs_client = self.sqs_client().await.clone();
 
-        let completed_step_receiver = AzureServiceBusCompletedStepReceiver::<P>::new(
+        let completed_step_receiver = AwsSqsCompletedStepReceiver::<P>::new(
             sqs_client.clone(),
             self.config.completed_step_queue_url.clone(),
         )
         .await?;
 
-        let next_step_sender = AzureServiceBusNextStepSender::<P>::new(
+        let next_step_sender = AwsSqsNextStepSender::<P>::new(
             sqs_client,
             self.config.next_step_queue_url.clone(),
         )
         .await?;
 
-        let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+        let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(CompletedStepWorkerDependencies::new(
             completed_step_receiver,
@@ -201,11 +201,11 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AwsDependencyManag
 }
 
 impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AwsDependencyManager {
-    type ActiveStepReceiver = AzureServiceBusActiveStepReceiver<P>;
-    type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
-    type FailedStepSender = AzureServiceBusFailedStepSender<P>;
-    type CompletedStepSender = AzureServiceBusCompletedStepSender<P>;
-    type PersistenceManager = AzurePersistenceManager;
+    type ActiveStepReceiver = AwsSqsActiveStepReceiver<P>;
+    type ActiveStepSender = AwsSqsActiveStepSender<P>;
+    type FailedStepSender = AwsSqsFailedStepSender<P>;
+    type CompletedStepSender = AwsSqsCompletedStepSender<P>;
+    type PersistenceManager = AwsPersistenceManager;
     type Error = anyhow::Error;
 
     async fn active_step_worker_dependencies(
@@ -223,31 +223,31 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AwsDependencyManager 
     > {
         let sqs_client = self.sqs_client().await.clone();
 
-        let active_step_receiver = AzureServiceBusActiveStepReceiver::<P>::new(
+        let active_step_receiver = AwsSqsActiveStepReceiver::<P>::new(
             sqs_client.clone(),
             self.config.active_step_queue_url.clone(),
         )
         .await?;
 
-        let active_step_sender = AzureServiceBusActiveStepSender::<P>::new(
+        let active_step_sender = AwsSqsActiveStepSender::<P>::new(
             sqs_client.clone(),
             self.config.active_step_queue_url.clone(),
         )
         .await?;
 
-        let failed_step_sender = AzureServiceBusFailedStepSender::<P>::new(
+        let failed_step_sender = AwsSqsFailedStepSender::<P>::new(
             sqs_client.clone(),
             self.config.failed_step_queue_url.clone(),
         )
         .await?;
 
-        let completed_step_sender = AzureServiceBusCompletedStepSender::<P>::new(
+        let completed_step_sender = AwsSqsCompletedStepSender::<P>::new(
             sqs_client,
             self.config.completed_step_queue_url.clone(),
         )
         .await?;
 
-        let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+        let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::active_step_worker::ActiveStepWorkerDependencies::new(
             active_step_receiver,
@@ -260,7 +260,7 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AwsDependencyManager 
 }
 
 impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AwsDependencyManager {
-    type FailedInstanceReceiver = AzureServiceBusFailedInstanceReceiver<P>;
+    type FailedInstanceReceiver = AwsSqsFailedInstanceReceiver<P>;
     type Error = anyhow::Error;
 
     async fn failed_instance_worker_dependencies(
@@ -271,7 +271,7 @@ impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AwsDependencyMana
     >{
         let sqs_client = self.sqs_client().await.clone();
 
-        let failed_instance_receiver = AzureServiceBusFailedInstanceReceiver::<P>::new(
+        let failed_instance_receiver = AwsSqsFailedInstanceReceiver::<P>::new(
             sqs_client,
             self.config.failed_instance_queue_url.clone(),
         )
@@ -284,9 +284,9 @@ impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AwsDependencyMana
 }
 
 impl<P: Project> FailedStepWorkerDependencyProvider<P> for AwsDependencyManager {
-    type FailedStepReceiver = AzureServiceBusFailedStepReceiver<P>;
-    type FailedInstanceSender = AzureServiceBusFailedInstanceSender<P>;
-    type PersistenceManager = AzurePersistenceManager;
+    type FailedStepReceiver = AwsSqsFailedStepReceiver<P>;
+    type FailedInstanceSender = AwsSqsFailedInstanceSender<P>;
+    type PersistenceManager = AwsPersistenceManager;
     type Error = anyhow::Error;
 
     async fn failed_step_worker_dependencies(
@@ -302,19 +302,19 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AwsDependencyManager 
     > {
         let sqs_client = self.sqs_client().await.clone();
 
-        let failed_step_receiver = AzureServiceBusFailedStepReceiver::<P>::new(
+        let failed_step_receiver = AwsSqsFailedStepReceiver::<P>::new(
             sqs_client.clone(),
             self.config.failed_step_queue_url.clone(),
         )
         .await?;
 
-        let failed_instance_sender = AzureServiceBusFailedInstanceSender::<P>::new(
+        let failed_instance_sender = AwsSqsFailedInstanceSender::<P>::new(
             sqs_client,
             self.config.failed_instance_queue_url.clone(),
         )
         .await?;
 
-        let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+        let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::failed_step_worker::FailedStepWorkerDependencies::new(
             failed_step_receiver,
@@ -325,9 +325,9 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AwsDependencyManager 
 }
 
 impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager {
-    type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
-    type EventReceiver = AzureServiceBusEventReceiver<P>;
-    type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<P>;
+    type ActiveStepSender = AwsSqsActiveStepSender<P>;
+    type EventReceiver = AwsSqsEventReceiver<P>;
+    type StepsAwaitingEventManager = AwsSqsStepsAwaitingEventManager<P>;
     type Error = anyhow::Error;
 
     async fn new_event_worker_dependencies(
@@ -344,19 +344,19 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager {
         let sqs_client = self.sqs_client().await.clone();
         let dynamo_client = self.dynamo_client().await.clone();
 
-        let event_receiver = AzureServiceBusEventReceiver::<P>::new(
+        let event_receiver = AwsSqsEventReceiver::<P>::new(
             sqs_client.clone(),
             self.config.new_event_queue_url.clone(),
         )
         .await?;
 
-        let active_step_sender = AzureServiceBusActiveStepSender::<P>::new(
+        let active_step_sender = AwsSqsActiveStepSender::<P>::new(
             sqs_client,
             self.config.active_step_queue_url.clone(),
         )
         .await?;
 
-        let steps_awaiting_event_manager = AzureServiceBusStepsAwaitingEventManager::<P>::new(
+        let steps_awaiting_event_manager = AwsSqsStepsAwaitingEventManager::<P>::new(
             dynamo_client,
             self.config.dynamodb_table_name.clone(),
         );
@@ -370,9 +370,9 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager {
 }
 
 impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AwsDependencyManager {
-    type NextStepSender = AzureServiceBusNextStepSender<P>;
-    type NewInstanceReceiver = AzureServiceBusNewInstanceReceiver<P>;
-    type PersistenceManager = AzurePersistenceManager;
+    type NextStepSender = AwsSqsNextStepSender<P>;
+    type NewInstanceReceiver = AwsSqsNewInstanceReceiver<P>;
+    type PersistenceManager = AwsPersistenceManager;
     type Error = anyhow::Error;
 
     async fn new_instance_worker_dependencies(
@@ -388,19 +388,19 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AwsDependencyManager
     > {
         let sqs_client = self.sqs_client().await.clone();
 
-        let new_instance_receiver = AzureServiceBusNewInstanceReceiver::<P>::new(
+        let new_instance_receiver = AwsSqsNewInstanceReceiver::<P>::new(
             sqs_client.clone(),
             self.config.new_instance_queue_url.clone(),
         )
         .await?;
 
-        let next_step_sender = AzureServiceBusNextStepSender::<P>::new(
+        let next_step_sender = AwsSqsNextStepSender::<P>::new(
             sqs_client,
             self.config.next_step_queue_url.clone(),
         )
         .await?;
 
-        let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+        let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::new_instance_worker::NewInstanceWorkerDependencies::new(
             next_step_sender,
@@ -411,10 +411,10 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AwsDependencyManager
 }
 
 impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager {
-    type NextStepReceiver = AzureServiceBusNextStepReceiver<P>;
-    type ActiveStepSender = AzureServiceBusActiveStepSender<P>;
-    type StepsAwaitingEventManager = AzureServiceBusStepsAwaitingEventManager<P>;
-    type PersistenceManager = AzurePersistenceManager;
+    type NextStepReceiver = AwsSqsNextStepReceiver<P>;
+    type ActiveStepSender = AwsSqsActiveStepSender<P>;
+    type StepsAwaitingEventManager = AwsSqsStepsAwaitingEventManager<P>;
+    type PersistenceManager = AwsPersistenceManager;
     type Error = anyhow::Error;
 
     async fn next_step_worker_dependencies(
@@ -432,24 +432,24 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager {
         let sqs_client = self.sqs_client().await.clone();
         let dynamo_client = self.dynamo_client().await.clone();
 
-        let next_step_receiver = AzureServiceBusNextStepReceiver::<P>::new(
+        let next_step_receiver = AwsSqsNextStepReceiver::<P>::new(
             sqs_client.clone(),
             self.config.next_step_queue_url.clone(),
         )
         .await?;
 
-        let active_step_sender = AzureServiceBusActiveStepSender::<P>::new(
+        let active_step_sender = AwsSqsActiveStepSender::<P>::new(
             sqs_client,
             self.config.active_step_queue_url.clone(),
         )
         .await?;
 
-        let steps_awaiting_event_manager = AzureServiceBusStepsAwaitingEventManager::<P>::new(
+        let steps_awaiting_event_manager = AwsSqsStepsAwaitingEventManager::<P>::new(
             dynamo_client,
             self.config.dynamodb_table_name.clone(),
         );
 
-        let persistence_manager = AzurePersistenceManager::new(self.sqlx_pool().await.clone());
+        let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
         Ok(crate::workers::adapters::dependencies::next_step_worker::NextStepWorkerDependencies::new(
             next_step_receiver,
@@ -461,8 +461,8 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager {
 }
 
 impl<P: Project> ControlServerDependencyProvider<P> for AwsDependencyManager {
-    type EventSender = AzureServiceBusEventSender<P>;
-    type NewInstanceSender = AzureServiceBusNewInstanceSender<P>;
+    type EventSender = AwsSqsEventSender<P>;
+    type NewInstanceSender = AwsSqsNewInstanceSender<P>;
     type Error = anyhow::Error;
 
     async fn control_server_dependencies(
@@ -471,13 +471,13 @@ impl<P: Project> ControlServerDependencyProvider<P> for AwsDependencyManager {
     {
         let sqs_client = self.sqs_client().await.clone();
 
-        let event_sender = AzureServiceBusEventSender::<P>::new(
+        let event_sender = AwsSqsEventSender::<P>::new(
             sqs_client.clone(),
             self.config.new_event_queue_url.clone(),
         )
         .await?;
 
-        let new_instance_sender = AzureServiceBusNewInstanceSender::<P>::new(
+        let new_instance_sender = AwsSqsNewInstanceSender::<P>::new(
             sqs_client,
             self.config.new_instance_queue_url.clone(),
         )

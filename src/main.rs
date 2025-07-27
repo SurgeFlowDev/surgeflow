@@ -2,7 +2,7 @@ use config::{Config, Environment};
 use rust_workflow_2::workers::active_step_worker;
 use rust_workflow_2::workers::adapters::dependencies::DependencyManager;
 use rust_workflow_2::workers::aws_adapter::dependencies::{
-    AzureAdapterConfig, AwsDependencyManager,
+    AwsAdapterConfig, AwsDependencyManager,
 };
 use rust_workflow_2::workers::completed_instance_worker;
 use rust_workflow_2::workers::completed_step_worker;
@@ -18,7 +18,7 @@ use rust_workflow_2::workflows::{MyProject, Project};
 use tokio::try_join;
 use tracing::Level;
 
-fn get_aws_adapter_config() -> anyhow::Result<AzureAdapterConfig> {
+fn get_aws_adapter_config() -> anyhow::Result<AwsAdapterConfig> {
     let config = Config::builder()
         // .add_source(File::with_name("config/default")) // e.g. default.toml
         // .add_source(File::with_name("config/local").required(false))
@@ -26,8 +26,8 @@ fn get_aws_adapter_config() -> anyhow::Result<AzureAdapterConfig> {
         .build()?;
 
     let config = config
-        .try_deserialize::<AzureAdapterConfig>()
-        .expect("Failed to deserialize AzureAdapterConfig from environment variables");
+        .try_deserialize::<AwsAdapterConfig>()
+        .expect("Failed to deserialize AwsAdapterConfig from environment variables");
 
     Ok(config)
 }

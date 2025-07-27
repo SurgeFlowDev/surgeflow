@@ -9,7 +9,7 @@ pub mod receivers;
 pub mod senders;
 
 #[derive(Debug, thiserror::Error)]
-pub enum AzureAdapterError {
+pub enum AwsAdapterError {
     #[error("failed to receive message")]
     ReceiveMessageError(#[from] SdkError<ReceiveMessageError, HttpResponse>),
     #[error("failed to send message")]

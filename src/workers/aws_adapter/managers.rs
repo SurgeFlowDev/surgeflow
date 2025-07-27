@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::AzureAdapterError;
+use super::AwsAdapterError;
 use crate::{
     step::FullyQualifiedStep,
     workers::adapters::managers::StepsAwaitingEventManager,
@@ -116,13 +116,13 @@ pub mod dynamo_kv {
 }
 
 #[derive(Clone)]
-pub struct AzureServiceBusStepsAwaitingEventManager<P: Project> {
+pub struct AwsSqsStepsAwaitingEventManager<P: Project> {
     dynamo_client: aws_sdk_dynamodb::Client,
     table_name: String,
     _phantom: PhantomData<P>,
 }
 
-impl<P: Project> AzureServiceBusStepsAwaitingEventManager<P> {
+impl<P: Project> AwsSqsStepsAwaitingEventManager<P> {
     // TODO: should be private
     pub fn new(dynamo_client: aws_sdk_dynamodb::Client, table_name: String) -> Self {
         Self {
@@ -137,8 +137,8 @@ impl<P: Project> AzureServiceBusStepsAwaitingEventManager<P> {
     }
 }
 
-impl<P: Project> StepsAwaitingEventManager<P> for AzureServiceBusStepsAwaitingEventManager<P> {
-    type Error = AzureAdapterError;
+impl<P: Project> StepsAwaitingEventManager<P> for AwsSqsStepsAwaitingEventManager<P> {
+    type Error = AwsAdapterError;
     async fn get_step(
         &mut self,
         instance_id: WorkflowInstanceId,
@@ -153,7 +153,7 @@ impl<P: Project> StepsAwaitingEventManager<P> for AzureServiceBusStepsAwaitingEv
         {
             Ok(item) => Ok(item),
             Err(dynamo_kv::DynamoKvError::NotFound) => Ok(None),
-            Err(e) => Err(AzureAdapterError::DynamoKvError(e)),
+            Err(e) => Err(AwsAdapterError::DynamoKvError(e)),
         }
     }
 
@@ -165,7 +165,7 @@ impl<P: Project> StepsAwaitingEventManager<P> for AzureServiceBusStepsAwaitingEv
             &key,
         )
         .await
-        .map_err(AzureAdapterError::DynamoKvError)?;
+        .map_err(AwsAdapterError::DynamoKvError)?;
         Ok(())
     }
 
@@ -173,7 +173,7 @@ impl<P: Project> StepsAwaitingEventManager<P> for AzureServiceBusStepsAwaitingEv
         let key = Self::make_key(step.instance.external_id);
         dynamo_kv::put_item(&self.dynamo_client, self.table_name.clone(), &key, step)
             .await
-            .map_err(AzureAdapterError::DynamoKvError)?;
+            .map_err(AwsAdapterError::DynamoKvError)?;
         Ok(())
     }
 }
@@ -188,15 +188,15 @@ mod persistence_manager {
     };
 
     #[derive(Clone)]
-    pub struct AzurePersistenceManager {
+    pub struct AwsPersistenceManager {
         sqlx_pool: PgPool,
     }
-    impl AzurePersistenceManager {
+    impl AwsPersistenceManager {
         pub fn new(sqlx_pool: PgPool) -> Self {
             Self { sqlx_pool }
         }
     }
-    impl PersistenceManager for AzurePersistenceManager {
+    impl PersistenceManager for AwsPersistenceManager {
         type Error = anyhow::Error;
         async fn set_step_status(&self, step_id: StepId, status: i32) -> Result<(), anyhow::Error> {
             query!(
@@ -277,4 +277,4 @@ mod persistence_manager {
         }
     }
 }
-pub use persistence_manager::AzurePersistenceManager;
+pub use persistence_manager::AwsPersistenceManager;
