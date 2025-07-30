@@ -1,12 +1,12 @@
 use crate::event::Immediate;
-use crate::step::StepError;
+use crate::step::{StepError, WorkflowStepWithSettings};
 use crate::workers::adapters::dependencies::control_server::ControlServerDependencies;
 use crate::workers::adapters::managers::{WorkflowInstance, WorkflowName};
 use crate::workers::adapters::senders::NewInstanceSender;
 use crate::workflows::workflow_1::{Workflow1, Workflow1Event, Workflow1Step};
 use crate::workflows::workflow_2::{Workflow2, Workflow2Event, Workflow2Step};
 use crate::{
-    AppState, ArcAppState, event::InstanceEvent, step::StepWithSettings,
+    AppState, ArcAppState, event::InstanceEvent, step::ProjectStepWithSettings,
     workers::adapters::senders::EventSender,
 };
 use aide::{OperationIo, axum::ApiRouter};
@@ -252,7 +252,7 @@ pub trait ProjectStep:
         wf: <Self::Project as Project>::Workflow,
         event: <Self::Project as Project>::Event,
     ) -> impl std::future::Future<
-        Output = Result<Option<StepWithSettings<Self::Project>>, StepError>,
+        Output = Result<Option<ProjectStepWithSettings<Self::Project>>, StepError>,
     > + Send;
 }
 pub trait ProjectEvent:
@@ -272,7 +272,7 @@ pub trait ProjectWorkflow: Sized + Send + Sync + 'static + Clone {
     type Project: Project<Workflow = Self>;
 
     // TODO: this should be based on some sort of enum, not a string
-    fn entrypoint(workflow_name: WorkflowName) -> StepWithSettings<Self::Project>;
+    fn entrypoint(workflow_name: WorkflowName) -> ProjectStepWithSettings<Self::Project>;
 
     fn control_router<
         NewEventSenderT: EventSender<Self::Project>,
@@ -299,7 +299,7 @@ pub trait Workflow:
     type Step: WorkflowStep<Workflow = Self>;
     const NAME: &'static str;
 
-    fn entrypoint() -> StepWithSettings<Self::Project>;
+    fn entrypoint() -> WorkflowStepWithSettings<Self>;
 }
 
 pub trait WorkflowStep:
@@ -320,7 +320,7 @@ pub trait WorkflowStep:
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
     ) -> impl std::future::Future<
-        Output = Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Project>>, StepError>,
+        Output = Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError>,
     > + Send;
 
     fn is_event<T: Event + 'static>(&self) -> bool;
@@ -383,7 +383,7 @@ pub trait Step:
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
     ) -> impl std::future::Future<
-        Output = Result<Option<StepWithSettings<<Self::Workflow as Workflow>::Project>>, StepError>,
+        Output = Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError>,
     > + Send;
 }
 
@@ -450,11 +450,11 @@ impl ProjectWorkflow for MyProjectWorkflow {
     type Project = MyProject;
 
     // TODO: this should be based on some sort of enum, not a string
-    fn entrypoint(workflow_name: WorkflowName) -> crate::step::StepWithSettings<Self::Project> {
+    fn entrypoint(workflow_name: WorkflowName) -> ProjectStepWithSettings<Self::Project> {
         if workflow_name == Workflow1::NAME.into() {
-            Workflow1::entrypoint()
+            Workflow1::entrypoint().into()
         } else if workflow_name == Workflow2::NAME.into() {
-            Workflow2::entrypoint()
+            Workflow2::entrypoint().into()
         } else {
             panic!("Unknown workflow name");
         }
@@ -507,15 +507,20 @@ impl ProjectStep for MyProjectStep {
         event: <Self::Project as Project>::Event,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> Result<Option<crate::step::StepWithSettings<Self::Project>>, crate::step::StepError> {
+    ) -> Result<Option<crate::step::ProjectStepWithSettings<Self::Project>>, crate::step::StepError>
+    {
         match self {
             MyProjectStep::Workflow1(step) => {
-                step.run_raw(wf.try_into().unwrap(), event.try_into().unwrap())
-                    .await
+                let step = step
+                    .run_raw(wf.try_into().unwrap(), event.try_into().unwrap())
+                    .await?;
+                Ok(step.map(Into::into))
             }
             MyProjectStep::Workflow2(step) => {
-                step.run_raw(wf.try_into().unwrap(), event.try_into().unwrap())
-                    .await
+                let step = step
+                    .run_raw(wf.try_into().unwrap(), event.try_into().unwrap())
+                    .await?;
+                Ok(step.map(Into::into))
             }
         }
     }

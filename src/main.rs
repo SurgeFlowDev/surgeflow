@@ -1,9 +1,7 @@
 use config::{Config, Environment};
 use rust_workflow_2::workers::active_step_worker;
 use rust_workflow_2::workers::adapters::dependencies::DependencyManager;
-use rust_workflow_2::workers::aws_adapter::dependencies::{
-    AwsAdapterConfig, AwsDependencyManager,
-};
+use rust_workflow_2::workers::aws_adapter::dependencies::{AwsAdapterConfig, AwsDependencyManager};
 use rust_workflow_2::workers::completed_instance_worker;
 use rust_workflow_2::workers::completed_step_worker;
 use rust_workflow_2::workers::control_server;

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     event::Immediate,
-    step::{StepSettings, StepWithSettings},
+    step::{StepSettings, WorkflowStepWithSettings},
     workflows::{
         Event, MyProject, MyProjectEvent, MyProjectStep, Step, TryFromRef, Workflow, WorkflowEvent,
         WorkflowStep,
@@ -25,9 +25,9 @@ impl Workflow for Workflow2 {
 
     const NAME: &'static str = "workflow_2";
 
-    fn entrypoint() -> crate::step::StepWithSettings<Self::Project> {
-        crate::step::StepWithSettings {
-            step: MyProjectStep::Workflow2(Workflow2Step::Step0(Step0)),
+    fn entrypoint() -> crate::step::WorkflowStepWithSettings<Self> {
+        crate::step::WorkflowStepWithSettings {
+            step: Workflow2Step::Step0(Step0),
             settings: crate::step::StepSettings { max_retries: 3 },
         }
     }
@@ -48,10 +48,8 @@ impl WorkflowStep for Workflow2Step {
         event: <Self::Workflow as Workflow>::Event,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> Result<
-        Option<crate::step::StepWithSettings<<Self::Workflow as Workflow>::Project>>,
-        crate::step::StepError,
-    > {
+    ) -> Result<Option<crate::step::WorkflowStepWithSettings<Self::Workflow>>, crate::step::StepError>
+    {
         match self {
             Workflow2Step::Step0(step) => step.run_raw(wf, event.try_into().unwrap()).await,
             Workflow2Step::Step1(step) => step.run_raw(wf, event.try_into().unwrap()).await,
@@ -89,14 +87,11 @@ impl Step for Step0 {
         event: Self::Event,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> Result<
-        Option<StepWithSettings<<Self::Workflow as Workflow>::Project>>,
-        crate::step::StepError,
-    > {
+    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, crate::step::StepError> {
         tracing::info!("Running Step0 in Workflow2");
-        Ok(Some(StepWithSettings {
+        Ok(Some(WorkflowStepWithSettings {
             // TODO: this should just return Workflow2Step, right? It shouldn't be able to return steps from other workflows
-            step: MyProjectStep::Workflow2(Workflow2Step::Step1(Step1)),
+            step: Workflow2Step::Step1(Step1),
             settings: StepSettings { max_retries: 3 },
         }))
     }
@@ -114,10 +109,8 @@ impl Step for Step1 {
         &self,
         wf: Self::Workflow,
         event: Self::Event,
-    ) -> Result<
-        Option<crate::step::StepWithSettings<<Self::Workflow as Workflow>::Project>>,
-        crate::step::StepError,
-    > {
+    ) -> Result<Option<crate::step::WorkflowStepWithSettings<Self::Workflow>>, crate::step::StepError>
+    {
         tracing::info!("Running Step1 in Workflow2");
         Ok(None)
     }

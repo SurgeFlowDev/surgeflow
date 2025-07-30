@@ -1,11 +1,11 @@
 use crate::{
     workers::adapters::managers::WorkflowInstance,
-    workflows::{Project, StepId},
+    workflows::{Project, StepId, Workflow},
 };
 use derive_more::Debug;
 use serde::{Deserialize, Serialize};
 
-pub type StepResult<W> = Result<Option<StepWithSettings<W>>, StepError>;
+pub type StepResult<W> = Result<Option<ProjectStepWithSettings<W>>, StepError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum StepError {
@@ -46,7 +46,7 @@ pub struct FullyQualifiedStep<P: Project> {
     pub instance: WorkflowInstance,
     pub step_id: StepId,
     #[serde(bound = "")]
-    pub step: StepWithSettings<P>,
+    pub step: ProjectStepWithSettings<P>,
 
     /// Eventful steps can be initialized without an event, but it will be set when the step is triggered.
     pub event: Option<P::Event>,
@@ -54,17 +54,27 @@ pub struct FullyQualifiedStep<P: Project> {
 
     pub previous_step_id: Option<StepId>,
     #[serde(bound = "")]
-    pub next_step: Option<StepWithSettings<P>>,
+    pub next_step: Option<ProjectStepWithSettings<P>>,
 }
 
-// #[derive(Debug, Deserialize, Serialize, Clone)]
-// pub struct OldStepWithSettings<W: Workflow> {
-//     pub step: W::Step,
-//     pub settings: StepSettings,
-// }
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct StepWithSettings<P: Project> {
+pub struct ProjectStepWithSettings<P: Project> {
     pub step: P::Step,
     pub settings: StepSettings,
 }
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct WorkflowStepWithSettings<W: Workflow> {
+    pub step: W::Step,
+    pub settings: StepSettings,
+}
+
+impl<W: Workflow> From<WorkflowStepWithSettings<W>> for ProjectStepWithSettings<W::Project> {
+    fn from(value: WorkflowStepWithSettings<W>) -> Self {
+        ProjectStepWithSettings {
+            step: value.step.into(),
+            settings: value.settings,
+        }
+    }
+}
+// TODO: implement the inverse TryFrom?

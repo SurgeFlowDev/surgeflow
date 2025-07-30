@@ -24,14 +24,12 @@ use crate::{
             managers::{AwsPersistenceManager, AwsSqsStepsAwaitingEventManager},
             receivers::{
                 AwsSqsActiveStepReceiver, AwsSqsCompletedInstanceReceiver,
-                AwsSqsCompletedStepReceiver, AwsSqsEventReceiver,
-                AwsSqsFailedInstanceReceiver, AwsSqsFailedStepReceiver,
-                AwsSqsNewInstanceReceiver, AwsSqsNextStepReceiver,
+                AwsSqsCompletedStepReceiver, AwsSqsEventReceiver, AwsSqsFailedInstanceReceiver,
+                AwsSqsFailedStepReceiver, AwsSqsNewInstanceReceiver, AwsSqsNextStepReceiver,
             },
             senders::{
-                AwsSqsActiveStepSender, AwsSqsCompletedStepSender,
-                AwsSqsEventSender, AwsSqsFailedInstanceSender,
-                AwsSqsFailedStepSender, AwsSqsNewInstanceSender,
+                AwsSqsActiveStepSender, AwsSqsCompletedStepSender, AwsSqsEventSender,
+                AwsSqsFailedInstanceSender, AwsSqsFailedStepSender, AwsSqsNewInstanceSender,
                 AwsSqsNextStepSender,
             },
         },
@@ -184,11 +182,9 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AwsDependencyManag
         )
         .await?;
 
-        let next_step_sender = AwsSqsNextStepSender::<P>::new(
-            sqs_client,
-            self.config.next_step_queue_url.clone(),
-        )
-        .await?;
+        let next_step_sender =
+            AwsSqsNextStepSender::<P>::new(sqs_client, self.config.next_step_queue_url.clone())
+                .await?;
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -350,11 +346,9 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager {
         )
         .await?;
 
-        let active_step_sender = AwsSqsActiveStepSender::<P>::new(
-            sqs_client,
-            self.config.active_step_queue_url.clone(),
-        )
-        .await?;
+        let active_step_sender =
+            AwsSqsActiveStepSender::<P>::new(sqs_client, self.config.active_step_queue_url.clone())
+                .await?;
 
         let steps_awaiting_event_manager = AwsSqsStepsAwaitingEventManager::<P>::new(
             dynamo_client,
@@ -394,11 +388,9 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AwsDependencyManager
         )
         .await?;
 
-        let next_step_sender = AwsSqsNextStepSender::<P>::new(
-            sqs_client,
-            self.config.next_step_queue_url.clone(),
-        )
-        .await?;
+        let next_step_sender =
+            AwsSqsNextStepSender::<P>::new(sqs_client, self.config.next_step_queue_url.clone())
+                .await?;
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -438,11 +430,9 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager {
         )
         .await?;
 
-        let active_step_sender = AwsSqsActiveStepSender::<P>::new(
-            sqs_client,
-            self.config.active_step_queue_url.clone(),
-        )
-        .await?;
+        let active_step_sender =
+            AwsSqsActiveStepSender::<P>::new(sqs_client, self.config.active_step_queue_url.clone())
+                .await?;
 
         let steps_awaiting_event_manager = AwsSqsStepsAwaitingEventManager::<P>::new(
             dynamo_client,
