@@ -38,8 +38,19 @@ pub enum Workflow1Step {
     Step1(Step1),
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum Workflow1StepError {
+    #[error("Step0 error: {0}")]
+    Step0(<Step0 as Step>::Error),
+    #[error("Step1 error: {0}")]
+    Step1(<Step1 as Step>::Error),
+}
+
+
+
 impl WorkflowStep for Workflow1Step {
     type Workflow = Workflow1;
+    type Error = Workflow1StepError;
 
     async fn run_raw(
         &self,
@@ -75,10 +86,17 @@ impl WorkflowStep for Workflow1Step {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Step0;
 
+#[derive(thiserror::Error, Debug)]
+pub enum Step0Error {
+    // TODO
+    #[error("Step0 error")]
+    Unknown,
+}
+
 impl Step for Step0 {
     type Event = Event0;
-
     type Workflow = Workflow1;
+    type Error = Step0Error;
 
     async fn run_raw(
         &self,
@@ -99,10 +117,17 @@ impl Step for Step0 {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Step1;
 
+#[derive(thiserror::Error, Debug)]
+pub enum Step1Error {
+    // TODO
+    #[error("Step1 error")]
+    Unknown,
+}
+
 impl Step for Step1 {
     type Event = Immediate;
-
     type Workflow = Workflow1;
+    type Error = Step1Error;
 
     async fn run_raw(
         &self,

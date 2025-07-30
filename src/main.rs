@@ -11,7 +11,7 @@ use rust_workflow_2::workers::new_event_worker;
 use rust_workflow_2::workers::new_instance_worker;
 use rust_workflow_2::workers::next_step_worker;
 use rust_workflow_2::workflows::workflow_1::Workflow1;
-use rust_workflow_2::workflows::workflow_2::Workflow2;
+// use rust_workflow_2::workflows::workflow_2::Workflow2;
 use rust_workflow_2::workflows::{MyProject, Project};
 use tokio::try_join;
 use tracing::Level;
@@ -43,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
 
     let project = MyProject {
         workflow_1: Workflow1 {},
-        workflow_2: Workflow2 {},
+        // workflow_2: Workflow2 {},
     };
 
     main_handler(project, dependency_manager).await?;
