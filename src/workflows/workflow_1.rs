@@ -6,7 +6,8 @@ use crate::{
     event::Immediate,
     step::{StepSettings, WorkflowStepWithSettings},
     workflows::{
-        Event, MyProject, MyProjectEvent, Step, TryFromRef, Workflow, WorkflowEvent, WorkflowStep,
+        Event, MyProject, MyProjectEvent, Project, ProjectStep, Step, TryFromRef, Workflow,
+        WorkflowEvent, WorkflowStep,
     },
 };
 
@@ -46,7 +47,75 @@ pub enum Workflow1StepError {
     Step1(<Step1 as Step>::Error),
 }
 
+//////////// ProjectStep::Error <-> WorkflowStep::Error conversions
 
+impl From<<<Workflow1 as Workflow>::Step as WorkflowStep>::Error>
+    for <<<Workflow1 as Workflow>::Project as Project>::Step as ProjectStep>::Error
+{
+    fn from(error: <<Workflow1 as Workflow>::Step as WorkflowStep>::Error) -> Self {
+        <<<Workflow1 as Workflow>::Project as Project>::Step as ProjectStep>::Error::Workflow1(
+            error,
+        )
+    }
+}
+
+impl TryFrom<<<MyProject as Project>::Step as ProjectStep>::Error>
+    for <<Workflow1 as Workflow>::Step as WorkflowStep>::Error
+{
+    type Error = ();
+
+    fn try_from(
+        error: <<<Workflow1 as Workflow>::Project as Project>::Step as ProjectStep>::Error,
+    ) -> Result<Self, Self::Error> {
+        type Error = <<MyProject as Project>::Step as ProjectStep>::Error;
+        match error {
+            Error::Workflow1(e) => Ok(e),
+            _ => Err(()),
+        }
+    }
+}
+
+//////////// WorkflowStep::Error <-> Step::Error conversions
+
+impl From<<Step0 as Step>::Error> for <<Workflow1 as Workflow>::Step as WorkflowStep>::Error {
+    fn from(error: <Step0 as Step>::Error) -> Self {
+        Workflow1StepError::Step0(error)
+    }
+}
+
+impl From<<Step1 as Step>::Error> for <<Workflow1 as Workflow>::Step as WorkflowStep>::Error {
+    fn from(error: <Step1 as Step>::Error) -> Self {
+        Workflow1StepError::Step1(error)
+    }
+}
+
+impl TryFrom<<<Workflow1 as Workflow>::Step as WorkflowStep>::Error> for <Step1 as Step>::Error {
+    type Error = ();
+
+    fn try_from(
+        error: <<Workflow1 as Workflow>::Step as WorkflowStep>::Error,
+    ) -> Result<Self, Self::Error> {
+        match error {
+            Workflow1StepError::Step1(e) => Ok(e),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<<<Workflow1 as Workflow>::Step as WorkflowStep>::Error> for <Step0 as Step>::Error {
+    type Error = ();
+
+    fn try_from(
+        error: <<Workflow1 as Workflow>::Step as WorkflowStep>::Error,
+    ) -> Result<Self, Self::Error> {
+        match error {
+            Workflow1StepError::Step0(e) => Ok(e),
+            _ => Err(()),
+        }
+    }
+}
+
+////////////
 
 impl WorkflowStep for Workflow1Step {
     type Workflow = Workflow1;

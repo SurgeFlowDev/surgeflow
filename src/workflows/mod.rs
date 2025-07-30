@@ -310,12 +310,19 @@ pub trait WorkflowStep:
     + for<'de> Deserialize<'de>
     + Clone
     + Send
-    + fmt::Debug
+    + Debug
     + Into<<<Self::Workflow as Workflow>::Project as Project>::Step>
     + TryFrom<<<Self::Workflow as Workflow>::Project as Project>::Step>
 {
     type Workflow: Workflow<Step = Self>;
-    type Error: Error + Send + Sync + 'static;
+    type Error: Error
+        + Send
+        + Sync
+        + 'static
+        // TODO: creating a ProjectStepError/WorkflowStepError/StepError trait would make this cleaner
+        // but this would come at the expense of users getting less clear error messaages when implementing these traits
+        + TryFrom<<<<Self::Workflow as Workflow>::Project as Project>::Step as ProjectStep>::Error>
+        + Into<<<<Self::Workflow as Workflow>::Project as Project>::Step as ProjectStep>::Error>;
 
     fn run_raw(
         &self,
@@ -379,14 +386,19 @@ pub trait Step:
 {
     type Event: Event + 'static;
     type Workflow: Workflow;
-    type Error: Error + Send + Sync + 'static;
+    type Error: Error
+        + Send
+        + Sync
+        + 'static
+        // TODO: creating a ProjectStepError/WorkflowStepError/StepError trait would make this cleaner
+        // but this would come at the expense of users getting less clear error messaages when implementing these traits
+        + TryFrom<<<Self::Workflow as Workflow>::Step as WorkflowStep>::Error>
+        + Into<<<Self::Workflow as Workflow>::Step as WorkflowStep>::Error>;
 
     fn run_raw(
         &self,
         wf: Self::Workflow,
         event: Self::Event,
-        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
-        // where we can get the WorkflowStep type from
     ) -> impl std::future::Future<
         Output = Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError>,
     > + Send;
