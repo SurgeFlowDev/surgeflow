@@ -1,5 +1,5 @@
 // TODO: review this file. a senders/receivers/managers are receiveing &str queue names when they should receive String to avoid one extra allocation
-
+use super::Result;
 use aws_config::SdkConfig;
 use aws_credential_types::Credentials;
 use aws_sdk_dynamodb::Client as DynamoClient;
@@ -21,6 +21,7 @@ use crate::{
             control_server::ControlServerDependencies,
         },
         aws_adapter::{
+            AwsAdapterError,
             managers::{AwsPersistenceManager, AwsSqsStepsAwaitingEventManager},
             receivers::{
                 AwsSqsActiveStepReceiver, AwsSqsCompletedInstanceReceiver,
@@ -88,7 +89,9 @@ impl AwsDependencyManager {
             sdk_config: None,
         }
     }
+}
 
+impl AwsDependencyManager {
     fn get_sdk_config(&mut self) -> &SdkConfig {
         if self.sdk_config.is_none() {
             let credentials = Credentials::from_keys(
@@ -105,12 +108,11 @@ impl AwsDependencyManager {
             );
         }
 
-        self.sdk_config.as_ref().unwrap()
+        self.sdk_config
+            .as_ref()
+            .expect("sdk_config is set in this function. this should never happen")
     }
-}
-
-impl AwsDependencyManager {
-    async fn sqs_client(&mut self) -> &SqsClient {
+    fn sqs_client(&mut self) -> &SqsClient {
         if self.sqs_client.is_none() {
             let config = self.get_sdk_config();
             self.sqs_client = Some(SqsClient::new(config));
@@ -118,7 +120,7 @@ impl AwsDependencyManager {
         self.sqs_client.as_ref().unwrap()
     }
 
-    async fn dynamo_client(&mut self) -> &DynamoClient {
+    fn dynamo_client(&mut self) -> &DynamoClient {
         if self.dynamo_client.is_none() {
             let config = self.get_sdk_config();
             self.dynamo_client = Some(DynamoClient::new(config));
@@ -140,19 +142,18 @@ impl AwsDependencyManager {
 
 impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AwsDependencyManager {
     type CompletedInstanceReceiver = AwsSqsCompletedInstanceReceiver<P>;
-    type Error = anyhow::Error;
+    type Error = AwsAdapterError;
 
     async fn completed_instance_worker_dependencies(
         &mut self,
-    ) -> anyhow::Result<CompletedInstanceWorkerDependencies<P, Self::CompletedInstanceReceiver>>
+    ) -> Result<CompletedInstanceWorkerDependencies<P, Self::CompletedInstanceReceiver>, Self::Error>
     {
-        let sqs_client = self.sqs_client().await.clone();
+        let sqs_client = self.sqs_client();
 
         let instance_receiver = AwsSqsCompletedInstanceReceiver::new(
-            sqs_client,
+            sqs_client.clone(),
             self.config.completed_instance_queue_url.clone(),
-        )
-        .await?;
+        );
 
         Ok(CompletedInstanceWorkerDependencies::new(instance_receiver))
     }
@@ -162,11 +163,11 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AwsDependencyManag
     type CompletedStepReceiver = AwsSqsCompletedStepReceiver<P>;
     type NextStepSender = AwsSqsNextStepSender<P>;
     type PersistenceManager = AwsPersistenceManager;
-    type Error = anyhow::Error;
+    type Error = AwsAdapterError;
 
     async fn completed_step_worker_dependencies(
         &mut self,
-    ) -> anyhow::Result<
+    ) -> Result<
         CompletedStepWorkerDependencies<
             P,
             Self::CompletedStepReceiver,
@@ -174,17 +175,15 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AwsDependencyManag
             Self::PersistenceManager,
         >,
     > {
-        let sqs_client = self.sqs_client().await.clone();
+        let sqs_client = self.sqs_client().clone();
 
         let completed_step_receiver = AwsSqsCompletedStepReceiver::<P>::new(
             sqs_client.clone(),
             self.config.completed_step_queue_url.clone(),
-        )
-        .await?;
+        );
 
         let next_step_sender =
-            AwsSqsNextStepSender::<P>::new(sqs_client, self.config.next_step_queue_url.clone())
-                .await?;
+            AwsSqsNextStepSender::<P>::new(sqs_client, self.config.next_step_queue_url.clone());
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -202,7 +201,7 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AwsDependencyManager 
     type FailedStepSender = AwsSqsFailedStepSender<P>;
     type CompletedStepSender = AwsSqsCompletedStepSender<P>;
     type PersistenceManager = AwsPersistenceManager;
-    type Error = anyhow::Error;
+    type Error = AwsAdapterError;
 
     async fn active_step_worker_dependencies(
         &mut self,
@@ -217,31 +216,27 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AwsDependencyManager 
         >,
         Self::Error,
     > {
-        let sqs_client = self.sqs_client().await.clone();
+        let sqs_client = self.sqs_client().clone();
 
         let active_step_receiver = AwsSqsActiveStepReceiver::<P>::new(
             sqs_client.clone(),
             self.config.active_step_queue_url.clone(),
-        )
-        .await?;
+        );
 
         let active_step_sender = AwsSqsActiveStepSender::<P>::new(
             sqs_client.clone(),
             self.config.active_step_queue_url.clone(),
-        )
-        .await?;
+        );
 
         let failed_step_sender = AwsSqsFailedStepSender::<P>::new(
             sqs_client.clone(),
             self.config.failed_step_queue_url.clone(),
-        )
-        .await?;
+        );
 
         let completed_step_sender = AwsSqsCompletedStepSender::<P>::new(
             sqs_client,
             self.config.completed_step_queue_url.clone(),
-        )
-        .await?;
+        );
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -257,7 +252,7 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AwsDependencyManager 
 
 impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AwsDependencyManager {
     type FailedInstanceReceiver = AwsSqsFailedInstanceReceiver<P>;
-    type Error = anyhow::Error;
+    type Error = AwsAdapterError;
 
     async fn failed_instance_worker_dependencies(
         &mut self,
@@ -265,13 +260,12 @@ impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AwsDependencyMana
         crate::workers::adapters::dependencies::failed_instance_worker::FailedInstanceWorkerDependencies<P, Self::FailedInstanceReceiver>,
         Self::Error,
     >{
-        let sqs_client = self.sqs_client().await.clone();
+        let sqs_client = self.sqs_client().clone();
 
         let failed_instance_receiver = AwsSqsFailedInstanceReceiver::<P>::new(
             sqs_client,
             self.config.failed_instance_queue_url.clone(),
-        )
-        .await?;
+        );
 
         Ok(crate::workers::adapters::dependencies::failed_instance_worker::FailedInstanceWorkerDependencies::new(
             failed_instance_receiver,
@@ -283,7 +277,7 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AwsDependencyManager 
     type FailedStepReceiver = AwsSqsFailedStepReceiver<P>;
     type FailedInstanceSender = AwsSqsFailedInstanceSender<P>;
     type PersistenceManager = AwsPersistenceManager;
-    type Error = anyhow::Error;
+    type Error = AwsAdapterError;
 
     async fn failed_step_worker_dependencies(
         &mut self,
@@ -296,19 +290,17 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AwsDependencyManager 
         >,
         Self::Error,
     > {
-        let sqs_client = self.sqs_client().await.clone();
+        let sqs_client = self.sqs_client().clone();
 
         let failed_step_receiver = AwsSqsFailedStepReceiver::<P>::new(
             sqs_client.clone(),
             self.config.failed_step_queue_url.clone(),
-        )
-        .await?;
+        );
 
         let failed_instance_sender = AwsSqsFailedInstanceSender::<P>::new(
             sqs_client,
             self.config.failed_instance_queue_url.clone(),
-        )
-        .await?;
+        );
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -324,7 +316,7 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager {
     type ActiveStepSender = AwsSqsActiveStepSender<P>;
     type EventReceiver = AwsSqsEventReceiver<P>;
     type StepsAwaitingEventManager = AwsSqsStepsAwaitingEventManager<P>;
-    type Error = anyhow::Error;
+    type Error = AwsAdapterError;
 
     async fn new_event_worker_dependencies(
         &mut self,
@@ -337,18 +329,15 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager {
         >,
         Self::Error,
     > {
-        let sqs_client = self.sqs_client().await.clone();
-        let dynamo_client = self.dynamo_client().await.clone();
+        let sqs_client = self.sqs_client().clone();
+        let dynamo_client = self.dynamo_client().clone();
 
         let event_receiver = AwsSqsEventReceiver::<P>::new(
             sqs_client.clone(),
             self.config.new_event_queue_url.clone(),
-        )
-        .await?;
-
+        );
         let active_step_sender =
-            AwsSqsActiveStepSender::<P>::new(sqs_client, self.config.active_step_queue_url.clone())
-                .await?;
+            AwsSqsActiveStepSender::<P>::new(sqs_client, self.config.active_step_queue_url.clone());
 
         let steps_awaiting_event_manager = AwsSqsStepsAwaitingEventManager::<P>::new(
             dynamo_client,
@@ -367,7 +356,7 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AwsDependencyManager
     type NextStepSender = AwsSqsNextStepSender<P>;
     type NewInstanceReceiver = AwsSqsNewInstanceReceiver<P>;
     type PersistenceManager = AwsPersistenceManager;
-    type Error = anyhow::Error;
+    type Error = AwsAdapterError;
 
     async fn new_instance_worker_dependencies(
         &mut self,
@@ -380,17 +369,15 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AwsDependencyManager
         >,
         Self::Error,
     > {
-        let sqs_client = self.sqs_client().await.clone();
+        let sqs_client = self.sqs_client().clone();
 
         let new_instance_receiver = AwsSqsNewInstanceReceiver::<P>::new(
             sqs_client.clone(),
             self.config.new_instance_queue_url.clone(),
-        )
-        .await?;
+        );
 
         let next_step_sender =
-            AwsSqsNextStepSender::<P>::new(sqs_client, self.config.next_step_queue_url.clone())
-                .await?;
+            AwsSqsNextStepSender::<P>::new(sqs_client, self.config.next_step_queue_url.clone());
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -407,7 +394,7 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager {
     type ActiveStepSender = AwsSqsActiveStepSender<P>;
     type StepsAwaitingEventManager = AwsSqsStepsAwaitingEventManager<P>;
     type PersistenceManager = AwsPersistenceManager;
-    type Error = anyhow::Error;
+    type Error = AwsAdapterError;
 
     async fn next_step_worker_dependencies(
         &mut self,
@@ -421,18 +408,16 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager {
         >,
         Self::Error,
     > {
-        let sqs_client = self.sqs_client().await.clone();
-        let dynamo_client = self.dynamo_client().await.clone();
+        let sqs_client = self.sqs_client().clone();
+        let dynamo_client = self.dynamo_client().clone();
 
         let next_step_receiver = AwsSqsNextStepReceiver::<P>::new(
             sqs_client.clone(),
             self.config.next_step_queue_url.clone(),
-        )
-        .await?;
+        );
 
         let active_step_sender =
-            AwsSqsActiveStepSender::<P>::new(sqs_client, self.config.active_step_queue_url.clone())
-                .await?;
+            AwsSqsActiveStepSender::<P>::new(sqs_client, self.config.active_step_queue_url.clone());
 
         let steps_awaiting_event_manager = AwsSqsStepsAwaitingEventManager::<P>::new(
             dynamo_client,
@@ -453,25 +438,23 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager {
 impl<P: Project> ControlServerDependencyProvider<P> for AwsDependencyManager {
     type EventSender = AwsSqsEventSender<P>;
     type NewInstanceSender = AwsSqsNewInstanceSender<P>;
-    type Error = anyhow::Error;
+    type Error = AwsAdapterError;
 
     async fn control_server_dependencies(
         &mut self,
     ) -> Result<ControlServerDependencies<P, Self::EventSender, Self::NewInstanceSender>, Self::Error>
     {
-        let sqs_client = self.sqs_client().await.clone();
+        let sqs_client = self.sqs_client().clone();
 
         let event_sender = AwsSqsEventSender::<P>::new(
             sqs_client.clone(),
             self.config.new_event_queue_url.clone(),
-        )
-        .await?;
+        );
 
         let new_instance_sender = AwsSqsNewInstanceSender::<P>::new(
             sqs_client,
             self.config.new_instance_queue_url.clone(),
-        )
-        .await?;
+        );
 
         Ok(ControlServerDependencies::new(
             event_sender,
@@ -481,5 +464,5 @@ impl<P: Project> ControlServerDependencyProvider<P> for AwsDependencyManager {
 }
 
 impl<P: Project> DependencyManager<P> for AwsDependencyManager {
-    type Error = anyhow::Error;
+    type Error = AwsAdapterError;
 }

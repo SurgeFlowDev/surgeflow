@@ -29,3 +29,5 @@ pub enum AwsAdapterError {
     #[error("SQLx error")]
     SqlxError(#[from] sqlx::Error),
 }
+
+pub type Result<T, E = AwsAdapterError> = std::result::Result<T, E>;

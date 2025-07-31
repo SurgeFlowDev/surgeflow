@@ -72,12 +72,12 @@ impl<P: Project> CompletedInstanceReceiver<P> for AwsSqsCompletedInstanceReceive
 }
 
 impl<P: Project> AwsSqsCompletedInstanceReceiver<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             receiver: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -140,12 +140,12 @@ impl<P: Project> FailedInstanceReceiver<P> for AwsSqsFailedInstanceReceiver<P> {
 }
 
 impl<P: Project> AwsSqsFailedInstanceReceiver<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             receiver: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -208,12 +208,12 @@ impl<P: Project> NewInstanceReceiver<P> for AwsSqsNewInstanceReceiver<P> {
 }
 
 impl<P: Project> AwsSqsNewInstanceReceiver<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             receiver: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -272,12 +272,12 @@ impl<P: Project> EventReceiver<P> for AwsSqsEventReceiver<P> {
 }
 
 impl<P: Project> AwsSqsEventReceiver<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             receiver: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 #[derive(Debug, Clone)]
@@ -335,12 +335,12 @@ impl<P: Project> NextStepReceiver<P> for AwsSqsNextStepReceiver<P> {
 }
 
 impl<P: Project> AwsSqsNextStepReceiver<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             receiver: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -403,12 +403,12 @@ impl<P: Project> CompletedStepReceiver<P> for AwsSqsCompletedStepReceiver<P> {
 }
 
 impl<P: Project> AwsSqsCompletedStepReceiver<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             receiver: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -471,12 +471,12 @@ impl<P: Project> FailedStepReceiver<P> for AwsSqsFailedStepReceiver<P> {
 }
 
 impl<P: Project> AwsSqsFailedStepReceiver<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             receiver: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -539,11 +539,11 @@ impl<P: Project> ActiveStepReceiver<P> for AwsSqsActiveStepReceiver<P> {
 }
 
 impl<P: Project> AwsSqsActiveStepReceiver<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             receiver: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }

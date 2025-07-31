@@ -43,12 +43,12 @@ impl<P: Project> NextStepSender<P> for AwsSqsNextStepSender<P> {
 }
 
 impl<P: Project> AwsSqsNextStepSender<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             sender: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -76,12 +76,12 @@ impl<P: Project> ActiveStepSender<P> for AwsSqsActiveStepSender<P> {
 }
 
 impl<P: Project> AwsSqsActiveStepSender<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             sender: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -111,12 +111,12 @@ impl<P: Project> FailedStepSender<P> for AwsSqsFailedStepSender<P> {
 }
 
 impl<P: Project> AwsSqsFailedStepSender<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             sender: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -146,12 +146,12 @@ impl<P: Project> EventSender<P> for AwsSqsEventSender<P> {
 }
 
 impl<P: Project> AwsSqsEventSender<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             sender: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -184,12 +184,12 @@ impl<P: Project> NewInstanceSender<P> for AwsSqsNewInstanceSender<P> {
 }
 
 impl<P: Project> AwsSqsNewInstanceSender<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             sender: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -223,12 +223,12 @@ impl<P: Project> FailedInstanceSender<P> for AwsSqsFailedInstanceSender<P> {
 }
 
 impl<P: Project> AwsSqsFailedInstanceSender<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             sender: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -262,12 +262,12 @@ impl<P: Project> CompletedInstanceSender<P> for AwsSqsCompletedInstanceSender<P>
 }
 
 impl<P: Project> AwsSqsCompletedInstanceSender<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             sender: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -299,11 +299,11 @@ impl<P: Project> CompletedStepSender<P> for AwsSqsCompletedStepSender<P> {
 }
 
 impl<P: Project> AwsSqsCompletedStepSender<P> {
-    pub async fn new(client: Client, queue_url: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: Client, queue_url: String) -> Self {
+        Self {
             sender: client,
             queue_url,
             _marker: PhantomData,
-        })
+        }
     }
 }
