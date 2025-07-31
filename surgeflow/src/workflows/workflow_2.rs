@@ -1,7 +1,10 @@
 use derive_more::{From, TryInto};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use surgeflow_types::{Event, Immediate, Project, ProjectStep, Step, StepError, StepSettings, TryFromRef, Workflow, WorkflowEvent, WorkflowStep, WorkflowStepWithSettings};
+use surgeflow_types::{
+    Event, Immediate, Project, ProjectStep, Step, StepError, StepSettings, TryFromRef, Workflow,
+    WorkflowEvent, WorkflowStep, WorkflowStepWithSettings,
+};
 
 use crate::workflows::{MyProject, MyProjectEvent};
 
@@ -27,7 +30,7 @@ impl Workflow for Workflow2 {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema,  From, TryInto)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, From, TryInto)]
 pub enum Workflow2Step {
     Step0(Step0),
     Step1(Step1),
@@ -121,8 +124,7 @@ impl WorkflowStep for Workflow2Step {
         event: <Self::Workflow as Workflow>::Event,
         // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
         // where we can get the WorkflowStep type from
-    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError>
-    {
+    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError> {
         match self {
             Workflow2Step::Step0(step) => step.run_raw(wf, event.try_into().unwrap()).await,
             Workflow2Step::Step1(step) => step.run_raw(wf, event.try_into().unwrap()).await,
@@ -165,12 +167,9 @@ impl Step for Step0 {
         &self,
         wf: Self::Workflow,
         event: Self::Event,
-        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
-        // where we can get the WorkflowStep type from
     ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError> {
         tracing::info!("Running Step0 in Workflow2");
         Ok(Some(WorkflowStepWithSettings {
-            // TODO: this should just return Workflow2Step, right? It shouldn't be able to return steps from other workflows
             step: Workflow2Step::Step1(Step1),
             settings: StepSettings { max_retries: 3 },
         }))
@@ -196,8 +195,7 @@ impl Step for Step1 {
         &self,
         wf: Self::Workflow,
         event: Self::Event,
-    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError>
-    {
+    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError> {
         tracing::info!("Running Step1 in Workflow2");
         Ok(None)
     }

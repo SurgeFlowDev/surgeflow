@@ -75,7 +75,7 @@ pub enum MyProjectWorkflow {
 impl ProjectWorkflow for MyProjectWorkflow {
     type Project = MyProject;
 
-    // TODO: this should be based on some sort of enum, not a string
+    // TODO: this should be based on some sort of enum, not a WorkflowName
     fn entrypoint(workflow_name: WorkflowName) -> ProjectStepWithSettings<Self::Project> {
         if workflow_name == Workflow1::NAME.into() {
             Workflow1::entrypoint().into()
@@ -140,8 +140,6 @@ impl ProjectStep for MyProjectStep {
         &self,
         wf: <Self::Project as Project>::Workflow,
         event: <Self::Project as Project>::Event,
-        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
-        // where we can get the WorkflowStep type from
     ) -> Result<Option<ProjectStepWithSettings<Self::Project>>, StepError> {
         match self {
             MyProjectStep::Workflow1(step) => {
