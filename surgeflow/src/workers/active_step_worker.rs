@@ -4,6 +4,7 @@ use adapter_types::{
     receivers::ActiveStepReceiver,
     senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
 };
+use anyhow::Context;
 use surgeflow_types::{FullyQualifiedStep, Immediate, Project, ProjectStep};
 
 async fn process<
@@ -31,7 +32,7 @@ where
     persistence_manager
         .set_step_status(step.step_id, 3)
         .await
-        .expect("TODO: handle error");
+        .context("TODO: handle error")?;
 
     let next_step = step
         .step

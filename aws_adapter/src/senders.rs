@@ -78,7 +78,6 @@ impl<P: Project> AwsSqsActiveStepSender<P> {
     }
 }
 
-// TODO: fields should not be pub?
 #[derive(Debug, Clone)]
 pub struct AwsSqsFailedStepSender<P: Project> {
     sender: Client,

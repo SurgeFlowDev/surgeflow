@@ -119,8 +119,6 @@ impl WorkflowStep for Workflow1Step {
         &self,
         wf: Self::Workflow,
         event: <Self::Workflow as Workflow>::Event,
-        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
-        // where we can get the WorkflowStep type from
     ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError>
     {
         match self {
@@ -165,12 +163,9 @@ impl Step for Step0 {
         &self,
         wf: Self::Workflow,
         event: Self::Event,
-        // TODO: WorkflowStep should not be hardcoded here, but rather there should be a "Workflow" associated type,
-        // where we can get the WorkflowStep type from
     ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError> {
         tracing::info!("Running Step0 in Workflow1");
         Ok(Some(WorkflowStepWithSettings {
-            // TODO: this should just return Workflow1Step, right? It shouldn't be able to return steps from other workflows
             step: Workflow1Step::Step1(Step1),
             settings: StepSettings { max_retries: 3 },
         }))

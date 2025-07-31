@@ -2,6 +2,7 @@ use adapter_types::{
     dependencies::completed_step_worker::CompletedStepWorkerDependencies,
     managers::PersistenceManager, receivers::CompletedStepReceiver, senders::NextStepSender,
 };
+use anyhow::Context;
 use derive_more::Debug;
 use surgeflow_types::{FullyQualifiedStep, Project, StepId};
 
@@ -106,17 +107,7 @@ where
     persistence_manager
         .set_step_status(step.step_id, 4)
         .await
-        .expect("TODO: handle error");
-    // query!(
-    //     r#"
-    //     UPDATE workflow_steps SET "status" = $1
-    //     WHERE "external_id" = $2
-    //     "#,
-    //     4,
-    //     Uuid::from(step.step_id)
-    // )
-    // .execute(conn.as_mut())
-    // .await?;
+        .expect("Failed to set step status");
 
     let next_step = step.next_step;
 

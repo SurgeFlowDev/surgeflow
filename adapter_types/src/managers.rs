@@ -21,16 +21,16 @@ pub trait StepsAwaitingEventManager<P: Project>: Sized + Send + 'static + Clone 
 }
 
 mod persistence_manager {
-    use std::fmt::{Debug, Display};
-
+    use std::error::Error;
     use surgeflow_types::{Project, StepId, WorkflowInstance, WorkflowInstanceId};
 
     // TODO: should these take references instead of ownership?
     pub trait PersistenceManager: Sized + Send + 'static + Clone {
-        type Error: Send + Sync + 'static + Debug + Display;
+        type Error: Send + Sync + 'static + Error;
         fn set_step_status(
             &self,
             step_id: StepId,
+            // TODO: use an enum for status
             status: i32,
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
