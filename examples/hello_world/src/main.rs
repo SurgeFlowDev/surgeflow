@@ -14,6 +14,18 @@ use anyhow::Context;
 use aws_adapter::dependencies::AwsAdapterConfig;
 use aws_adapter::dependencies::AwsDependencyManager;
 use config::{Config, Environment};
+#[cfg(any(
+    feature = "active_step_worker",
+    feature = "new_instance_worker",
+    feature = "next_step_worker",
+    feature = "new_event_worker",
+    feature = "completed_step_worker",
+    feature = "failed_step_worker",
+    feature = "failed_instance_worker",
+    feature = "completed_instance_worker",
+    feature = "control_server"
+))]
+use ::control_server::ProjectWorkflowControl;
 use surgeflow::workers::active_step_worker;
 use surgeflow::workers::completed_instance_worker;
 use surgeflow::workers::completed_step_worker;
@@ -59,7 +71,7 @@ fn get_aws_adapter_config() -> anyhow::Result<AwsAdapterConfig> {
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt()
-        .with_max_level(Level::DEBUG)
+        .with_max_level(Level::INFO)
         .init();
 
     let config = get_aws_adapter_config()?;
@@ -89,6 +101,7 @@ async fn main() -> anyhow::Result<()> {
 async fn main_handler<P: Project, D>(project: P, mut dependency_manager: D) -> anyhow::Result<()>
 where
     D: DependencyManager<P>,
+    P::Workflow: ProjectWorkflowControl,
 {
     try_join!(
         #[cfg(feature = "control_server")]

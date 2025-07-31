@@ -30,6 +30,7 @@ adapter-types = { version = "0.1.0", path = "../../adapter_types" }
 anyhow = "1.0.98"
 aws-adapter = { version = "0.1.0", path = "../../aws_adapter" }
 config = "0.15.13"
+control-server = { version = "0.1.0", path = "../../control_server" }
 dotenvy = "0.15.7"
 surgeflow = { version = "0.1.0", path = "../../surgeflow" }
 surgeflow-types = { version = "0.1.0", path = "../../surgeflow_types" }

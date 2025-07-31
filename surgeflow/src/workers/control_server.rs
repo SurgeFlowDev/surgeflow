@@ -8,28 +8,27 @@ use aide::{
     scalar::Scalar,
 };
 use axum::{Extension, Json, ServiceExt, extract::Request};
+use control_server::{ProjectWorkflowControl, init_app_state};
 use surgeflow_types::Project;
 use tokio::net::TcpListener;
 use tower::Layer;
 use tower_http::normalize_path::NormalizePathLayer;
 
-use crate::init_app_state;
-
 pub async fn main<P, EventSenderT, NewInstanceSenderT>(
     dependencies: ControlServerDependencies<P, EventSenderT, NewInstanceSenderT>,
 ) -> anyhow::Result<()>
 where
+    P::Workflow: ProjectWorkflowControl,
     P: Project,
     EventSenderT: EventSender<P> + std::marker::Send + std::marker::Sync + 'static,
     NewInstanceSenderT: NewInstanceSender<P> + std::marker::Send + std::marker::Sync + 'static,
 {
-    // let app_state = init_app_state(dependencies).await?;
-    // let router = P::Workflow::control_router()
-    //     .await?
-    //     .with_state(app_state.clone());
+    let app_state = init_app_state(dependencies).await?;
+    let router = P::Workflow::control_router()
+        .await?
+        .with_state(app_state.clone());
 
-    // serve(router).await
-    todo!()
+    serve(router).await
 }
 
 async fn serve(router: ApiRouter) -> anyhow::Result<()> {

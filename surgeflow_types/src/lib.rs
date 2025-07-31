@@ -107,16 +107,6 @@ pub trait ProjectWorkflow: Sized + Send + Sync + 'static + Clone {
 
     // TODO: this should be based on some sort of enum, not a string
     fn entrypoint(workflow_name: WorkflowName) -> ProjectStepWithSettings<Self::Project>;
-
-    // TODO: move this to an extension trait
-    // fn control_router<
-    //     NewEventSenderT: EventSender<Self::Project>,
-    //     NewInstanceSenderT: NewInstanceSender<Self::Project>,
-    // >() -> impl Future<
-    //     Output = anyhow::Result<
-    //         ApiRouter<ArcAppState<Self::Project, NewEventSenderT, NewInstanceSenderT>>,
-    //     >,
-    // > + Send;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////

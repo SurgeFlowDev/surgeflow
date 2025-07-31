@@ -8,6 +8,7 @@ members = [
     "surgeflow_types",
     "examples/hello_world",
     "surgeflow",
+    "control_server",
 ]
 resolver = "2"
 

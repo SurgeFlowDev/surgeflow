@@ -1,0 +1,24 @@
+[package]
+name = "control-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+adapter-types = { version = "0.1.0", path = "../adapter_types" }
+aide = { git = "https://github.com/Zizico2/aide.git", branch = "feat/typed-routing-with", features = [
+    "macros",
+    "scalar",
+    "axum",
+    "axum-json",
+    "axum-query",
+    "axum-extra-typed-routing",
+] }
+anyhow = "1.0.98"
+axum = "0.8.4"
+axum-extra = "0.10.1"
+axum_thiserror = "0.1.0"
+schemars = { version = "1.0.4", features = ["uuid1"] }
+serde = { version = "1.0.219", features = ["derive"] }
+surgeflow-types = { version = "0.1.0", path = "../surgeflow_types" }
+thiserror = "2.0.12"
+tracing = "0.1.41"

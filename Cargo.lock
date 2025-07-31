@@ -1429,6 +1429,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "control-server"
+version = "0.1.0"
+dependencies = [
+ "adapter-types",
+ "aide",
+ "anyhow",
+ "axum 0.8.4",
+ "axum-extra",
+ "axum_thiserror",
+ "schemars",
+ "serde",
+ "surgeflow-types",
+ "thiserror 2.0.12",
+ "tracing",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2284,6 +2301,7 @@ dependencies = [
  "anyhow",
  "aws-adapter",
  "config",
+ "control-server",
  "dotenvy",
  "surgeflow",
  "surgeflow-types",
@@ -4700,6 +4718,7 @@ dependencies = [
  "azure_messaging_servicebus",
  "bytes",
  "config",
+ "control-server",
  "derive_more",
  "dotenvy",
  "drain_filter_polyfill",

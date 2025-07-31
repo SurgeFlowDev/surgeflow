@@ -1,6 +1,8 @@
+use adapter_types::senders::{EventSender, NewInstanceSender};
 use aide::{OperationIo, axum::ApiRouter};
 use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::routing::TypedPath;
+use control_server::{ArcAppState, ProjectWorkflowControl, WorkflowControl};
 use derive_more::{Display, From, Into, TryInto};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -9,7 +11,8 @@ use std::error::Error;
 use std::fmt::{self, Debug};
 use std::{marker::PhantomData, sync::Arc};
 use surgeflow_types::{
-    Event, Immediate, Project, ProjectEvent, ProjectStep, ProjectStepWithSettings, ProjectWorkflow, StepError, TryAsRef, Workflow, WorkflowName, WorkflowStep
+    Event, Immediate, Project, ProjectEvent, ProjectStep, ProjectStepWithSettings, ProjectWorkflow,
+    StepError, TryAsRef, Workflow, WorkflowName, WorkflowStep,
 };
 use uuid::Uuid;
 
@@ -82,24 +85,23 @@ impl ProjectWorkflow for MyProjectWorkflow {
             panic!("Unknown workflow name");
         }
     }
+}
 
-    // TODO
-    // async fn control_router<
-    //     NewEventSenderT: crate::workers::adapters::senders::EventSender<Self::Project>,
-    //     NewInstanceSenderT: crate::workers::adapters::senders::NewInstanceSender<Self::Project>,
-    // >() -> anyhow::Result<
-    //     ApiRouter<crate::ArcAppState<Self::Project, NewEventSenderT, NewInstanceSenderT>>,
-    // > {
-    //     let workflow_1_router =
-    //         Workflow1::control_router::<NewEventSenderT, NewInstanceSenderT>().await?;
+impl ProjectWorkflowControl for MyProjectWorkflow {
+    async fn control_router<
+        NewEventSenderT: EventSender<Self::Project>,
+        NewInstanceSenderT: NewInstanceSender<Self::Project>,
+    >() -> anyhow::Result<ApiRouter<ArcAppState<Self::Project, NewEventSenderT, NewInstanceSenderT>>>
+    {
+        let workflow_1_router =
+            Workflow1::control_router::<NewEventSenderT, NewInstanceSenderT>().await?;
+        let workflow_2_router =
+            Workflow2::control_router::<NewEventSenderT, NewInstanceSenderT>().await?;
 
-    //     let workflow_2_router =
-    //         Workflow2::control_router::<NewEventSenderT, NewInstanceSenderT>().await?;
-
-    //     Ok(ApiRouter::new()
-    //         .merge(workflow_1_router)
-    //         .merge(workflow_2_router))
-    // }
+        Ok(ApiRouter::new()
+            .merge(workflow_1_router)
+            .merge(workflow_2_router))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, From, TryInto)]
