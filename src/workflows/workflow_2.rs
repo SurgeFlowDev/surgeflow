@@ -6,8 +6,8 @@ use crate::{
     event::Immediate,
     step::{StepSettings, WorkflowStepWithSettings},
     workflows::{
-        Event, MyProject, MyProjectEvent, MyProjectStep, Step, TryFromRef, Workflow, WorkflowEvent,
-        WorkflowStep,
+        Event, MyProject, MyProjectEvent, Project, ProjectStep, Step, TryFromRef, Workflow,
+        WorkflowEvent, WorkflowStep,
     },
 };
 
@@ -26,7 +26,7 @@ impl Workflow for Workflow2 {
     const NAME: &'static str = "workflow_2";
 
     fn entrypoint() -> crate::step::WorkflowStepWithSettings<Self> {
-        crate::step::WorkflowStepWithSettings {
+        WorkflowStepWithSettings {
             step: Workflow2Step::Step0(Step0),
             settings: crate::step::StepSettings { max_retries: 3 },
         }
@@ -39,8 +39,87 @@ pub enum Workflow2Step {
     Step1(Step1),
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum Workflow2StepError {
+    #[error("Step0 error: {0}")]
+    Step0(<Step0 as Step>::Error),
+    #[error("Step1 error: {0}")]
+    Step1(<Step1 as Step>::Error),
+}
+
+//////////// ProjectStep::Error <-> WorkflowStep::Error conversions
+
+impl From<<<Workflow2 as Workflow>::Step as WorkflowStep>::Error>
+    for <<<Workflow2 as Workflow>::Project as Project>::Step as ProjectStep>::Error
+{
+    fn from(error: <<Workflow2 as Workflow>::Step as WorkflowStep>::Error) -> Self {
+        <<<Workflow2 as Workflow>::Project as Project>::Step as ProjectStep>::Error::Workflow2(
+            error,
+        )
+    }
+}
+
+impl TryFrom<<<MyProject as Project>::Step as ProjectStep>::Error>
+    for <<Workflow2 as Workflow>::Step as WorkflowStep>::Error
+{
+    type Error = ();
+
+    fn try_from(
+        error: <<<Workflow2 as Workflow>::Project as Project>::Step as ProjectStep>::Error,
+    ) -> Result<Self, Self::Error> {
+        type Error = <<MyProject as Project>::Step as ProjectStep>::Error;
+        match error {
+            Error::Workflow2(e) => Ok(e),
+            _ => Err(()),
+        }
+    }
+}
+
+//////////// WorkflowStep::Error <-> Step::Error conversions
+
+impl From<<Step0 as Step>::Error> for <<Workflow2 as Workflow>::Step as WorkflowStep>::Error {
+    fn from(error: <Step0 as Step>::Error) -> Self {
+        Workflow2StepError::Step0(error)
+    }
+}
+
+impl From<<Step1 as Step>::Error> for <<Workflow2 as Workflow>::Step as WorkflowStep>::Error {
+    fn from(error: <Step1 as Step>::Error) -> Self {
+        Workflow2StepError::Step1(error)
+    }
+}
+
+impl TryFrom<<<Workflow2 as Workflow>::Step as WorkflowStep>::Error> for <Step1 as Step>::Error {
+    type Error = ();
+
+    fn try_from(
+        error: <<Workflow2 as Workflow>::Step as WorkflowStep>::Error,
+    ) -> Result<Self, Self::Error> {
+        match error {
+            Workflow2StepError::Step1(e) => Ok(e),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<<<Workflow2 as Workflow>::Step as WorkflowStep>::Error> for <Step0 as Step>::Error {
+    type Error = ();
+
+    fn try_from(
+        error: <<Workflow2 as Workflow>::Step as WorkflowStep>::Error,
+    ) -> Result<Self, Self::Error> {
+        match error {
+            Workflow2StepError::Step0(e) => Ok(e),
+            _ => Err(()),
+        }
+    }
+}
+
+////////////
+
 impl WorkflowStep for Workflow2Step {
     type Workflow = Workflow2;
+    type Error = Workflow2StepError;
 
     async fn run_raw(
         &self,
@@ -76,10 +155,17 @@ impl WorkflowStep for Workflow2Step {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Step0;
 
+#[derive(thiserror::Error, Debug)]
+pub enum Step0Error {
+    // TODO
+    #[error("Step0 error")]
+    Unknown,
+}
+
 impl Step for Step0 {
     type Event = Event0;
-
     type Workflow = Workflow2;
+    type Error = Step0Error;
 
     async fn run_raw(
         &self,
@@ -100,10 +186,17 @@ impl Step for Step0 {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Step1;
 
+#[derive(thiserror::Error, Debug)]
+pub enum Step1Error {
+    // TODO
+    #[error("Step1 error")]
+    Unknown,
+}
+
 impl Step for Step1 {
     type Event = Immediate;
-
     type Workflow = Workflow2;
+    type Error = Step1Error;
 
     async fn run_raw(
         &self,

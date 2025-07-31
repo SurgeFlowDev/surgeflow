@@ -4,7 +4,7 @@ use crate::workers::adapters::dependencies::control_server::ControlServerDepende
 use crate::workers::adapters::managers::{WorkflowInstance, WorkflowName};
 use crate::workers::adapters::senders::NewInstanceSender;
 use crate::workflows::workflow_1::{Workflow1, Workflow1Event, Workflow1Step};
-// use crate::workflows::workflow_2::{Workflow2, Workflow2Event, Workflow2Step};
+use crate::workflows::workflow_2::{Workflow2, Workflow2Event, Workflow2Step};
 use crate::{
     AppState, ArcAppState, event::InstanceEvent, step::ProjectStepWithSettings,
     workers::adapters::senders::EventSender,
@@ -22,7 +22,7 @@ use std::{marker::PhantomData, sync::Arc};
 use uuid::Uuid;
 
 pub mod workflow_1;
-// pub mod workflow_2;
+pub mod workflow_2;
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, From, Into, JsonSchema,
@@ -418,7 +418,7 @@ pub trait Event:
 #[derive(Debug, Clone, Serialize, Deserialize, From)]
 pub enum MyProjectEvent {
     Workflow1(Workflow1Event),
-    // Workflow2(Workflow2Event),
+    Workflow2(Workflow2Event),
     #[serde(skip)]
     Immediate(Immediate),
 }
@@ -441,7 +441,7 @@ impl TryFrom<MyProjectEvent> for Immediate {
 #[derive(Clone)]
 pub struct MyProject {
     pub workflow_1: Workflow1,
-    // pub workflow_2: Workflow2,
+    pub workflow_2: Workflow2,
 }
 
 impl Project for MyProject {
@@ -452,7 +452,7 @@ impl Project for MyProject {
     fn workflow_for_step(&self, step: &Self::Step) -> Self::Workflow {
         match step {
             MyProjectStep::Workflow1(_) => MyProjectWorkflow::Workflow1(self.workflow_1.clone()),
-            // MyProjectStep::Workflow2(_) => MyProjectWorkflow::Workflow2(self.workflow_2.clone()),
+            MyProjectStep::Workflow2(_) => MyProjectWorkflow::Workflow2(self.workflow_2.clone()),
         }
     }
 }
@@ -460,7 +460,7 @@ impl Project for MyProject {
 #[derive(Clone, From, TryInto, Debug)]
 pub enum MyProjectWorkflow {
     Workflow1(Workflow1),
-    // Workflow2(Workflow2),
+    Workflow2(Workflow2),
 }
 
 impl ProjectWorkflow for MyProjectWorkflow {
@@ -470,8 +470,8 @@ impl ProjectWorkflow for MyProjectWorkflow {
     fn entrypoint(workflow_name: WorkflowName) -> ProjectStepWithSettings<Self::Project> {
         if workflow_name == Workflow1::NAME.into() {
             Workflow1::entrypoint().into()
-        // } else if workflow_name == Workflow2::NAME.into() {
-        //     Workflow2::entrypoint().into()
+        } else if workflow_name == Workflow2::NAME.into() {
+            Workflow2::entrypoint().into()
         } else {
             panic!("Unknown workflow name");
         }
@@ -486,26 +486,27 @@ impl ProjectWorkflow for MyProjectWorkflow {
         let workflow_1_router =
             Workflow1::control_router::<NewEventSenderT, NewInstanceSenderT>().await?;
 
-        // let workflow_2_router =
-        //     Workflow2::control_router::<NewEventSenderT, NewInstanceSenderT>().await?;
+        let workflow_2_router =
+            Workflow2::control_router::<NewEventSenderT, NewInstanceSenderT>().await?;
 
-        Ok(
-            ApiRouter::new().merge(workflow_1_router), // .merge(workflow_2_router)
-        )
+        Ok(ApiRouter::new()
+            .merge(workflow_1_router)
+            .merge(workflow_2_router))
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, From, TryInto)]
 pub enum MyProjectStep {
     Workflow1(Workflow1Step),
-    // Workflow2(Workflow2Step),
+    Workflow2(Workflow2Step),
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum MyProjectStepError {
     #[error("Workflow1 step error: {0}")]
     Workflow1(<Workflow1Step as WorkflowStep>::Error),
-    // Workflow2(Workflow2Step::Error),
+    #[error("Workflow2 step error: {0}")]
+    Workflow2(<Workflow2Step as WorkflowStep>::Error),
 }
 
 impl ProjectStep for MyProjectStep {
@@ -515,14 +516,14 @@ impl ProjectStep for MyProjectStep {
     fn is_event<T: Event + 'static>(&self) -> bool {
         match self {
             MyProjectStep::Workflow1(step) => step.is_event::<T>(),
-            // MyProjectStep::Workflow2(step) => step.is_event::<T>(),
+            MyProjectStep::Workflow2(step) => step.is_event::<T>(),
         }
     }
 
     fn is_project_event(&self, event: &<Self::Project as Project>::Event) -> bool {
         match self {
             MyProjectStep::Workflow1(step) => step.is_workflow_event(event.try_as_ref().unwrap()),
-            // MyProjectStep::Workflow2(step) => step.is_workflow_event(event.try_as_ref().unwrap()),
+            MyProjectStep::Workflow2(step) => step.is_workflow_event(event.try_as_ref().unwrap()),
         }
     }
 
@@ -540,12 +541,13 @@ impl ProjectStep for MyProjectStep {
                     .run_raw(wf.try_into().unwrap(), event.try_into().unwrap())
                     .await?;
                 Ok(step.map(Into::into))
-            } // MyProjectStep::Workflow2(step) => {
-              //     let step = step
-              //         .run_raw(wf.try_into().unwrap(), event.try_into().unwrap())
-              //         .await?;
-              //     Ok(step.map(Into::into))
-              // }
+            }
+            MyProjectStep::Workflow2(step) => {
+                let step = step
+                    .run_raw(wf.try_into().unwrap(), event.try_into().unwrap())
+                    .await?;
+                Ok(step.map(Into::into))
+            }
         }
     }
 }
