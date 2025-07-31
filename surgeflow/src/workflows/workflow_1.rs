@@ -1,22 +1,26 @@
-use derive_more::{From, TryInto};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use surgeflow_types::{Event, Immediate, Project, ProjectStep, Step, StepError, StepSettings, TryFromRef, Workflow, WorkflowEvent, WorkflowStep, WorkflowStepWithSettings};
+use surgeflow_types::{
+    Event, Immediate, Project, ProjectStep, Step, StepError, StepSettings, TryFromRef, Workflow,
+    WorkflowEvent, WorkflowStep, WorkflowStepWithSettings,
+};
 
 use crate::workflows::{MyProject, MyProjectEvent};
 
-///////////////
+// user-defined
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct Event0 {}
+
+impl Event for Event0 {}
 
 #[derive(Clone, Debug)]
 pub struct Workflow1 {}
 
 impl Workflow for Workflow1 {
     type Project = MyProject;
-
     type Event = Workflow1Event;
-
     type Step = Workflow1Step;
-
     const NAME: &'static str = "workflow_1";
 
     fn entrypoint() -> WorkflowStepWithSettings<Self> {
@@ -27,11 +31,132 @@ impl Workflow for Workflow1 {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema,  From, TryInto)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct Step0;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Step0Error {
+    // TODO
+    #[error("Step0 error")]
+    Unknown,
+}
+
+impl Step for Step0 {
+    type Event = Event0;
+    type Workflow = Workflow1;
+    type Error = Step0Error;
+
+    async fn run(
+        &self,
+        wf: Self::Workflow,
+        event: Self::Event,
+    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError> {
+        tracing::info!("Running Step0 in Workflow1");
+        Ok(Some(WorkflowStepWithSettings {
+            step: Workflow1Step::Step1(Step1),
+            settings: StepSettings { max_retries: 3 },
+        }))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct Step1;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Step1Error {
+    #[error("Step1 error")]
+    Unknown,
+}
+
+impl Step for Step1 {
+    type Event = Immediate;
+    type Workflow = Workflow1;
+    type Error = Step1Error;
+
+    async fn run(
+        &self,
+        wf: Self::Workflow,
+        event: Self::Event,
+    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError> {
+        tracing::info!("Running Step1 in Workflow1");
+        Ok(None)
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub enum Workflow1Step {
     Step0(Step0),
     Step1(Step1),
 }
+
+impl From<Step0> for Workflow1Step {
+    fn from(step: Step0) -> Self {
+        Workflow1Step::Step0(step)
+    }
+}
+impl From<Step1> for Workflow1Step {
+    fn from(step: Step1) -> Self {
+        Workflow1Step::Step1(step)
+    }
+}
+impl TryFrom<Workflow1Step> for Step0 {
+    type Error = ();
+
+    fn try_from(step: Workflow1Step) -> Result<Self, Self::Error> {
+        match step {
+            Workflow1Step::Step0(step) => Ok(step),
+            _ => Err(()),
+        }
+    }
+}
+impl TryFrom<Workflow1Step> for Step1 {
+    type Error = ();
+
+    fn try_from(step: Workflow1Step) -> Result<Self, Self::Error> {
+        match step {
+            Workflow1Step::Step1(step) => Ok(step),
+            _ => Err(()),
+        }
+    }
+}
+
+impl WorkflowStep for Workflow1Step {
+    type Workflow = Workflow1;
+    type Error = Workflow1StepError;
+
+    async fn run(
+        &self,
+        wf: Self::Workflow,
+        event: <Self::Workflow as Workflow>::Event,
+    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError> {
+        match self {
+            Workflow1Step::Step0(step) => step.run(wf, event.try_into().unwrap()).await,
+            Workflow1Step::Step1(step) => step.run(wf, event.try_into().unwrap()).await,
+        }
+    }
+
+    fn is_event<T: Event + 'static>(&self) -> bool {
+        match self {
+            Workflow1Step::Step0(_) => <Step0 as Step>::Event::is::<T>(),
+            Workflow1Step::Step1(_) => <Step1 as Step>::Event::is::<T>(),
+        }
+    }
+
+    fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool {
+        match self {
+            Workflow1Step::Step0(_) => event.is_event::<<Step0 as Step>::Event>(),
+            Workflow1Step::Step1(_) => event.is_event::<<Step1 as Step>::Event>(),
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
 pub enum Workflow1StepError {
@@ -40,8 +165,6 @@ pub enum Workflow1StepError {
     #[error("Step1 error: {0}")]
     Step1(<Step1 as Step>::Error),
 }
-
-//////////// ProjectStep::Error <-> WorkflowStep::Error conversions
 
 impl From<<<Workflow1 as Workflow>::Step as WorkflowStep>::Error>
     for <<<Workflow1 as Workflow>::Project as Project>::Step as ProjectStep>::Error
@@ -68,8 +191,6 @@ impl TryFrom<<<MyProject as Project>::Step as ProjectStep>::Error>
         }
     }
 }
-
-//////////// WorkflowStep::Error <-> Step::Error conversions
 
 impl From<<Step0 as Step>::Error> for <<Workflow1 as Workflow>::Step as WorkflowStep>::Error {
     fn from(error: <Step0 as Step>::Error) -> Self {
@@ -109,96 +230,9 @@ impl TryFrom<<<Workflow1 as Workflow>::Step as WorkflowStep>::Error> for <Step0 
     }
 }
 
-////////////
-
-impl WorkflowStep for Workflow1Step {
-    type Workflow = Workflow1;
-    type Error = Workflow1StepError;
-
-    async fn run_raw(
-        &self,
-        wf: Self::Workflow,
-        event: <Self::Workflow as Workflow>::Event,
-    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError>
-    {
-        match self {
-            Workflow1Step::Step0(step) => step.run_raw(wf, event.try_into().unwrap()).await,
-            Workflow1Step::Step1(step) => step.run_raw(wf, event.try_into().unwrap()).await,
-        }
-    }
-
-    fn is_event<T: Event + 'static>(&self) -> bool {
-        match self {
-            Workflow1Step::Step0(_) => <Step0 as Step>::Event::is::<T>(),
-            Workflow1Step::Step1(_) => <Step1 as Step>::Event::is::<T>(),
-        }
-    }
-
-    fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool {
-        match self {
-            Workflow1Step::Step0(_) => event.is_event::<<Step0 as Step>::Event>(),
-            Workflow1Step::Step1(_) => event.is_event::<<Step1 as Step>::Event>(),
-        }
-    }
-}
-
-///// Steps
-
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct Step0;
-
-#[derive(thiserror::Error, Debug)]
-pub enum Step0Error {
-    // TODO
-    #[error("Step0 error")]
-    Unknown,
-}
-
-impl Step for Step0 {
-    type Event = Event0;
-    type Workflow = Workflow1;
-    type Error = Step0Error;
-
-    async fn run_raw(
-        &self,
-        wf: Self::Workflow,
-        event: Self::Event,
-    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError> {
-        tracing::info!("Running Step0 in Workflow1");
-        Ok(Some(WorkflowStepWithSettings {
-            step: Workflow1Step::Step1(Step1),
-            settings: StepSettings { max_retries: 3 },
-        }))
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct Step1;
-
-#[derive(thiserror::Error, Debug)]
-pub enum Step1Error {
-    // TODO
-    #[error("Step1 error")]
-    Unknown,
-}
-
-impl Step for Step1 {
-    type Event = Immediate;
-    type Workflow = Workflow1;
-    type Error = Step1Error;
-
-    async fn run_raw(
-        &self,
-        wf: Self::Workflow,
-        event: Self::Event,
-    ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError>
-    {
-        tracing::info!("Running Step1 in Workflow1");
-        Ok(None)
-    }
-}
-
-// events
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub enum Workflow1Event {
@@ -271,13 +305,8 @@ impl TryFromRef<MyProjectEvent> for Workflow1Event {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct Event0 {}
-
 impl From<Event0> for Workflow1Event {
     fn from(event: Event0) -> Self {
         Workflow1Event::Event0(event)
     }
 }
-
-impl Event for Event0 {}

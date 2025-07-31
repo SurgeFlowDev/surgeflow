@@ -81,7 +81,7 @@ pub trait ProjectStep:
 
     fn is_event<T: Event + 'static>(&self) -> bool;
     fn is_project_event(&self, event: &<Self::Project as Project>::Event) -> bool;
-    fn run_raw(
+    fn run(
         &self,
         wf: <Self::Project as Project>::Workflow,
         event: <Self::Project as Project>::Event,
@@ -147,7 +147,7 @@ pub trait WorkflowStep:
         + TryFrom<<<<Self::Workflow as Workflow>::Project as Project>::Step as ProjectStep>::Error>
         + Into<<<<Self::Workflow as Workflow>::Project as Project>::Step as ProjectStep>::Error>;
 
-    fn run_raw(
+    fn run(
         &self,
         wf: Self::Workflow,
         event: <Self::Workflow as Workflow>::Event,
@@ -216,7 +216,7 @@ pub trait Step:
         + TryFrom<<<Self::Workflow as Workflow>::Step as WorkflowStep>::Error>
         + Into<<<Self::Workflow as Workflow>::Step as WorkflowStep>::Error>;
 
-    fn run_raw(
+    fn run(
         &self,
         wf: Self::Workflow,
         event: Self::Event,

@@ -136,7 +136,7 @@ impl ProjectStep for MyProjectStep {
         }
     }
 
-    async fn run_raw(
+    async fn run(
         &self,
         wf: <Self::Project as Project>::Workflow,
         event: <Self::Project as Project>::Event,
@@ -144,13 +144,13 @@ impl ProjectStep for MyProjectStep {
         match self {
             MyProjectStep::Workflow1(step) => {
                 let step = step
-                    .run_raw(wf.try_into().unwrap(), event.try_into().unwrap())
+                    .run(wf.try_into().unwrap(), event.try_into().unwrap())
                     .await?;
                 Ok(step.map(Into::into))
             }
             MyProjectStep::Workflow2(step) => {
                 let step = step
-                    .run_raw(wf.try_into().unwrap(), event.try_into().unwrap())
+                    .run(wf.try_into().unwrap(), event.try_into().unwrap())
                     .await?;
                 Ok(step.map(Into::into))
             }

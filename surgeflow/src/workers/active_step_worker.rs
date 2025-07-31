@@ -37,7 +37,7 @@ where
     let next_step = step
         .step
         .step
-        .run_raw(wf.clone(), step.event.clone().unwrap_or(Immediate.into()))
+        .run(wf.clone(), step.event.clone().unwrap_or(Immediate.into()))
         .await;
     step.retry_count += 1;
     if let Ok(next_step) = next_step {

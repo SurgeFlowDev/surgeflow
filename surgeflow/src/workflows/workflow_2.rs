@@ -118,7 +118,7 @@ impl WorkflowStep for Workflow2Step {
     type Workflow = Workflow2;
     type Error = Workflow2StepError;
 
-    async fn run_raw(
+    async fn run(
         &self,
         wf: Self::Workflow,
         event: <Self::Workflow as Workflow>::Event,
@@ -126,8 +126,8 @@ impl WorkflowStep for Workflow2Step {
         // where we can get the WorkflowStep type from
     ) -> Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError> {
         match self {
-            Workflow2Step::Step0(step) => step.run_raw(wf, event.try_into().unwrap()).await,
-            Workflow2Step::Step1(step) => step.run_raw(wf, event.try_into().unwrap()).await,
+            Workflow2Step::Step0(step) => step.run(wf, event.try_into().unwrap()).await,
+            Workflow2Step::Step1(step) => step.run(wf, event.try_into().unwrap()).await,
         }
     }
 
@@ -163,7 +163,7 @@ impl Step for Step0 {
     type Workflow = Workflow2;
     type Error = Step0Error;
 
-    async fn run_raw(
+    async fn run(
         &self,
         wf: Self::Workflow,
         event: Self::Event,
@@ -191,7 +191,7 @@ impl Step for Step1 {
     type Workflow = Workflow2;
     type Error = Step1Error;
 
-    async fn run_raw(
+    async fn run(
         &self,
         wf: Self::Workflow,
         event: Self::Event,
