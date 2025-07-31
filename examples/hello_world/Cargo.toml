@@ -1,0 +1,38 @@
+[package]
+name = "hello_world"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = [
+    "new_instance_worker",
+    "failed_instance_worker",
+    "completed_instance_worker",
+    "active_step_worker",
+    "next_step_worker",
+    "new_event_worker",
+    "completed_step_worker",
+    "failed_step_worker",
+    "control_server",
+]
+new_instance_worker = []
+failed_instance_worker = []
+completed_instance_worker = []
+active_step_worker = []
+next_step_worker = []
+new_event_worker = []
+control_server = []
+completed_step_worker = []
+failed_step_worker = []
+
+[dependencies]
+adapter-types = { version = "0.1.0", path = "../../adapter_types" }
+anyhow = "1.0.98"
+aws-adapter = { version = "0.1.0", path = "../../aws_adapter" }
+config = "0.15.13"
+dotenvy = "0.15.7"
+surgeflow = { version = "0.1.0", path = "../../surgeflow" }
+surgeflow-types = { version = "0.1.0", path = "../../surgeflow_types" }
+tokio = { version = "1.47.0", features = ["full"] }
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"

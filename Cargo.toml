@@ -1,93 +1,14 @@
-[package]
-name = "rust-workflow-2"
-version = "0.1.0"
-edition = "2024"
 
-[dependencies]
-aide = { git = "https://github.com/Zizico2/aide.git", branch = "feat/typed-routing-with", features = [
-    "macros",
-    "scalar",
-    "axum",
-    "axum-json",
-    "axum-query",
-    "axum-extra-typed-routing",
-] }
-anyhow = { version = "1.0.98" }
-aws-config = { version = "1.8.3", features = ["behavior-version-latest"] }
-aws-credential-types = { version = "1.2.4", features = [
-    "hardcoded-credentials",
-] }
-aws-sdk-dynamodb = { version = "1.85.0", features = [
-    "behavior-version-latest",
-] }
-aws-sdk-sqs = { version = "1.77.0", features = ["behavior-version-latest"] }
-aws-types = { version = "1.3.8" }
-axum = { version = "0.8.4", features = ["http2", "macros", "multipart"] }
-axum-extra = { version = "0.10.1", features = ["typed-routing"] }
-# axum-sqlx-tx = "0.10.0"
-axum_thiserror = "0.1.0"
-azservicebus = "0.25.1"
-azure_core = "0.21.0"
-azure_data_cosmos = { version = "0.24.0", features = ["key_auth"] }
-azure_identity = "0.25.0"
-azure_messaging_servicebus = "0.21.0"
-bytes = "1.10.1"
-config = "0.15.13"
-derive_more = { version = "2.0.1", features = ["full"] }
-dotenvy = "0.15.7"
-drain_filter_polyfill = "0.1.3"
-fe2o3-amqp = "0.14.0"
-fe2o3-amqp-ext = "0.14.0"
-futures = "0.3.31"
-lapin = "3.0.0"
-macros = { version = "0.1.0", path = "macros" }
-schemars = { version = "1.0.4", features = ["uuid1"] }
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = { version = "1.0.140", features = ["raw_value"] }
-sqlx = { version = "0.8.6", default-features = false, features = [
-    "postgres",
-    "macros",
-    "json",
-    "runtime-tokio",
-    "tls-rustls",
-    "uuid",
-] }
-surrealdb-tikv-client = "0.3.0-surreal.3"
-thiserror = "2.0.12"
-tokio = { version = "1.46.1", features = ["full"] }
-tower = "0.5.2"
-tower-http = { version = "0.6.6", features = ["normalize-path"] }
-tower-layer = "0.3.3"
-tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
-typemap_rev = "0.4.0"
-typespec = "0.5.0"
-uuid = { version = "1.16.0", features = ["serde", "v4"] }
-
-[features]
-default = [
-    "new_instance_worker",
-    "failed_instance_worker",
-    "completed_instance_worker",
-    "active_step_worker",
-    "next_step_worker",
-    "new_event_worker",
-    "completed_step_worker",
-    "failed_step_worker",
-    "control_server",
-]
-new_instance_worker = []
-failed_instance_worker = []
-completed_instance_worker = []
-active_step_worker = []
-next_step_worker = []
-new_event_worker = []
-control_server = []
-completed_step_worker = []
-failed_step_worker = []
 
 [workspace]
-members = ["macros"]
+members = [
+    "macros",
+    "aws_adapter",
+    "adapter_types",
+    "surgeflow_types",
+    "examples/hello_world",
+    "surgeflow",
+]
 resolver = "2"
 
 [profile.release]
