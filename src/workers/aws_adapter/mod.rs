@@ -26,4 +26,6 @@ pub enum AwsAdapterError {
     SerializeError(#[source] serde_json::Error),
     #[error("DynamoDB KV error")]
     DynamoKvError(#[from] managers::dynamo_kv::DynamoKvError),
+    #[error("SQLx error")]
+    SqlxError(#[from] sqlx::Error),
 }

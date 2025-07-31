@@ -183,7 +183,10 @@ mod persistence_manager {
     use uuid::Uuid;
 
     use crate::{
-        workers::adapters::managers::{PersistenceManager, WorkflowInstance},
+        workers::{
+            adapters::managers::{PersistenceManager, WorkflowInstance},
+            aws_adapter::AwsAdapterError,
+        },
         workflows::{Project, StepId, WorkflowInstanceId},
     };
 
@@ -197,13 +200,17 @@ mod persistence_manager {
         }
     }
     impl PersistenceManager for AwsPersistenceManager {
-        type Error = anyhow::Error;
-        async fn set_step_status(&self, step_id: StepId, status: i32) -> Result<(), anyhow::Error> {
+        type Error = AwsAdapterError;
+        async fn set_step_status(
+            &self,
+            step_id: StepId,
+            status: i32,
+        ) -> Result<(), AwsAdapterError> {
             query!(
                 r#"
-        UPDATE workflow_steps SET "status" = $1
-        WHERE "external_id" = $2
-        "#,
+                UPDATE workflow_steps SET "status" = $1
+                WHERE "external_id" = $2
+                "#,
                 status,
                 Uuid::from(step_id)
             )
@@ -218,7 +225,7 @@ mod persistence_manager {
             workflow_instance_id: WorkflowInstanceId,
             step_id: StepId,
             step: &P::Step,
-        ) -> Result<(), anyhow::Error> {
+        ) -> Result<(), AwsAdapterError> {
             let json_step = serde_json::to_value(step).expect("TODO: handle serialization error");
             query!(
                 r#"
@@ -239,7 +246,7 @@ mod persistence_manager {
             &self,
             step_id: StepId,
             output: Option<&P::Step>,
-        ) -> Result<(), anyhow::Error> {
+        ) -> Result<(), AwsAdapterError> {
             let output = serde_json::to_value(output).expect("TODO: handle serialization error");
             query!(
                 r#"
