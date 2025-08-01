@@ -1,4 +1,7 @@
-use adapter_types::{dependencies::completed_instance_worker::CompletedInstanceWorkerDependencies, receivers::CompletedInstanceReceiver};
+use adapter_types::{
+    dependencies::completed_instance_worker::CompletedInstanceWorkerDependencies,
+    receivers::CompletedInstanceReceiver,
+};
 use surgeflow_types::{Project, WorkflowInstance};
 
 async fn process(instance: WorkflowInstance) -> anyhow::Result<()> {

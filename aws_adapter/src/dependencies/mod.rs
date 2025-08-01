@@ -9,7 +9,18 @@ use serde::Deserialize;
 use sqlx::PgPool;
 
 use adapter_types::dependencies::{
-    active_step_worker::ActiveStepWorkerDependencies, completed_instance_worker::CompletedInstanceWorkerDependencies, completed_step_worker::CompletedStepWorkerDependencies, control_server::ControlServerDependencies, failed_instance_worker::FailedInstanceWorkerDependencies, failed_step_worker::FailedStepWorkerDependencies, new_event_worker::NewEventWorkerDependencies, new_instance_worker::NewInstanceWorkerDependencies, next_step_worker::NextStepWorkerDependencies, ActiveStepWorkerDependencyProvider, CompletedInstanceWorkerDependencyProvider, CompletedStepWorkerDependencyProvider, ControlServerDependencyProvider, DependencyManager, FailedInstanceWorkerDependencyProvider, FailedStepWorkerDependencyProvider, NewEventWorkerDependencyProvider, NewInstanceWorkerDependencyProvider, NextStepWorkerDependencyProvider
+    ActiveStepWorkerDependencyProvider, CompletedInstanceWorkerDependencyProvider,
+    CompletedStepWorkerDependencyProvider, ControlServerDependencyProvider, DependencyManager,
+    FailedInstanceWorkerDependencyProvider, FailedStepWorkerDependencyProvider,
+    NewEventWorkerDependencyProvider, NewInstanceWorkerDependencyProvider,
+    NextStepWorkerDependencyProvider, active_step_worker::ActiveStepWorkerDependencies,
+    completed_instance_worker::CompletedInstanceWorkerDependencies,
+    completed_step_worker::CompletedStepWorkerDependencies,
+    control_server::ControlServerDependencies,
+    failed_instance_worker::FailedInstanceWorkerDependencies,
+    failed_step_worker::FailedStepWorkerDependencies, new_event_worker::NewEventWorkerDependencies,
+    new_instance_worker::NewInstanceWorkerDependencies,
+    next_step_worker::NextStepWorkerDependencies,
 };
 use surgeflow_types::Project;
 
@@ -205,7 +216,7 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AwsDependencyManager 
             Self::PersistenceManager,
         >,
         Self::Error,
-    >{
+    > {
         let sqs_client = self.sqs_client().clone();
 
         let active_step_receiver = AwsSqsActiveStepReceiver::<P>::new(
@@ -277,7 +288,7 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AwsDependencyManager 
             Self::PersistenceManager,
         >,
         Self::Error,
-    >{
+    > {
         let sqs_client = self.sqs_client().clone();
 
         let failed_step_receiver = AwsSqsFailedStepReceiver::<P>::new(
@@ -316,7 +327,7 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager {
             Self::StepsAwaitingEventManager,
         >,
         Self::Error,
-    >{
+    > {
         let sqs_client = self.sqs_client().clone();
         let dynamo_client = self.dynamo_client().clone();
 
@@ -356,7 +367,7 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AwsDependencyManager
             Self::PersistenceManager,
         >,
         Self::Error,
-    >{
+    > {
         let sqs_client = self.sqs_client().clone();
 
         let new_instance_receiver = AwsSqsNewInstanceReceiver::<P>::new(
@@ -395,7 +406,7 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager {
             Self::PersistenceManager,
         >,
         Self::Error,
-    >{
+    > {
         let sqs_client = self.sqs_client().clone();
         let dynamo_client = self.dynamo_client().clone();
 

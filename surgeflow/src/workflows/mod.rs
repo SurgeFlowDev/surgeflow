@@ -13,23 +13,15 @@
 // }
 
 use adapter_types::senders::{EventSender, NewInstanceSender};
-use aide::{OperationIo, axum::ApiRouter};
-use axum::{Json, extract::State, http::StatusCode};
-use axum_extra::routing::TypedPath;
+use aide::axum::ApiRouter;
 use control_server::{ArcAppState, ProjectWorkflowControl, WorkflowControl};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::any::TypeId;
-use std::error::Error;
-use std::fmt::{self, Debug};
-use std::{marker::PhantomData, sync::Arc};
+use std::fmt::Debug;
 use surgeflow_types::{
     ConvertingProjectStepToWorkflowStepError, ConvertingProjectWorkflowToWorkflowError, Event,
     Immediate, Project, ProjectEvent, ProjectStep, ProjectStepWithSettings, ProjectWorkflow,
-    SurgeflowProjectStepError, SurgeflowWorkflowStepError, TryAsRef, Workflow, WorkflowName,
-    WorkflowStep,
+    SurgeflowProjectStepError, TryAsRef, Workflow, WorkflowName, WorkflowStep,
 };
-use uuid::Uuid;
 
 use crate::workflows::workflow_1::{Workflow1, Workflow1Event, Workflow1Step};
 use crate::workflows::workflow_2::{Workflow2, Workflow2Event, Workflow2Step};
@@ -225,11 +217,15 @@ impl ProjectStep for MyProjectStep {
         }
     }
 
-    fn is_project_event(&self, event: &<Self::Project as Project>::Event) -> bool {
-        match self {
-            MyProjectStep::Workflow1(step) => step.is_workflow_event(event.try_as_ref().unwrap()),
-            MyProjectStep::Workflow2(step) => step.is_workflow_event(event.try_as_ref().unwrap()),
-        }
+    fn is_project_event(
+        &self,
+        event: &<Self::Project as Project>::Event,
+    ) -> Result<bool, SurgeflowProjectStepError<Self::Error>> {
+        let res = match self {
+            MyProjectStep::Workflow1(step) => step.is_workflow_event(event.try_as_ref()?),
+            MyProjectStep::Workflow2(step) => step.is_workflow_event(event.try_as_ref()?),
+        };
+        Ok(res)
     }
 
     async fn run(

@@ -132,15 +132,15 @@ impl WorkflowStep for Workflow2Step {
     > {
         let res = match self {
             Workflow2Step::Step0(step) => step
-                .run(wf, event.try_into().unwrap())
+                .run(wf, event.try_into()?)
                 .await
                 .map_err(|e| SurgeflowWorkflowStepError::StepError(Workflow2StepError::Step0(e)))?,
             Workflow2Step::Step1(step) => step
-                .run(wf, event.try_into().unwrap())
+                .run(wf, event.try_into()?)
                 .await
                 .map_err(|e| SurgeflowWorkflowStepError::StepError(Workflow2StepError::Step1(e)))?,
         };
-        Ok(res.map(Into::into))
+        Ok(res)
     }
 
     fn is_event<T: Event + 'static>(&self) -> bool {

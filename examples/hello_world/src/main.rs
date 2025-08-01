@@ -9,11 +9,7 @@
     feature = "completed_instance_worker",
     feature = "control_server"
 ))]
-use adapter_types::dependencies::DependencyManager;
-use anyhow::Context;
-use aws_adapter::dependencies::AwsAdapterConfig;
-use aws_adapter::dependencies::AwsDependencyManager;
-use config::{Config, Environment};
+use ::control_server::ProjectWorkflowControl;
 #[cfg(any(
     feature = "active_step_worker",
     feature = "new_instance_worker",
@@ -25,7 +21,11 @@ use config::{Config, Environment};
     feature = "completed_instance_worker",
     feature = "control_server"
 ))]
-use ::control_server::ProjectWorkflowControl;
+use adapter_types::dependencies::DependencyManager;
+use anyhow::Context;
+use aws_adapter::dependencies::AwsAdapterConfig;
+use aws_adapter::dependencies::AwsDependencyManager;
+use config::{Config, Environment};
 use surgeflow::workers::active_step_worker;
 use surgeflow::workers::completed_instance_worker;
 use surgeflow::workers::completed_step_worker;
@@ -70,9 +70,7 @@ fn get_aws_adapter_config() -> anyhow::Result<AwsAdapterConfig> {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     let config = get_aws_adapter_config()?;
 

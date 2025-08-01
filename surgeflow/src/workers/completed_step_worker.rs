@@ -2,7 +2,6 @@ use adapter_types::{
     dependencies::completed_step_worker::CompletedStepWorkerDependencies,
     managers::PersistenceManager, receivers::CompletedStepReceiver, senders::NextStepSender,
 };
-use anyhow::Context;
 use derive_more::Debug;
 use surgeflow_types::{FullyQualifiedStep, Project, StepId};
 

@@ -80,7 +80,10 @@ pub trait ProjectStep:
     type Error: Error + Send + Sync + 'static;
 
     fn is_event<T: Event + 'static>(&self) -> bool;
-    fn is_project_event(&self, event: &<Self::Project as Project>::Event) -> bool;
+    fn is_project_event(
+        &self,
+        event: &<Self::Project as Project>::Event,
+    ) -> Result<bool, SurgeflowProjectStepError<Self::Error>>;
     fn run(
         &self,
         wf: <Self::Project as Project>::Workflow,
@@ -132,16 +135,23 @@ pub trait Workflow:
 
 #[derive(thiserror::Error, Debug)]
 pub enum SurgeflowWorkflowStepError<E> {
+    #[error("Step error: {0}")]
     StepError(E),
+    #[error("Converting workflow event to event failed: {0}")]
     ConvertingWorkflowEventToEvent(#[from] ConvertingWorkflowEventToEventError),
+    #[error("Converting workflow step to step failed: {0}")]
     ConvertingWorkflowStepToStep(#[from] ConvertingWorkflowStepToStepError),
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum SurgeflowProjectStepError<E> {
+    #[error("Workflow step error: {0}")]
     WorkflowStepError(SurgeflowWorkflowStepError<E>),
+    #[error("Converting project event to workflow event failed: {0}")]
     ConvertingProjectEventToWorkflowEvent(#[from] ConvertingProjectEventToWorkflowEventError),
+    #[error("Converting project workflow to workflow failed: {0}")]
     ConvertingProjectWorkflowToWorkflow(#[from] ConvertingProjectWorkflowToWorkflowError),
+    #[error("Converting project step to workflow step failed: {0}")]
     ConvertingProjectStepToWorkflowStep(#[from] ConvertingProjectStepToWorkflowStepError),
 }
 

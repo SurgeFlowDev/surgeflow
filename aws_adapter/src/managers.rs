@@ -220,8 +220,7 @@ mod persistence_manager {
             step_id: StepId,
             step: &P::Step,
         ) -> Result<(), AwsAdapterError> {
-            let json_step =
-                serde_json::to_value(step).map_err(|e| AwsAdapterError::SerializeError(e))?;
+            let json_step = serde_json::to_value(step).map_err(AwsAdapterError::SerializeError)?;
             query!(
                 r#"
                 INSERT INTO workflow_steps ("workflow_instance_external_id", "external_id", "step")

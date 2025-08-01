@@ -92,7 +92,7 @@ where
         tracing::debug!("No step awaiting event for instance {}", instance_id);
         return Ok(());
     };
-    if step.step.step.is_project_event(&event) {
+    if step.step.step.is_project_event(&event)? {
         steps_awaiting_event.delete_step(instance_id).await?;
     } else {
         return Ok(());
