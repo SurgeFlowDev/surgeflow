@@ -86,7 +86,10 @@ pub trait ProjectStep:
         wf: <Self::Project as Project>::Workflow,
         event: <Self::Project as Project>::Event,
     ) -> impl std::future::Future<
-        Output = Result<Option<ProjectStepWithSettings<Self::Project>>, StepError>,
+        Output = Result<
+            Option<ProjectStepWithSettings<Self::Project>>,
+            SurgeflowProjectStepError<Self::Error>,
+        >,
     > + Send;
 }
 pub trait ProjectEvent:
@@ -127,6 +130,63 @@ pub trait Workflow:
     fn entrypoint() -> WorkflowStepWithSettings<Self>;
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum SurgeflowWorkflowStepError<E> {
+    StepError(E),
+    ConvertingWorkflowEventToEvent(#[from] ConvertingWorkflowEventToEventError),
+    ConvertingWorkflowStepToStep(#[from] ConvertingWorkflowStepToStepError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum SurgeflowProjectStepError<E> {
+    WorkflowStepError(SurgeflowWorkflowStepError<E>),
+    ConvertingProjectEventToWorkflowEvent(#[from] ConvertingProjectEventToWorkflowEventError),
+    ConvertingProjectWorkflowToWorkflow(#[from] ConvertingProjectWorkflowToWorkflowError),
+    ConvertingProjectStepToWorkflowStep(#[from] ConvertingProjectStepToWorkflowStepError),
+}
+
+impl<E1, E2: From<E1>> From<SurgeflowWorkflowStepError<E1>> for SurgeflowProjectStepError<E2> {
+    fn from(error: SurgeflowWorkflowStepError<E1>) -> Self {
+        match error {
+            SurgeflowWorkflowStepError::StepError(e) => {
+                SurgeflowProjectStepError::WorkflowStepError(SurgeflowWorkflowStepError::StepError(
+                    e.into(),
+                ))
+            }
+            SurgeflowWorkflowStepError::ConvertingWorkflowStepToStep(e) => {
+                SurgeflowProjectStepError::WorkflowStepError(
+                    SurgeflowWorkflowStepError::ConvertingWorkflowStepToStep(e),
+                )
+            }
+            SurgeflowWorkflowStepError::ConvertingWorkflowEventToEvent(e) => {
+                SurgeflowProjectStepError::WorkflowStepError(
+                    SurgeflowWorkflowStepError::ConvertingWorkflowEventToEvent(e),
+                )
+            }
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("converting workflow step to step failed")]
+pub struct ConvertingWorkflowStepToStepError;
+
+#[derive(thiserror::Error, Debug)]
+#[error("converting project step to workflow step failed")]
+pub struct ConvertingProjectStepToWorkflowStepError;
+
+#[derive(thiserror::Error, Debug)]
+#[error("converting project event to workflow event failed")]
+pub struct ConvertingWorkflowEventToEventError;
+
+#[derive(thiserror::Error, Debug)]
+#[error("converting project workflow to workflow failed")]
+pub struct ConvertingProjectWorkflowToWorkflowError;
+
+#[derive(thiserror::Error, Debug)]
+#[error("converting project event to workflow event failed")]
+pub struct ConvertingProjectEventToWorkflowEventError;
+
 pub trait WorkflowStep:
     Sync
     + Serialize
@@ -152,7 +212,10 @@ pub trait WorkflowStep:
         wf: Self::Workflow,
         event: <Self::Workflow as Workflow>::Event,
     ) -> impl std::future::Future<
-        Output = Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError>,
+        Output = Result<
+            Option<WorkflowStepWithSettings<Self::Workflow>>,
+            SurgeflowWorkflowStepError<<Self as WorkflowStep>::Error>,
+        >,
     > + Send;
 
     fn is_event<T: Event + 'static>(&self) -> bool;
@@ -221,7 +284,7 @@ pub trait Step:
         wf: Self::Workflow,
         event: Self::Event,
     ) -> impl std::future::Future<
-        Output = Result<Option<WorkflowStepWithSettings<Self::Workflow>>, StepError>,
+        Output = Result<Option<WorkflowStepWithSettings<Self::Workflow>>, <Self as Step>::Error>,
     > + Send;
 }
 
@@ -235,16 +298,6 @@ pub trait Event:
 }
 
 ////////////////////////////////////////////////
-
-pub type StepResult<W> = Result<Option<ProjectStepWithSettings<W>>, StepError>;
-
-#[derive(Debug, thiserror::Error)]
-pub enum StepError {
-    #[error("Unknown step error")]
-    Unknown,
-    #[error("couldn't convert event")]
-    WrongEventType,
-}
 
 #[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub struct StepSettings {

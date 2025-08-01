@@ -1,9 +1,22 @@
+// #[workflow("workflow_1")]
+// impl Workflow for Workflow1 {
+//     type Project = MyProject;
+//     type Event = event!(Event0, ...);
+//     type Step = step!(Step0, Step1);
+//
+//     fn entrypoint() -> WorkflowStepWithSettings<Self> {
+//         WorkflowStepWithSettings {
+//             step: Workflow1Step::Step0(Step0),
+//             settings: StepSettings { max_retries: 3 },
+//         }
+//     }
+// }
+
 use adapter_types::senders::{EventSender, NewInstanceSender};
 use aide::{OperationIo, axum::ApiRouter};
 use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::routing::TypedPath;
 use control_server::{ArcAppState, ProjectWorkflowControl, WorkflowControl};
-use derive_more::{Display, From, Into, TryInto};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::any::TypeId;
@@ -11,8 +24,10 @@ use std::error::Error;
 use std::fmt::{self, Debug};
 use std::{marker::PhantomData, sync::Arc};
 use surgeflow_types::{
-    Event, Immediate, Project, ProjectEvent, ProjectStep, ProjectStepWithSettings, ProjectWorkflow,
-    StepError, TryAsRef, Workflow, WorkflowName, WorkflowStep,
+    ConvertingProjectStepToWorkflowStepError, ConvertingProjectWorkflowToWorkflowError, Event,
+    Immediate, Project, ProjectEvent, ProjectStep, ProjectStepWithSettings, ProjectWorkflow,
+    SurgeflowProjectStepError, SurgeflowWorkflowStepError, TryAsRef, Workflow, WorkflowName,
+    WorkflowStep,
 };
 use uuid::Uuid;
 
@@ -24,7 +39,7 @@ pub mod workflow_2;
 
 ////////////////// Project Implementations //////////////////
 
-#[derive(Debug, Clone, Serialize, Deserialize, From)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MyProjectEvent {
     Workflow1(Workflow1Event),
     Workflow2(Workflow2Event),
@@ -32,17 +47,33 @@ pub enum MyProjectEvent {
     Immediate(Immediate),
 }
 
+impl From<Workflow1Event> for MyProjectEvent {
+    fn from(event: Workflow1Event) -> Self {
+        MyProjectEvent::Workflow1(event)
+    }
+}
+impl From<Workflow2Event> for MyProjectEvent {
+    fn from(event: Workflow2Event) -> Self {
+        MyProjectEvent::Workflow2(event)
+    }
+}
+impl From<Immediate> for MyProjectEvent {
+    fn from(immediate: Immediate) -> Self {
+        MyProjectEvent::Immediate(immediate)
+    }
+}
+
 impl ProjectEvent for MyProjectEvent {
     type Project = MyProject;
 }
 
 impl TryFrom<MyProjectEvent> for Immediate {
-    type Error = ();
+    type Error = ConvertingProjectWorkflowToWorkflowError;
 
     fn try_from(event: MyProjectEvent) -> Result<Self, Self::Error> {
         match event {
             MyProjectEvent::Immediate(immediate) => Ok(immediate),
-            _ => Err(()),
+            _ => Err(ConvertingProjectWorkflowToWorkflowError),
         }
     }
 }
@@ -66,10 +97,42 @@ impl Project for MyProject {
     }
 }
 
-#[derive(Clone, From, Debug, TryInto)]
+#[derive(Clone, Debug)]
 pub enum MyProjectWorkflow {
     Workflow1(Workflow1),
     Workflow2(Workflow2),
+}
+impl From<Workflow1> for MyProjectWorkflow {
+    fn from(workflow: Workflow1) -> Self {
+        MyProjectWorkflow::Workflow1(workflow)
+    }
+}
+impl From<Workflow2> for MyProjectWorkflow {
+    fn from(workflow: Workflow2) -> Self {
+        MyProjectWorkflow::Workflow2(workflow)
+    }
+}
+impl TryFrom<MyProjectWorkflow> for Workflow1 {
+    type Error = ConvertingProjectWorkflowToWorkflowError;
+
+    fn try_from(workflow: MyProjectWorkflow) -> Result<Self, Self::Error> {
+        if let MyProjectWorkflow::Workflow1(wf) = workflow {
+            Ok(wf)
+        } else {
+            Err(ConvertingProjectWorkflowToWorkflowError)
+        }
+    }
+}
+impl TryFrom<MyProjectWorkflow> for Workflow2 {
+    type Error = ConvertingProjectWorkflowToWorkflowError;
+
+    fn try_from(workflow: MyProjectWorkflow) -> Result<Self, Self::Error> {
+        if let MyProjectWorkflow::Workflow2(wf) = workflow {
+            Ok(wf)
+        } else {
+            Err(ConvertingProjectWorkflowToWorkflowError)
+        }
+    }
 }
 
 impl ProjectWorkflow for MyProjectWorkflow {
@@ -104,10 +167,43 @@ impl ProjectWorkflowControl for MyProjectWorkflow {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, From, TryInto)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MyProjectStep {
     Workflow1(Workflow1Step),
     Workflow2(Workflow2Step),
+}
+
+impl From<Workflow1Step> for MyProjectStep {
+    fn from(step: Workflow1Step) -> Self {
+        MyProjectStep::Workflow1(step)
+    }
+}
+impl From<Workflow2Step> for MyProjectStep {
+    fn from(step: Workflow2Step) -> Self {
+        MyProjectStep::Workflow2(step)
+    }
+}
+impl TryFrom<MyProjectStep> for Workflow1Step {
+    type Error = ConvertingProjectStepToWorkflowStepError;
+
+    fn try_from(step: MyProjectStep) -> Result<Self, Self::Error> {
+        if let MyProjectStep::Workflow1(s) = step {
+            Ok(s)
+        } else {
+            Err(ConvertingProjectStepToWorkflowStepError)
+        }
+    }
+}
+impl TryFrom<MyProjectStep> for Workflow2Step {
+    type Error = ConvertingProjectStepToWorkflowStepError;
+
+    fn try_from(step: MyProjectStep) -> Result<Self, Self::Error> {
+        if let MyProjectStep::Workflow2(s) = step {
+            Ok(s)
+        } else {
+            Err(ConvertingProjectStepToWorkflowStepError)
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -140,18 +236,17 @@ impl ProjectStep for MyProjectStep {
         &self,
         wf: <Self::Project as Project>::Workflow,
         event: <Self::Project as Project>::Event,
-    ) -> Result<Option<ProjectStepWithSettings<Self::Project>>, StepError> {
+    ) -> Result<
+        Option<ProjectStepWithSettings<Self::Project>>,
+        SurgeflowProjectStepError<Self::Error>,
+    > {
         match self {
             MyProjectStep::Workflow1(step) => {
-                let step = step
-                    .run(wf.try_into().unwrap(), event.try_into().unwrap())
-                    .await?;
+                let step = step.run(wf.try_into()?, event.try_into()?).await?;
                 Ok(step.map(Into::into))
             }
             MyProjectStep::Workflow2(step) => {
-                let step = step
-                    .run(wf.try_into().unwrap(), event.try_into().unwrap())
-                    .await?;
+                let step = step.run(wf.try_into()?, event.try_into()?).await?;
                 Ok(step.map(Into::into))
             }
         }
