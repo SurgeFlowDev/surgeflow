@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use super::managers::{PersistenceManager, StepsAwaitingEventManager};
 use super::receivers::{
     ActiveStepReceiver, CompletedInstanceReceiver, CompletedStepReceiver, EventReceiver,
@@ -36,7 +38,7 @@ pub trait ActiveStepWorkerDependencyProvider<P: Project> {
     type FailedStepSender: FailedStepSender<P>;
     type CompletedStepSender: CompletedStepSender<P>;
     type PersistenceManager: PersistenceManager;
-    type Error: Send + Sync + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     fn active_step_worker_dependencies(
         &mut self,
@@ -56,7 +58,7 @@ pub trait ActiveStepWorkerDependencyProvider<P: Project> {
 }
 
 pub trait ControlServerDependencyProvider<P: Project> {
-    type Error: Send + Sync + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     type EventSender: EventSender<P>;
     type NewInstanceSender: NewInstanceSender<P>;
@@ -73,7 +75,7 @@ pub trait ControlServerDependencyProvider<P: Project> {
 
 pub trait CompletedInstanceWorkerDependencyProvider<P: Project> {
     type CompletedInstanceReceiver: CompletedInstanceReceiver<P>;
-    type Error: Send + Sync + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     fn completed_instance_worker_dependencies(
         &mut self,
@@ -89,7 +91,7 @@ pub trait CompletedStepWorkerDependencyProvider<P: Project> {
     type CompletedStepReceiver: CompletedStepReceiver<P>;
     type NextStepSender: NextStepSender<P>;
     type PersistenceManager: PersistenceManager;
-    type Error: Send + Sync + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     fn completed_step_worker_dependencies(
         &mut self,
@@ -108,7 +110,7 @@ pub trait CompletedStepWorkerDependencyProvider<P: Project> {
 
 pub trait FailedInstanceWorkerDependencyProvider<P: Project> {
     type FailedInstanceReceiver: FailedInstanceReceiver<P>;
-    type Error: Send + Sync + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     fn failed_instance_worker_dependencies(
         &mut self,
@@ -124,7 +126,7 @@ pub trait FailedStepWorkerDependencyProvider<P: Project> {
     type FailedStepReceiver: FailedStepReceiver<P>;
     type FailedInstanceSender: FailedInstanceSender<P>;
     type PersistenceManager: PersistenceManager;
-    type Error: Send + Sync + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     fn failed_step_worker_dependencies(
         &mut self,
@@ -145,7 +147,7 @@ pub trait NewEventWorkerDependencyProvider<P: Project> {
     type ActiveStepSender: ActiveStepSender<P>;
     type EventReceiver: EventReceiver<P>;
     type StepsAwaitingEventManager: StepsAwaitingEventManager<P>;
-    type Error: Send + Sync + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     fn new_event_worker_dependencies(
         &mut self,
@@ -166,7 +168,7 @@ pub trait NewInstanceWorkerDependencyProvider<P: Project> {
     type NextStepSender: NextStepSender<P>;
     type NewInstanceReceiver: NewInstanceReceiver<P>;
     type PersistenceManager: PersistenceManager;
-    type Error: Send + Sync + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     fn new_instance_worker_dependencies(
         &mut self,
@@ -188,7 +190,7 @@ pub trait NextStepWorkerDependencyProvider<P: Project> {
     type ActiveStepSender: ActiveStepSender<P>;
     type StepsAwaitingEventManager: StepsAwaitingEventManager<P>;
     type PersistenceManager: PersistenceManager;
-    type Error: Send + Sync + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     fn next_step_worker_dependencies(
         &mut self,
@@ -218,5 +220,5 @@ pub trait DependencyManager<P: Project>:
     + NextStepWorkerDependencyProvider<P>
     + ControlServerDependencyProvider<P>
 {
-    type Error: Send + Sync + 'static;
+    type Error: Error + Send + Sync + 'static;
 }

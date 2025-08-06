@@ -107,64 +107,64 @@ where
             dependency_manager
                 .control_server_dependencies()
                 .await
-                .unwrap_or_else(|_| panic!("Failed to get control server dependencies"))
+                .expect("Failed to get control server dependencies")
         ),
         #[cfg(feature = "active_step_worker")]
         active_step_worker::main::<P, _, _, _, _, _>(
             dependency_manager
                 .active_step_worker_dependencies()
                 .await
-                .unwrap_or_else(|_| panic!("Failed to get active step worker dependencies")),
-            project.clone(),
+                .expect("Failed to get active step worker dependencies"),
+            project,
         ),
         #[cfg(feature = "new_instance_worker")]
         new_instance_worker::main::<P, _, _, _>(
             dependency_manager
                 .new_instance_worker_dependencies()
                 .await
-                .unwrap_or_else(|_| panic!("Failed to get new instance worker dependencies"))
+                .expect("Failed to get new instance worker dependencies")
         ),
         #[cfg(feature = "next_step_worker")]
         next_step_worker::main::<P, _, _, _, _>(
             dependency_manager
                 .next_step_worker_dependencies()
                 .await
-                .unwrap_or_else(|_| panic!("Failed to get next step worker dependencies"))
+                .expect("Failed to get next step worker dependencies")
         ),
         #[cfg(feature = "new_event_worker")]
         new_event_worker::main::<P, _, _, _>(
             dependency_manager
                 .new_event_worker_dependencies()
                 .await
-                .unwrap_or_else(|_| panic!("Failed to get new event worker dependencies"))
+                .expect("Failed to get new event worker dependencies")
         ),
         #[cfg(feature = "completed_step_worker")]
         completed_step_worker::main::<P, _, _, _>(
             dependency_manager
                 .completed_step_worker_dependencies()
                 .await
-                .unwrap_or_else(|_| panic!("Failed to get completed step worker dependencies"))
+                .expect("Failed to get completed step worker dependencies")
         ),
         #[cfg(feature = "failed_step_worker")]
         failed_step_worker::main::<P, _, _, _>(
             dependency_manager
                 .failed_step_worker_dependencies()
                 .await
-                .unwrap_or_else(|_| panic!("Failed to get failed step worker dependencies"))
+                .expect("Failed to get failed step worker dependencies")
         ),
         #[cfg(feature = "failed_instance_worker")]
         failed_instance_worker::main::<P, _>(
             dependency_manager
                 .failed_instance_worker_dependencies()
                 .await
-                .unwrap_or_else(|_| panic!("Failed to get failed instance worker dependencies"))
+                .expect("Failed to get failed instance worker dependencies")
         ),
         #[cfg(feature = "completed_instance_worker")]
         completed_instance_worker::main::<P, _>(
             dependency_manager
                 .completed_instance_worker_dependencies()
                 .await
-                .unwrap_or_else(|_| panic!("Failed to get completed instance worker dependencies"))
+                .expect("Failed to get completed instance worker dependencies")
         ),
     )?;
 
