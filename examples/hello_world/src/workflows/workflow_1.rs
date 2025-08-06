@@ -1,7 +1,7 @@
 use derive_more::{From, TryInto};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use surgeflow_types::{
+use surgeflow::{
     ConvertingProjectEventToWorkflowEventError, ConvertingProjectStepToWorkflowStepError,
     ConvertingWorkflowEventToEventError, ConvertingWorkflowStepToStepError, Event, Immediate,
     Project, ProjectStep, Step, StepSettings, SurgeflowWorkflowStepError, TryFromRef, Workflow,

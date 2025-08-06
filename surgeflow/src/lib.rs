@@ -1,6 +1,3 @@
-pub mod workers;
-pub mod workflows;
-
 #[cfg(not(any(
     feature = "active_step_worker",
     feature = "new_instance_worker",
@@ -16,7 +13,11 @@ compile_error!(
     "At least one worker feature must be enabled. Please enable one or more of the following features: active_step_worker, new_instance_worker, next_step_worker, new_event_worker, completed_step_worker, failed_step_worker, failed_instance_worker, completed_instance_worker, control_server."
 );
 
+pub mod workers;
 pub use main_handler::main_handler;
+pub use surgeflow_types::*;
+pub use adapter_types::*;
+pub use control_server::*;
 
 #[cfg(any(
     feature = "active_step_worker",

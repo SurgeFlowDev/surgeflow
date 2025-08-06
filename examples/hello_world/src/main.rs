@@ -1,13 +1,14 @@
-
 use anyhow::Context;
 use aws_adapter::dependencies::AwsAdapterConfig;
 use aws_adapter::dependencies::AwsDependencyManager;
 use config::{Config, Environment};
 use surgeflow::main_handler;
-use surgeflow::workflows::MyProject;
-use surgeflow::workflows::workflow_1::Workflow1;
-use surgeflow::workflows::workflow_2::Workflow2;
 use tracing::Level;
+use workflows::MyProject;
+use workflows::workflow_1::Workflow1;
+use workflows::workflow_2::Workflow2;
+
+mod workflows;
 
 fn get_aws_adapter_config() -> anyhow::Result<AwsAdapterConfig> {
     let config = Config::builder()
@@ -40,4 +41,3 @@ async fn main() -> anyhow::Result<()> {
     main_handler(project, dependency_manager).await?;
     Ok(())
 }
-
