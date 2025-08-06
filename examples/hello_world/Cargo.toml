@@ -11,9 +11,6 @@ dotenvy = "0.15.7"
 tokio = { version = "1.47.0", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
-
-aws-adapter = { version = "0.1.0", path = "../../aws_adapter" }
-surgeflow = { version = "0.1.0", path = "../../surgeflow" }
 derive_more = { version = "2.0.1", features = ["full"] }
 serde = { version = "1.0.219", features = ["derive"] }
 schemars = "1.0.4"
@@ -26,3 +23,6 @@ aide = { git = "https://github.com/Zizico2/aide.git", branch = "feat/typed-routi
     "axum-query",
     "axum-extra-typed-routing",
 ] }
+
+aws-adapter = { version = "0.1.0", path = "../../aws_adapter" }
+surgeflow = { version = "0.1.0", path = "../../surgeflow" }
