@@ -16,7 +16,7 @@ pub async fn main<P: Project, CompletedStepReceiverT, NextStepSenderT, Persisten
 where
     CompletedStepReceiverT: CompletedStepReceiver<P>,
     NextStepSenderT: NextStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let completed_step_receiver = dependencies.completed_step_receiver;
     let next_step_sender = dependencies.next_step_sender;
@@ -48,7 +48,7 @@ async fn receive_and_process<
 where
     CompletedStepReceiverT: CompletedStepReceiver<P>,
     NextStepSenderT: NextStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let mut completed_step_receiver = completed_step_receiver.clone();
 
@@ -96,7 +96,7 @@ async fn process<P, NextStepSenderT, PersistenceManagerT>(
 where
     P: Project,
     NextStepSenderT: NextStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     tracing::debug!(
         "received completed step for instance: {}",
@@ -112,7 +112,7 @@ where
 
     if let Some(next_step) = next_step {
         persistence_manager
-            .insert_step_output::<P>(step.step_id, Some(&next_step.step))
+            .insert_step_output(step.step_id, Some(&next_step.step))
             .await
             .expect("TODO: handle error");
 
@@ -133,7 +133,7 @@ where
         tracing::debug!("Instance {} completed", step.instance.external_id);
 
         persistence_manager
-            .insert_step_output::<P>(step.step_id, None)
+            .insert_step_output(step.step_id, None)
             .await
             .expect("TODO: handle error");
     }

@@ -50,7 +50,7 @@ pub trait NewInstanceSender<P: Project>: Sized + Send + Sync + 'static {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,
-        event: &WorkflowInstance,
+        event: WorkflowInstance,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
@@ -58,7 +58,7 @@ pub trait CompletedInstanceSender<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,
-        event: &WorkflowInstance,
+        event: WorkflowInstance,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
@@ -66,6 +66,6 @@ pub trait FailedInstanceSender<P: Project>: Sized + Send + 'static + Clone {
     type Error: Error + Send + Sync + 'static;
     fn send(
         &self,
-        event: &WorkflowInstance,
+        event: WorkflowInstance,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }

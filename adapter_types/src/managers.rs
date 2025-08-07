@@ -25,7 +25,7 @@ mod persistence_manager {
     use surgeflow_types::{Project, StepId, WorkflowInstance, WorkflowInstanceId};
 
     // TODO: should these take references instead of ownership?
-    pub trait PersistenceManager: Sized + Send + 'static + Clone {
+    pub trait PersistenceManager<P: Project>: Sized + Send + 'static + Clone {
         type Error: Send + Sync + 'static + Error;
         fn set_step_status(
             &self,
@@ -34,14 +34,14 @@ mod persistence_manager {
             status: i32,
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
-        fn insert_step<P: Project>(
+        fn insert_step(
             &self,
             workflow_instance_id: WorkflowInstanceId,
             step_id: StepId,
             step: &P::Step,
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
-        fn insert_step_output<P: Project>(
+        fn insert_step_output(
             &self,
             step_id: StepId,
             output: Option<&P::Step>,

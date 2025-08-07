@@ -15,7 +15,7 @@ pub struct CompletedStepWorkerDependencies<
     P: Project,
     CompletedStepReceiverT: CompletedStepReceiver<P>,
     NextStepSenderT: NextStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     pub completed_step_receiver: CompletedStepReceiverT,
     pub next_step_sender: NextStepSenderT,
@@ -28,7 +28,7 @@ impl<P: Project, CompletedStepReceiverT, NextStepSenderT, PersistenceManagerT>
 where
     CompletedStepReceiverT: CompletedStepReceiver<P>,
     NextStepSenderT: NextStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     pub fn new(
         completed_step_receiver: CompletedStepReceiverT,

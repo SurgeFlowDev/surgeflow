@@ -21,7 +21,7 @@ pub struct ActiveStepWorkerDependencies<
     ActiveStepSenderT: ActiveStepSender<P>,
     FailedStepSenderT: FailedStepSender<P>,
     CompletedStepSenderT: CompletedStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     pub active_step_receiver: ActiveStepReceiverT,
     pub active_step_sender: ActiveStepSenderT,
@@ -53,7 +53,7 @@ where
     ActiveStepSenderT: ActiveStepSender<P>,
     FailedStepSenderT: FailedStepSender<P>,
     CompletedStepSenderT: CompletedStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     pub fn new(
         active_step_receiver: ActiveStepReceiverT,

@@ -17,7 +17,7 @@ where
     P: Project,
     FailedStepReceiverT: FailedStepReceiver<P>,
     FailedInstanceSenderT: FailedInstanceSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let failed_step_receiver = dependencies.failed_step_receiver;
     let failed_instance_sender = dependencies.failed_instance_sender;
@@ -50,7 +50,7 @@ where
     P: Project,
     FailedStepReceiverT: FailedStepReceiver<P>,
     FailedInstanceSenderT: FailedInstanceSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let mut failed_step_receiver = failed_step_receiver.clone();
 
@@ -87,12 +87,12 @@ enum FailedStepWorkerError<P, FailedInstanceSenderT, PersistenceManagerT>
 where
     P: Project,
     FailedInstanceSenderT: FailedInstanceSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     #[error("Database error occurred")]
-    PersistenceManagerError(#[source] <PersistenceManagerT as PersistenceManager>::Error),
+    PersistenceManagerError(#[source] PersistenceManagerT::Error),
     #[error("Failed to send instance: {0}")]
-    SendError(#[source] <FailedInstanceSenderT as FailedInstanceSender<P>>::Error),
+    SendError(#[source] FailedInstanceSenderT::Error),
 }
 
 async fn process<P, FailedInstanceSenderT, PersistenceManagerT>(
@@ -103,7 +103,7 @@ async fn process<P, FailedInstanceSenderT, PersistenceManagerT>(
 where
     P: Project,
     FailedInstanceSenderT: FailedInstanceSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     tracing::debug!(
         "received failed step for instance: {}",
@@ -116,7 +116,7 @@ where
         .map_err(FailedStepWorkerError::PersistenceManagerError)?;
 
     failed_instance_sender
-        .send(&step.instance)
+        .send(step.instance)
         .await
         .map_err(FailedStepWorkerError::SendError)?;
 

@@ -27,7 +27,7 @@ where
     NextStepReceiverT: NextStepReceiver<P>,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let next_step_receiver = dependencies.next_step_receiver;
     let active_step_sender = dependencies.active_step_sender;
@@ -71,7 +71,7 @@ where
     NextStepReceiverT: NextStepReceiver<P>,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let mut next_step_receiver = next_step_receiver.clone();
 
@@ -112,14 +112,14 @@ where
     P: Project,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     #[error("Database error occurred")]
-    DatabaseError(#[source] <PersistenceManagerT as PersistenceManager>::Error),
+    DatabaseError(#[source] PersistenceManagerT::Error),
     #[error("Failed to send active step")]
-    SendActiveStepError(#[source] <ActiveStepSenderT as ActiveStepSender<P>>::Error),
+    SendActiveStepError(#[source] ActiveStepSenderT::Error),
     #[error("Failed to put step in awaiting event manager")]
-    AwaitEventError(#[source] <StepsAwaitingEventManagerT as StepsAwaitingEventManager<P>>::Error),
+    AwaitEventError(#[source] StepsAwaitingEventManagerT::Error),
 }
 
 async fn process<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceManagerT>(
@@ -135,7 +135,7 @@ where
     P: Project,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     tracing::debug!(
         "received next step for instance: {}",
@@ -143,7 +143,7 @@ where
     );
 
     persistence_manager
-        .insert_step::<P>(step.instance.external_id, step.step_id, &step.step.step)
+        .insert_step(step.instance.external_id, step.step_id, &step.step.step)
         .await
         .map_err(NextStepWorkerError::DatabaseError)?;
 

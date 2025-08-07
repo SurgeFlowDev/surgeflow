@@ -26,7 +26,7 @@ where
     ActiveStepSenderT: ActiveStepSender<P>,
     FailedStepSenderT: FailedStepSender<P>,
     CompletedStepSenderT: CompletedStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     tracing::debug!("Received new step");
     persistence_manager
@@ -83,7 +83,7 @@ where
     ActiveStepSenderT: ActiveStepSender<P>,
     FailedStepSenderT: FailedStepSender<P>,
     CompletedStepSenderT: CompletedStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let active_step_receiver = dependencies.active_step_receiver;
     let active_step_sender = dependencies.active_step_sender;
@@ -135,7 +135,7 @@ where
     ActiveStepSenderT: ActiveStepSender<P>,
     FailedStepSenderT: FailedStepSender<P>,
     CompletedStepSenderT: CompletedStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let mut active_step_receiver = active_step_receiver.clone();
 

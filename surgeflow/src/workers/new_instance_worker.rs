@@ -12,7 +12,7 @@ async fn process<P, NextStepSenderT, PersistenceManagerT>(
 where
     P: Project,
     NextStepSenderT: NextStepSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let workflow_name = instance.workflow_name.clone();
     persistence_manager
@@ -47,7 +47,7 @@ where
     P: Project,
     NextStepSenderT: NextStepSender<P>,
     NewInstanceReceiverT: NewInstanceReceiver<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let instance_receiver = dependencies.new_instance_receiver;
     let next_step_sender = dependencies.next_step_sender;
@@ -76,7 +76,7 @@ where
     P: Project,
     NextStepSenderT: NextStepSender<P>,
     NewInstanceReceiverT: NewInstanceReceiver<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     let mut instance_receiver = instance_receiver.clone();
 

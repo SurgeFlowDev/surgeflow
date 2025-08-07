@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 derive_more = { version = "2.0.1", features = ["full"] }
-schemars = "1.0.4"
+schemars = {version = "1.0.4", features = ["uuid1"] }
 serde = { version = "1.0.219", features = ["derive"] }
 thiserror = "2.0.12"
 uuid = { version = "1.17.0", features = ["serde", "v4"] }

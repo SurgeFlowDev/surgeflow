@@ -15,7 +15,7 @@ pub struct FailedStepWorkerDependencies<
     P: Project,
     FailedStepReceiverT: FailedStepReceiver<P>,
     FailedInstanceSenderT: FailedInstanceSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     pub failed_step_receiver: FailedStepReceiverT,
     pub failed_instance_sender: FailedInstanceSenderT,
@@ -29,7 +29,7 @@ where
     P: Project,
     FailedStepReceiverT: FailedStepReceiver<P>,
     FailedInstanceSenderT: FailedInstanceSender<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     pub fn new(
         failed_step_receiver: FailedStepReceiverT,

@@ -19,7 +19,7 @@ pub struct NextStepWorkerDependencies<
     NextStepReceiverT: NextStepReceiver<P>,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     pub next_step_receiver: NextStepReceiverT,
     pub active_step_sender: ActiveStepSenderT,
@@ -46,7 +46,7 @@ where
     NextStepReceiverT: NextStepReceiver<P>,
     ActiveStepSenderT: ActiveStepSender<P>,
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     pub fn new(
         next_step_receiver: NextStepReceiverT,

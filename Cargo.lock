@@ -1756,6 +1756,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-adapter"
+version = "0.1.0"
+dependencies = [
+ "adapter-types",
+ "async-channel 2.5.0",
+ "aws-config",
+ "aws-credential-types",
+ "aws-sdk-dynamodb",
+ "aws-sdk-sqs",
+ "aws-types",
+ "derive_more",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "surgeflow-types",
+ "thiserror 2.0.12",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -37,7 +37,7 @@ pub trait ActiveStepWorkerDependencyProvider<P: Project> {
     type ActiveStepSender: ActiveStepSender<P>;
     type FailedStepSender: FailedStepSender<P>;
     type CompletedStepSender: CompletedStepSender<P>;
-    type PersistenceManager: PersistenceManager;
+    type PersistenceManager: PersistenceManager<P>;
     type Error: Error + Send + Sync + 'static;
 
     fn active_step_worker_dependencies(
@@ -90,7 +90,7 @@ pub trait CompletedInstanceWorkerDependencyProvider<P: Project> {
 pub trait CompletedStepWorkerDependencyProvider<P: Project> {
     type CompletedStepReceiver: CompletedStepReceiver<P>;
     type NextStepSender: NextStepSender<P>;
-    type PersistenceManager: PersistenceManager;
+    type PersistenceManager: PersistenceManager<P>;
     type Error: Error + Send + Sync + 'static;
 
     fn completed_step_worker_dependencies(
@@ -125,7 +125,7 @@ pub trait FailedInstanceWorkerDependencyProvider<P: Project> {
 pub trait FailedStepWorkerDependencyProvider<P: Project> {
     type FailedStepReceiver: FailedStepReceiver<P>;
     type FailedInstanceSender: FailedInstanceSender<P>;
-    type PersistenceManager: PersistenceManager;
+    type PersistenceManager: PersistenceManager<P>;
     type Error: Error + Send + Sync + 'static;
 
     fn failed_step_worker_dependencies(
@@ -167,7 +167,7 @@ pub trait NewEventWorkerDependencyProvider<P: Project> {
 pub trait NewInstanceWorkerDependencyProvider<P: Project> {
     type NextStepSender: NextStepSender<P>;
     type NewInstanceReceiver: NewInstanceReceiver<P>;
-    type PersistenceManager: PersistenceManager;
+    type PersistenceManager: PersistenceManager<P>;
     type Error: Error + Send + Sync + 'static;
 
     fn new_instance_worker_dependencies(
@@ -189,7 +189,7 @@ pub trait NextStepWorkerDependencyProvider<P: Project> {
     type NextStepReceiver: NextStepReceiver<P>;
     type ActiveStepSender: ActiveStepSender<P>;
     type StepsAwaitingEventManager: StepsAwaitingEventManager<P>;
-    type PersistenceManager: PersistenceManager;
+    type PersistenceManager: PersistenceManager<P>;
     type Error: Error + Send + Sync + 'static;
 
     fn next_step_worker_dependencies(

@@ -15,7 +15,7 @@ pub struct NewInstanceWorkerDependencies<
     P: Project,
     NextStepSenderT: NextStepSender<P>,
     NewInstanceReceiverT: NewInstanceReceiver<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     pub next_step_sender: NextStepSenderT,
     pub new_instance_receiver: NewInstanceReceiverT,
@@ -29,7 +29,7 @@ where
     P: Project,
     NextStepSenderT: NextStepSender<P>,
     NewInstanceReceiverT: NewInstanceReceiver<P>,
-    PersistenceManagerT: PersistenceManager,
+    PersistenceManagerT: PersistenceManager<P>,
 {
     pub fn new(
         next_step_sender: NextStepSenderT,

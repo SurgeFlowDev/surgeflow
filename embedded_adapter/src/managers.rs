@@ -135,7 +135,7 @@ impl<P: Project> AwsSqsStepsAwaitingEventManager<P> {
 }
 
 impl<P: Project> StepsAwaitingEventManager<P> for AwsSqsStepsAwaitingEventManager<P> {
-    type Error = AwsAdapterError;
+    type Error = AwsAdapterError<P>;
     async fn get_step(
         &mut self,
         instance_id: WorkflowInstanceId,
@@ -194,12 +194,12 @@ mod persistence_manager {
         }
     }
     impl<P: Project> PersistenceManager<P> for AwsPersistenceManager {
-        type Error = AwsAdapterError;
+        type Error = AwsAdapterError<P>;
         async fn set_step_status(
             &self,
             step_id: StepId,
             status: i32,
-        ) -> Result<(), AwsAdapterError> {
+        ) -> Result<(), Self::Error> {
             query!(
                 r#"
                 UPDATE workflow_steps SET "status" = $1
@@ -219,7 +219,7 @@ mod persistence_manager {
             workflow_instance_id: WorkflowInstanceId,
             step_id: StepId,
             step: &P::Step,
-        ) -> Result<(), AwsAdapterError> {
+        ) -> Result<(), Self::Error> {
             let json_step = serde_json::to_value(step).map_err(AwsAdapterError::SerializeError)?;
             query!(
                 r#"
@@ -240,7 +240,7 @@ mod persistence_manager {
             &self,
             step_id: StepId,
             output: Option<&P::Step>,
-        ) -> Result<(), AwsAdapterError> {
+        ) -> Result<(), AwsAdapterError<P>> {
             let output = serde_json::to_value(output).expect("TODO: handle serialization error");
             query!(
                 r#"

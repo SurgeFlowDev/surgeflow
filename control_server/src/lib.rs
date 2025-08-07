@@ -157,7 +157,7 @@ pub trait WorkflowControl: Workflow {
             state
                 .dependencies
                 .new_instance_sender
-                .send(&WorkflowInstance {
+                .send(WorkflowInstance {
                     external_id,
                     workflow_name: T::NAME.into(),
                 })
