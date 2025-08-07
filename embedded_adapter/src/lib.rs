@@ -1,4 +1,4 @@
-use async_channel::SendError;
+use async_channel::{RecvError, SendError};
 use aws_sdk_sqs::{
     config::http::HttpResponse, error::SdkError, operation::receive_message::ReceiveMessageError,
     operation::send_message::SendMessageError,
@@ -13,7 +13,7 @@ pub mod senders;
 #[derive(derive_more::Debug, thiserror::Error)]
 pub enum AwsAdapterError<P: Project> {
     #[error("failed to receive message")]
-    ReceiveMessageError(#[from] SdkError<ReceiveMessageError, HttpResponse>),
+    ReceiveMessageError(#[from] RecvError),
     #[error("failed to send step")]
     SendStepError(#[from] SendError<FullyQualifiedStep<P>>),
     #[error("failed to send instance event")]

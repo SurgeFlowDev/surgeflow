@@ -1,10 +1,5 @@
 use async_channel::{Receiver, Sender};
-// TODO: review this file. a senders/receivers/managers are receiveing &str queue names when they should receive String to avoid one extra allocation
-use aws_config::SdkConfig;
-use aws_credential_types::Credentials;
 use aws_sdk_dynamodb::Client as DynamoClient;
-use aws_sdk_sqs::{Client as SqsClient, config::SharedCredentialsProvider};
-use aws_types::region::Region;
 use serde::Deserialize;
 use sqlx::PgPool;
 
@@ -42,147 +37,177 @@ use super::{
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AwsAdapterConfig {
-    /// The URL for the new instance queue
-    pub new_instance_queue_url: String,
-    /// The URL for the next step queue
-    pub next_step_queue_url: String,
-    /// The URL for the completed instance queue
-    pub completed_instance_queue_url: String,
-    /// The URL for the completed step queue
-    pub completed_step_queue_url: String,
-    /// The URL for the active step queue
-    pub active_step_queue_url: String,
-    /// The URL for the failed instance queue
-    pub failed_instance_queue_url: String,
-    /// The URL for the failed step queue
-    pub failed_step_queue_url: String,
-    /// The URL for the new event queue
-    pub new_event_queue_url: String,
     /// The connection string for the PostgreSQL database
     /// This is used for persistent step management
     pub pg_connection_string: String,
     /// The DynamoDB table name for steps awaiting events
     pub dynamodb_table_name: String,
-    /// AWS access key
-    pub aws_secret_access_key: String,
-    /// AWS access key ID
-    pub aws_access_key_id: String,
-    /// AWS region
-    pub aws_region: String,
 }
 
 #[derive(Debug)]
 pub struct AwsDependencyManager<P: Project> {
-    sqs_client: Option<SqsClient>,
-    //
-    step_channel: Option<(
+    next_step_channel: Option<(
+        Sender<FullyQualifiedStep<P>>,
+        Receiver<FullyQualifiedStep<P>>,
+    )>,
+    active_step_channel: Option<(
+        Sender<FullyQualifiedStep<P>>,
+        Receiver<FullyQualifiedStep<P>>,
+    )>,
+    failed_step_channel: Option<(
+        Sender<FullyQualifiedStep<P>>,
+        Receiver<FullyQualifiedStep<P>>,
+    )>,
+    completed_step_channel: Option<(
         Sender<FullyQualifiedStep<P>>,
         Receiver<FullyQualifiedStep<P>>,
     )>,
     //
-    instance_event_channel: Option<(Sender<InstanceEvent<P>>, Receiver<InstanceEvent<P>>)>,
+    new_instance_channel: Option<(Sender<WorkflowInstance>, Receiver<WorkflowInstance>)>,
+    completed_instance_channel: Option<(Sender<WorkflowInstance>, Receiver<WorkflowInstance>)>,
+    failed_instance_channel: Option<(Sender<WorkflowInstance>, Receiver<WorkflowInstance>)>,
     //
-    workflow_instance_channel: Option<(Sender<WorkflowInstance>, Receiver<WorkflowInstance>)>,
+    new_event_channel: Option<(Sender<InstanceEvent<P>>, Receiver<InstanceEvent<P>>)>,
     //
     dynamo_client: Option<DynamoClient>,
     sqlx_pool: Option<PgPool>,
     config: AwsAdapterConfig,
-    sdk_config: Option<SdkConfig>,
 }
 
 impl<P: Project> AwsDependencyManager<P> {
     pub fn new(config: AwsAdapterConfig) -> Self {
         Self {
-            sqs_client: None,
             dynamo_client: None,
             sqlx_pool: None,
             config,
-            sdk_config: None,
-            step_channel: None,
-            instance_event_channel: None,
-            workflow_instance_channel: None,
+            next_step_channel: None,
+            active_step_channel: None,
+            failed_step_channel: None,
+            completed_step_channel: None,
+            new_instance_channel: None,
+            completed_instance_channel: None,
+            failed_instance_channel: None,
+            new_event_channel: None,
         }
     }
 }
 
 impl<P: Project> AwsDependencyManager<P> {
-    fn step_sender(&mut self) -> &Sender<FullyQualifiedStep<P>> {
-        if self.step_channel.is_none() {
+    fn next_step_sender(&mut self) -> &Sender<FullyQualifiedStep<P>> {
+        if self.next_step_channel.is_none() {
             let (sender, receiver) = async_channel::unbounded();
-            self.step_channel = Some((sender, receiver));
+            self.next_step_channel = Some((sender, receiver));
         }
-        &self.step_channel.as_ref().unwrap().0
+        &self.next_step_channel.as_ref().unwrap().0
     }
-    fn step_receiver(&mut self) -> &Receiver<FullyQualifiedStep<P>> {
-        if self.step_channel.is_none() {
+    fn next_step_receiver(&mut self) -> &Receiver<FullyQualifiedStep<P>> {
+        if self.next_step_channel.is_none() {
             let (sender, receiver) = async_channel::unbounded();
-            self.step_channel = Some((sender, receiver));
+            self.next_step_channel = Some((sender, receiver));
         }
-        &self.step_channel.as_ref().unwrap().1
+        &self.next_step_channel.as_ref().unwrap().1
     }
-    fn instance_event_sender(&mut self) -> &Sender<InstanceEvent<P>> {
-        if self.instance_event_channel.is_none() {
+    fn active_step_sender(&mut self) -> &Sender<FullyQualifiedStep<P>> {
+        if self.active_step_channel.is_none() {
             let (sender, receiver) = async_channel::unbounded();
-            self.instance_event_channel = Some((sender, receiver));
+            self.active_step_channel = Some((sender, receiver));
         }
-        &self.instance_event_channel.as_ref().unwrap().0
+        &self.active_step_channel.as_ref().unwrap().0
     }
-    fn instance_event_receiver(&mut self) -> &Receiver<InstanceEvent<P>> {
-        if self.instance_event_channel.is_none() {
+    fn active_step_receiver(&mut self) -> &Receiver<FullyQualifiedStep<P>> {
+        if self.active_step_channel.is_none() {
             let (sender, receiver) = async_channel::unbounded();
-            self.instance_event_channel = Some((sender, receiver));
+            self.active_step_channel = Some((sender, receiver));
         }
-        &self.instance_event_channel.as_ref().unwrap().1
+        &self.active_step_channel.as_ref().unwrap().1
     }
-    fn workflow_instance_sender(&mut self) -> &Sender<WorkflowInstance> {
-        if self.workflow_instance_channel.is_none() {
+    fn failed_step_sender(&mut self) -> &Sender<FullyQualifiedStep<P>> {
+        if self.failed_step_channel.is_none() {
             let (sender, receiver) = async_channel::unbounded();
-            self.workflow_instance_channel = Some((sender, receiver));
+            self.failed_step_channel = Some((sender, receiver));
         }
-        &self.workflow_instance_channel.as_ref().unwrap().0
+        &self.failed_step_channel.as_ref().unwrap().0
     }
-    fn workflow_instance_receiver(&mut self) -> &Receiver<WorkflowInstance> {
-        if self.workflow_instance_channel.is_none() {
+    fn failed_step_receiver(&mut self) -> &Receiver<FullyQualifiedStep<P>> {
+        if self.failed_step_channel.is_none() {
             let (sender, receiver) = async_channel::unbounded();
-            self.workflow_instance_channel = Some((sender, receiver));
+            self.failed_step_channel = Some((sender, receiver));
         }
-        &self.workflow_instance_channel.as_ref().unwrap().1
+        &self.failed_step_channel.as_ref().unwrap().1
     }
-
-    fn get_sdk_config(&mut self) -> &SdkConfig {
-        if self.sdk_config.is_none() {
-            let credentials = Credentials::from_keys(
-                self.config.aws_access_key_id.clone(),
-                self.config.aws_secret_access_key.clone(),
-                None,
-            );
-
-            self.sdk_config = Some(
-                aws_config::SdkConfig::builder()
-                    .credentials_provider(SharedCredentialsProvider::new(credentials))
-                    .region(Region::new(self.config.aws_region.clone()))
-                    .build(),
-            );
+    fn completed_step_sender(&mut self) -> &Sender<FullyQualifiedStep<P>> {
+        if self.completed_step_channel.is_none() {
+            let (sender, receiver) = async_channel::unbounded();
+            self.completed_step_channel = Some((sender, receiver));
         }
-
-        self.sdk_config
-            .as_ref()
-            .expect("sdk_config is set in this function. this should never happen")
+        &self.completed_step_channel.as_ref().unwrap().0
     }
-    fn sqs_client(&mut self) -> &SqsClient {
-        if self.sqs_client.is_none() {
-            let config = self.get_sdk_config();
-            self.sqs_client = Some(SqsClient::new(config));
+    fn completed_step_receiver(&mut self) -> &Receiver<FullyQualifiedStep<P>> {
+        if self.completed_step_channel.is_none() {
+            let (sender, receiver) = async_channel::unbounded();
+            self.completed_step_channel = Some((sender, receiver));
         }
-        self.sqs_client.as_ref().unwrap()
+        &self.completed_step_channel.as_ref().unwrap().1
+    }
+    fn new_instance_sender(&mut self) -> &Sender<WorkflowInstance> {
+        if self.new_instance_channel.is_none() {
+            let (sender, receiver) = async_channel::unbounded();
+            self.new_instance_channel = Some((sender, receiver));
+        }
+        &self.new_instance_channel.as_ref().unwrap().0
+    }
+    fn new_instance_receiver(&mut self) -> &Receiver<WorkflowInstance> {
+        if self.new_instance_channel.is_none() {
+            let (sender, receiver) = async_channel::unbounded();
+            self.new_instance_channel = Some((sender, receiver));
+        }
+        &self.new_instance_channel.as_ref().unwrap().1
+    }
+    fn completed_instance_sender(&mut self) -> &Sender<WorkflowInstance> {
+        if self.completed_instance_channel.is_none() {
+            let (sender, receiver) = async_channel::unbounded();
+            self.completed_instance_channel = Some((sender, receiver));
+        }
+        &self.completed_instance_channel.as_ref().unwrap().0
+    }
+    fn completed_instance_receiver(&mut self) -> &Receiver<WorkflowInstance> {
+        if self.completed_instance_channel.is_none() {
+            let (sender, receiver) = async_channel::unbounded();
+            self.completed_instance_channel = Some((sender, receiver));
+        }
+        &self.completed_instance_channel.as_ref().unwrap().1
+    }
+    fn failed_instance_sender(&mut self) -> &Sender<WorkflowInstance> {
+        if self.failed_instance_channel.is_none() {
+            let (sender, receiver) = async_channel::unbounded();
+            self.failed_instance_channel = Some((sender, receiver));
+        }
+        &self.failed_instance_channel.as_ref().unwrap().0
+    }
+    fn failed_instance_receiver(&mut self) -> &Receiver<WorkflowInstance> {
+        if self.failed_instance_channel.is_none() {
+            let (sender, receiver) = async_channel::unbounded();
+            self.failed_instance_channel = Some((sender, receiver));
+        }
+        &self.failed_instance_channel.as_ref().unwrap().1
+    }
+    fn new_event_sender(&mut self) -> &Sender<InstanceEvent<P>> {
+        if self.new_event_channel.is_none() {
+            let (sender, receiver) = async_channel::unbounded();
+            self.new_event_channel = Some((sender, receiver));
+        }
+        &self.new_event_channel.as_ref().unwrap().0
+    }
+    fn new_event_receiver(&mut self) -> &Receiver<InstanceEvent<P>> {
+        if self.new_event_channel.is_none() {
+            let (sender, receiver) = async_channel::unbounded();
+            self.new_event_channel = Some((sender, receiver));
+        }
+        &self.new_event_channel.as_ref().unwrap().1
     }
 
     fn dynamo_client(&mut self) -> &DynamoClient {
-        if self.dynamo_client.is_none() {
-            let config = self.get_sdk_config();
-            self.dynamo_client = Some(DynamoClient::new(config));
-        }
-        self.dynamo_client.as_ref().unwrap()
+        todo!()
     }
 
     async fn sqlx_pool(&mut self) -> &mut PgPool {
@@ -205,14 +230,12 @@ impl<P: Project> CompletedInstanceWorkerDependencyProvider<P> for AwsDependencyM
         &mut self,
     ) -> Result<CompletedInstanceWorkerDependencies<P, Self::CompletedInstanceReceiver>, Self::Error>
     {
-        let sqs_client = self.sqs_client();
+        let completed_instance_receiver =
+            AwsSqsCompletedInstanceReceiver::new(self.completed_instance_receiver().clone());
 
-        let instance_receiver = AwsSqsCompletedInstanceReceiver::new(
-            sqs_client.clone(),
-            self.config.completed_instance_queue_url.clone(),
-        );
-
-        Ok(CompletedInstanceWorkerDependencies::new(instance_receiver))
+        Ok(CompletedInstanceWorkerDependencies::new(
+            completed_instance_receiver,
+        ))
     }
 }
 
@@ -233,17 +256,10 @@ impl<P: Project> CompletedStepWorkerDependencyProvider<P> for AwsDependencyManag
         >,
         Self::Error,
     > {
-        let sqs_client = self.sqs_client().clone();
-        let step_sender = self.step_sender().clone();
+        let completed_step_receiver =
+            AwsSqsCompletedStepReceiver::<P>::new(self.completed_step_receiver().clone());
 
-
-        let completed_step_receiver = AwsSqsCompletedStepReceiver::<P>::new(
-            sqs_client.clone(),
-            self.config.completed_step_queue_url.clone(),
-        );
-
-        let next_step_sender =
-            AwsSqsNextStepSender::<P>::new(step_sender, self.config.next_step_queue_url.clone());
+        let next_step_sender = AwsSqsNextStepSender::<P>::new(self.next_step_sender().clone());
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -276,28 +292,17 @@ impl<P: Project> ActiveStepWorkerDependencyProvider<P> for AwsDependencyManager<
         >,
         Self::Error,
     > {
-        let sqs_client = self.sqs_client().clone();
-        let step_sender = self.step_sender().clone();
+        let active_step_receiver =
+            AwsSqsActiveStepReceiver::<P>::new(self.active_step_receiver().clone());
 
-        let active_step_receiver = AwsSqsActiveStepReceiver::<P>::new(
-            sqs_client.clone(),
-            self.config.active_step_queue_url.clone(),
-        );
+        let active_step_sender =
+            AwsSqsActiveStepSender::<P>::new(self.active_step_sender().clone());
 
-        let active_step_sender = AwsSqsActiveStepSender::<P>::new(
-            step_sender.clone(),
-            self.config.active_step_queue_url.clone(),
-        );
+        let failed_step_sender =
+            AwsSqsFailedStepSender::<P>::new(self.failed_step_sender().clone());
 
-        let failed_step_sender = AwsSqsFailedStepSender::<P>::new(
-            step_sender.clone(),
-            self.config.failed_step_queue_url.clone(),
-        );
-
-        let completed_step_sender = AwsSqsCompletedStepSender::<P>::new(
-            step_sender,
-            self.config.completed_step_queue_url.clone(),
-        );
+        let completed_step_sender =
+            AwsSqsCompletedStepSender::<P>::new(self.completed_step_sender().clone());
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -319,12 +324,8 @@ impl<P: Project> FailedInstanceWorkerDependencyProvider<P> for AwsDependencyMana
         &mut self,
     ) -> Result<FailedInstanceWorkerDependencies<P, Self::FailedInstanceReceiver>, Self::Error>
     {
-        let sqs_client = self.sqs_client().clone();
-
-        let failed_instance_receiver = AwsSqsFailedInstanceReceiver::<P>::new(
-            sqs_client,
-            self.config.failed_instance_queue_url.clone(),
-        );
+        let failed_instance_receiver =
+            AwsSqsFailedInstanceReceiver::<P>::new(self.failed_instance_receiver().clone());
 
         Ok(FailedInstanceWorkerDependencies::new(
             failed_instance_receiver,
@@ -349,18 +350,11 @@ impl<P: Project> FailedStepWorkerDependencyProvider<P> for AwsDependencyManager<
         >,
         Self::Error,
     > {
-        let sqs_client = self.sqs_client().clone();
-        let workflow_instance_sender = self.workflow_instance_sender().clone();
+        let failed_step_receiver =
+            AwsSqsFailedStepReceiver::<P>::new(self.failed_step_receiver().clone());
 
-        let failed_step_receiver = AwsSqsFailedStepReceiver::<P>::new(
-            sqs_client.clone(),
-            self.config.failed_step_queue_url.clone(),
-        );
-
-        let failed_instance_sender = AwsSqsFailedInstanceSender::<P>::new(
-            workflow_instance_sender,
-            self.config.failed_instance_queue_url.clone(),
-        );
+        let failed_instance_sender =
+            AwsSqsFailedInstanceSender::<P>::new(self.failed_instance_sender().clone());
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -389,16 +383,11 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager<P>
         >,
         Self::Error,
     > {
-        let step_sender = self.step_sender().clone();
-        let sqs_client = self.sqs_client().clone();
         let dynamo_client = self.dynamo_client().clone();
 
-        let event_receiver = AwsSqsEventReceiver::<P>::new(
-            sqs_client.clone(),
-            self.config.new_event_queue_url.clone(),
-        );
+        let new_event_receiver = AwsSqsEventReceiver::<P>::new(self.new_event_receiver().clone());
         let active_step_sender =
-            AwsSqsActiveStepSender::<P>::new(step_sender, self.config.active_step_queue_url.clone());
+            AwsSqsActiveStepSender::<P>::new(self.active_step_sender().clone());
 
         let steps_awaiting_event_manager = AwsSqsStepsAwaitingEventManager::<P>::new(
             dynamo_client,
@@ -407,7 +396,7 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager<P>
 
         Ok(NewEventWorkerDependencies::new(
             active_step_sender,
-            event_receiver,
+            new_event_receiver,
             steps_awaiting_event_manager,
         ))
     }
@@ -430,16 +419,10 @@ impl<P: Project> NewInstanceWorkerDependencyProvider<P> for AwsDependencyManager
         >,
         Self::Error,
     > {
-        let sqs_client = self.sqs_client().clone();
-        let step_sender = self.step_sender().clone();
+        let new_instance_receiver =
+            AwsSqsNewInstanceReceiver::<P>::new(self.new_instance_receiver().clone());
 
-        let new_instance_receiver = AwsSqsNewInstanceReceiver::<P>::new(
-            sqs_client.clone(),
-            self.config.new_instance_queue_url.clone(),
-        );
-
-        let next_step_sender =
-            AwsSqsNextStepSender::<P>::new(step_sender, self.config.next_step_queue_url.clone());
+        let next_step_sender = AwsSqsNextStepSender::<P>::new(self.next_step_sender().clone());
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 
@@ -470,17 +453,13 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager<P>
         >,
         Self::Error,
     > {
-        let step_sender = self.step_sender().clone();
-        let sqs_client = self.sqs_client().clone();
         let dynamo_client = self.dynamo_client().clone();
 
-        let next_step_receiver = AwsSqsNextStepReceiver::<P>::new(
-            sqs_client.clone(),
-            self.config.next_step_queue_url.clone(),
-        );
+        let next_step_receiver =
+            AwsSqsNextStepReceiver::<P>::new(self.next_step_receiver().clone());
 
         let active_step_sender =
-            AwsSqsActiveStepSender::<P>::new(step_sender, self.config.active_step_queue_url.clone());
+            AwsSqsActiveStepSender::<P>::new(self.active_step_sender().clone());
 
         let steps_awaiting_event_manager = AwsSqsStepsAwaitingEventManager::<P>::new(
             dynamo_client,
@@ -507,21 +486,13 @@ impl<P: Project> ControlServerDependencyProvider<P> for AwsDependencyManager<P> 
         &mut self,
     ) -> Result<ControlServerDependencies<P, Self::EventSender, Self::NewInstanceSender>, Self::Error>
     {
-        let instance_event_sender = self.instance_event_sender().clone();
-        let workflow_instance_sender = self.workflow_instance_sender().clone();
+        let new_event_sender = AwsSqsEventSender::<P>::new(self.new_event_sender().clone());
 
-        let event_sender = AwsSqsEventSender::<P>::new(
-            instance_event_sender,
-            self.config.new_event_queue_url.clone(),
-        );
-
-        let new_instance_sender = AwsSqsNewInstanceSender::<P>::new(
-            workflow_instance_sender,
-            self.config.new_instance_queue_url.clone(),
-        );
+        let new_instance_sender =
+            AwsSqsNewInstanceSender::<P>::new(self.new_instance_sender().clone());
 
         Ok(ControlServerDependencies::new(
-            event_sender,
+            new_event_sender,
             new_instance_sender,
         ))
     }

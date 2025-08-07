@@ -195,11 +195,7 @@ mod persistence_manager {
     }
     impl<P: Project> PersistenceManager<P> for AwsPersistenceManager {
         type Error = AwsAdapterError<P>;
-        async fn set_step_status(
-            &self,
-            step_id: StepId,
-            status: i32,
-        ) -> Result<(), Self::Error> {
+        async fn set_step_status(&self, step_id: StepId, status: i32) -> Result<(), Self::Error> {
             query!(
                 r#"
                 UPDATE workflow_steps SET "status" = $1
