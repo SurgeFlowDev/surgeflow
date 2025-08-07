@@ -92,6 +92,7 @@ where
     let persistence_manager = dependencies.persistence_manager;
 
     loop {
+        tracing::info!("Waiting for active step...");
         if let Err(err) = receive_and_process::<
             P,
             ActiveStepReceiverT,

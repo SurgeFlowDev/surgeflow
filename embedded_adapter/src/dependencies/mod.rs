@@ -1,5 +1,7 @@
+use std::sync::Arc;
+
 use async_channel::{Receiver, Sender};
-use aws_sdk_dynamodb::Client as DynamoClient;
+use papaya::HashMap;
 use serde::Deserialize;
 use sqlx::PgPool;
 
@@ -17,7 +19,9 @@ use adapter_types::dependencies::{
     new_instance_worker::NewInstanceWorkerDependencies,
     next_step_worker::NextStepWorkerDependencies,
 };
-use surgeflow_types::{FullyQualifiedStep, InstanceEvent, Project, WorkflowInstance};
+use surgeflow_types::{
+    FullyQualifiedStep, InstanceEvent, Project, WorkflowInstance, WorkflowInstanceId,
+};
 
 use super::{
     AwsAdapterError,
@@ -40,12 +44,11 @@ pub struct AwsAdapterConfig {
     /// The connection string for the PostgreSQL database
     /// This is used for persistent step management
     pub pg_connection_string: String,
-    /// The DynamoDB table name for steps awaiting events
-    pub dynamodb_table_name: String,
 }
 
-#[derive(Debug)]
+#[derive(derive_more::Debug)]
 pub struct AwsDependencyManager<P: Project> {
+    steps_awaiting_event_map: Arc<HashMap<WorkflowInstanceId, FullyQualifiedStep<P>>>,
     next_step_channel: Option<(
         Sender<FullyQualifiedStep<P>>,
         Receiver<FullyQualifiedStep<P>>,
@@ -69,7 +72,6 @@ pub struct AwsDependencyManager<P: Project> {
     //
     new_event_channel: Option<(Sender<InstanceEvent<P>>, Receiver<InstanceEvent<P>>)>,
     //
-    dynamo_client: Option<DynamoClient>,
     sqlx_pool: Option<PgPool>,
     config: AwsAdapterConfig,
 }
@@ -77,7 +79,7 @@ pub struct AwsDependencyManager<P: Project> {
 impl<P: Project> AwsDependencyManager<P> {
     pub fn new(config: AwsAdapterConfig) -> Self {
         Self {
-            dynamo_client: None,
+            steps_awaiting_event_map: Arc::new(HashMap::new()),
             sqlx_pool: None,
             config,
             next_step_channel: None,
@@ -93,6 +95,9 @@ impl<P: Project> AwsDependencyManager<P> {
 }
 
 impl<P: Project> AwsDependencyManager<P> {
+    fn steps_awaiting_event_map(&self) -> Arc<HashMap<WorkflowInstanceId, FullyQualifiedStep<P>>> {
+        self.steps_awaiting_event_map.clone()
+    }
     fn next_step_sender(&mut self) -> &Sender<FullyQualifiedStep<P>> {
         if self.next_step_channel.is_none() {
             let (sender, receiver) = async_channel::unbounded();
@@ -204,10 +209,6 @@ impl<P: Project> AwsDependencyManager<P> {
             self.new_event_channel = Some((sender, receiver));
         }
         &self.new_event_channel.as_ref().unwrap().1
-    }
-
-    fn dynamo_client(&mut self) -> &DynamoClient {
-        todo!()
     }
 
     async fn sqlx_pool(&mut self) -> &mut PgPool {
@@ -383,16 +384,13 @@ impl<P: Project> NewEventWorkerDependencyProvider<P> for AwsDependencyManager<P>
         >,
         Self::Error,
     > {
-        let dynamo_client = self.dynamo_client().clone();
-
+        let steps_awaiting_event_map = self.steps_awaiting_event_map().clone();
         let new_event_receiver = AwsSqsEventReceiver::<P>::new(self.new_event_receiver().clone());
         let active_step_sender =
             AwsSqsActiveStepSender::<P>::new(self.active_step_sender().clone());
 
-        let steps_awaiting_event_manager = AwsSqsStepsAwaitingEventManager::<P>::new(
-            dynamo_client,
-            self.config.dynamodb_table_name.clone(),
-        );
+        let steps_awaiting_event_manager =
+            AwsSqsStepsAwaitingEventManager::<P>::new(steps_awaiting_event_map);
 
         Ok(NewEventWorkerDependencies::new(
             active_step_sender,
@@ -453,7 +451,7 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager<P>
         >,
         Self::Error,
     > {
-        let dynamo_client = self.dynamo_client().clone();
+        let steps_awaiting_event_map = self.steps_awaiting_event_map().clone();
 
         let next_step_receiver =
             AwsSqsNextStepReceiver::<P>::new(self.next_step_receiver().clone());
@@ -461,10 +459,8 @@ impl<P: Project> NextStepWorkerDependencyProvider<P> for AwsDependencyManager<P>
         let active_step_sender =
             AwsSqsActiveStepSender::<P>::new(self.active_step_sender().clone());
 
-        let steps_awaiting_event_manager = AwsSqsStepsAwaitingEventManager::<P>::new(
-            dynamo_client,
-            self.config.dynamodb_table_name.clone(),
-        );
+        let steps_awaiting_event_manager =
+            AwsSqsStepsAwaitingEventManager::<P>::new(steps_awaiting_event_map);
 
         let persistence_manager = AwsPersistenceManager::new(self.sqlx_pool().await.clone());
 

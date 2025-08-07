@@ -1,4 +1,5 @@
-use std::marker::PhantomData;
+use papaya::HashMap;
+use std::{marker::PhantomData, sync::Arc};
 
 use super::AwsAdapterError;
 use adapter_types::managers::StepsAwaitingEventManager;
@@ -114,23 +115,17 @@ pub mod dynamo_kv {
 
 #[derive(Clone)]
 pub struct AwsSqsStepsAwaitingEventManager<P: Project> {
-    dynamo_client: aws_sdk_dynamodb::Client,
-    table_name: String,
+    map: Arc<HashMap<WorkflowInstanceId, FullyQualifiedStep<P>>>,
     _phantom: PhantomData<P>,
 }
 
 impl<P: Project> AwsSqsStepsAwaitingEventManager<P> {
     // TODO: should be private
-    pub fn new(dynamo_client: aws_sdk_dynamodb::Client, table_name: String) -> Self {
+    pub fn new(map: Arc<HashMap<WorkflowInstanceId, FullyQualifiedStep<P>>>) -> Self {
         Self {
-            dynamo_client,
-            table_name,
+            map,
             _phantom: PhantomData,
         }
-    }
-
-    fn make_key(instance_id: WorkflowInstanceId) -> [u8; 16] {
-        instance_id.into()
     }
 }
 
@@ -140,37 +135,22 @@ impl<P: Project> StepsAwaitingEventManager<P> for AwsSqsStepsAwaitingEventManage
         &mut self,
         instance_id: WorkflowInstanceId,
     ) -> Result<Option<FullyQualifiedStep<P>>, Self::Error> {
-        let key = Self::make_key(instance_id);
-        match dynamo_kv::try_get_item::<FullyQualifiedStep<P>>(
-            &self.dynamo_client,
-            self.table_name.clone(),
-            &key,
-        )
-        .await
-        {
-            Ok(item) => Ok(item),
-            Err(dynamo_kv::DynamoKvError::NotFound) => Ok(None),
-            Err(e) => Err(AwsAdapterError::DynamoKvError(e)),
+        let map = self.map.pin();
+        match map.get(&instance_id) {
+            Some(step) => Ok(Some(step.clone())),
+            None => Ok(None),
         }
     }
 
     async fn delete_step(&mut self, instance_id: WorkflowInstanceId) -> Result<(), Self::Error> {
-        let key = Self::make_key(instance_id);
-        dynamo_kv::delete_item::<FullyQualifiedStep<P>>(
-            &self.dynamo_client,
-            self.table_name.clone(),
-            &key,
-        )
-        .await
-        .map_err(AwsAdapterError::DynamoKvError)?;
+        let map = self.map.pin();
+        map.remove(&instance_id);
         Ok(())
     }
 
     async fn put_step(&mut self, step: FullyQualifiedStep<P>) -> Result<(), Self::Error> {
-        let key = Self::make_key(step.instance.external_id);
-        dynamo_kv::put_item(&self.dynamo_client, self.table_name.clone(), &key, step)
-            .await
-            .map_err(AwsAdapterError::DynamoKvError)?;
+        let map = self.map.pin();
+        map.insert(step.instance.external_id, step);
         Ok(())
     }
 }

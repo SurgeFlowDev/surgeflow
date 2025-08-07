@@ -23,6 +23,7 @@ where
     let steps_awaiting_event = dependencies.steps_awaiting_event_manager;
 
     loop {
+        tracing::info!("Waiting for new event...");
         if let Err(err) = receive_and_process::<
             P,
             ActiveStepSenderT,
@@ -88,6 +89,7 @@ where
     StepsAwaitingEventManagerT: StepsAwaitingEventManager<P>,
 {
     let step = steps_awaiting_event.get_step(instance_id).await?;
+
     let Some(step) = step else {
         tracing::debug!("No step awaiting event for instance {}", instance_id);
         return Ok(());

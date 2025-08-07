@@ -74,7 +74,7 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
 }
 
 pub trait ProjectStep:
-    Sized + Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>
+    fmt::Debug + Sized + Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>
 {
     type Project: Project<Step = Self>;
     type Error: Error + Send + Sync + 'static;
@@ -97,6 +97,7 @@ pub trait ProjectStep:
 }
 pub trait ProjectEvent:
     Sized
+    + fmt::Debug
     + Send
     + Sync
     + 'static

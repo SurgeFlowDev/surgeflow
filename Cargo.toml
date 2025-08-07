@@ -8,6 +8,7 @@ members = [
     "adapter_types",
     "surgeflow_types",
     "examples/hello_world",
+    "examples/hello_world_embedded",
     "surgeflow",
     "control_server",
 ]
