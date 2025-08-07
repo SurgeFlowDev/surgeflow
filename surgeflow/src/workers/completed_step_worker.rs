@@ -82,8 +82,6 @@ where
 
 #[derive(thiserror::Error, Debug)]
 enum CompletedStepWorkerError<P: Project, NextStepSenderT: NextStepSender<P>> {
-    #[error("Database error occurred")]
-    DatabaseError(#[from] sqlx::Error),
     #[error("Failed to send next step")]
     SendNextStepError(#[source] <NextStepSenderT as NextStepSender<P>>::Error),
 }

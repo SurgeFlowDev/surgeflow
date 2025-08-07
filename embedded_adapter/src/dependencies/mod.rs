@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_channel::{Receiver, Sender};
 use papaya::HashMap;
 use serde::Deserialize;
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use adapter_types::dependencies::{
     ActiveStepWorkerDependencyProvider, CompletedInstanceWorkerDependencyProvider,
@@ -72,7 +72,7 @@ pub struct AwsDependencyManager<P: Project> {
     //
     new_event_channel: Option<(Sender<InstanceEvent<P>>, Receiver<InstanceEvent<P>>)>,
     //
-    sqlx_pool: Option<PgPool>,
+    sqlx_pool: Option<SqlitePool>,
     config: AwsAdapterConfig,
 }
 
@@ -211,12 +211,12 @@ impl<P: Project> AwsDependencyManager<P> {
         &self.new_event_channel.as_ref().unwrap().1
     }
 
-    async fn sqlx_pool(&mut self) -> &mut PgPool {
+    async fn sqlx_pool(&mut self) -> &mut SqlitePool {
         if self.sqlx_pool.is_none() {
             self.sqlx_pool = Some(
-                PgPool::connect(&self.config.pg_connection_string)
+                SqlitePool::connect(&self.config.pg_connection_string)
                     .await
-                    .expect("Failed to connect to PostgreSQL database"),
+                    .expect("Failed to connect to SQLite database"),
             );
         }
         self.sqlx_pool.as_mut().unwrap()

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO workflow_steps (\"workflow_instance_external_id\", \"external_id\", \"step\")\n                VALUES ($1, $2, $3)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "91f0e9a583aae5777781d916d7fc6889be0951bd011b481261a2d63cdbe30b9e"
+}

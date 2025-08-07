@@ -47,14 +47,6 @@ macros = { version = "0.1.0", path = "../macros" }
 schemars = { version = "1.0.4", features = ["uuid1"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.140", features = ["raw_value"] }
-sqlx = { version = "0.8.6", default-features = false, features = [
-    "postgres",
-    "macros",
-    "json",
-    "runtime-tokio",
-    "tls-rustls",
-    "uuid",
-] }
 surgeflow-types = { version = "0.1.0", path = "../surgeflow_types" }
 surrealdb-tikv-client = "0.3.0-surreal.3"
 thiserror = "2.0.12"

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO workflow_instances (\"workflow_id\", \"external_id\")\n                SELECT \"id\", $1\n                FROM workflows\n                WHERE \"name\" = $2\n                RETURNING \"external_id\"\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "external_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c52b3b2aba644fff3edece8c30740d36919adbfc026b8919bd908d4d68f50151"
+}

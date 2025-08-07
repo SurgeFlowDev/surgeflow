@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                UPDATE workflow_steps SET \"status\" = $1\n                WHERE \"external_id\" = $2\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "32c357492ad1fe3d226a4fc36e661a7f6c875a1867c5827f7c61ce7bd1f94b61"
+}

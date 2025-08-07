@@ -48,8 +48,7 @@ impl<P: Project> StepsAwaitingEventManager<P> for AwsSqsStepsAwaitingEventManage
 }
 
 mod persistence_manager {
-    use sqlx::{PgPool, query};
-    use uuid::Uuid;
+    use sqlx::{SqlitePool, query};
 
     use adapter_types::managers::PersistenceManager;
     use surgeflow_types::{Project, StepId, WorkflowInstance, WorkflowInstanceId};
@@ -58,23 +57,24 @@ mod persistence_manager {
 
     #[derive(Clone)]
     pub struct AwsPersistenceManager {
-        sqlx_pool: PgPool,
+        sqlx_pool: SqlitePool,
     }
     impl AwsPersistenceManager {
-        pub fn new(sqlx_pool: PgPool) -> Self {
+        pub fn new(sqlx_pool: SqlitePool) -> Self {
             Self { sqlx_pool }
         }
     }
     impl<P: Project> PersistenceManager<P> for AwsPersistenceManager {
         type Error = AwsAdapterError<P>;
         async fn set_step_status(&self, step_id: StepId, status: i32) -> Result<(), Self::Error> {
+            let step_id = step_id.to_string();
             query!(
                 r#"
                 UPDATE workflow_steps SET "status" = $1
                 WHERE "external_id" = $2
                 "#,
                 status,
-                Uuid::from(step_id)
+                step_id
             )
             .execute(&self.sqlx_pool)
             .await?;
@@ -89,13 +89,15 @@ mod persistence_manager {
             step: &P::Step,
         ) -> Result<(), Self::Error> {
             let json_step = serde_json::to_value(step).map_err(AwsAdapterError::SerializeError)?;
+            let workflow_instance_id = workflow_instance_id.to_string();
+            let step_id = step_id.to_string();
             query!(
                 r#"
                 INSERT INTO workflow_steps ("workflow_instance_external_id", "external_id", "step")
                 VALUES ($1, $2, $3)
                 "#,
-                Uuid::from(workflow_instance_id),
-                Uuid::from(step_id),
+                workflow_instance_id,
+                step_id,
                 json_step
             )
             .execute(&self.sqlx_pool)
@@ -110,12 +112,13 @@ mod persistence_manager {
             output: Option<&P::Step>,
         ) -> Result<(), AwsAdapterError<P>> {
             let output = serde_json::to_value(output).expect("TODO: handle serialization error");
+            let step_id = step_id.to_string();
             query!(
                 r#"
             INSERT INTO workflow_step_outputs ("workflow_step_id", "output")
             VALUES ((SELECT id FROM workflow_steps WHERE external_id = $1), $2)
             "#,
-                Uuid::from(step_id),
+                step_id,
                 output
             )
             .execute(&self.sqlx_pool)
@@ -128,6 +131,8 @@ mod persistence_manager {
             &self,
             workflow_instance: WorkflowInstance,
         ) -> Result<WorkflowInstanceId, Self::Error> {
+            let external_id = workflow_instance.external_id.to_string();
+            let workflow_name = String::from(workflow_instance.workflow_name);
             query!(
                 r#"
                 INSERT INTO workflow_instances ("workflow_id", "external_id")
@@ -136,8 +141,8 @@ mod persistence_manager {
                 WHERE "name" = $2
                 RETURNING "external_id"
                 "#,
-                Uuid::from(workflow_instance.external_id),
-                String::from(workflow_instance.workflow_name)
+                external_id,
+                workflow_name                
             )
             .fetch_one(&self.sqlx_pool)
             .await?;

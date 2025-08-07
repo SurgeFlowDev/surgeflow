@@ -11,7 +11,14 @@ derive_more = { version = "2.0.1", features = ["full"] }
 papaya = "0.2.3"
 serde = "1.0.219"
 serde_json = "1.0.141"
-sqlx = { version = "0.8.6", default-features = false, features = ["postgres", "macros", "uuid", "json"] }
+sqlx = { version = "0.8.6", default-features = false, features = [
+    "sqlite",
+    "macros",
+    "uuid",
+    "json",
+    "runtime-tokio",
+    "tls-rustls",
+] }
 surgeflow-types = { version = "0.1.0", path = "../surgeflow_types" }
 thiserror = "2.0.12"
 tracing = "0.1.41"
