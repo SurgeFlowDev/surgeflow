@@ -6,12 +6,7 @@ edition = "2024"
 [dependencies]
 adapter-types = { version = "0.1.0", path = "../adapter_types" }
 async-channel = "2.5.0"
-aws-config = { version = "1.8.3", features = ["behavior-version-latest", "rustls"] }
-aws-credential-types = { version = "1.2.4", features = ["hardcoded-credentials"] }
-aws-sdk-dynamodb = { version = "1.86.0", features = ["behavior-version-latest"] }
-aws-sdk-sqs = { version = "1.78.0", features = ["behavior-version-latest"] }
-aws-types = "1.3.8"
-dashmap = "6.1.0"
+
 derive_more = { version = "2.0.1", features = ["full"] }
 papaya = "0.2.3"
 serde = "1.0.219"
