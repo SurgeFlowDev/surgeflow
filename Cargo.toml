@@ -3,10 +3,8 @@
 [workspace]
 members = [
     "macros",
-    "aws_adapter",
     "adapter_types",
     "surgeflow_types",
-    "examples/hello_world",
     "surgeflow",
     "control_server",
 ]
