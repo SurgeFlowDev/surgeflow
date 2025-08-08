@@ -311,7 +311,7 @@ pub trait Event:
 
 ////////////////////////////////////////////////
 
-#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, Builder)]
 pub struct StepSettings {
     pub max_retries: u32,
     // TODO
