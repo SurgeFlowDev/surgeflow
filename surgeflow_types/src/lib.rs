@@ -345,6 +345,7 @@ pub struct ProjectStepWithSettings<P: Project> {
 
 #[derive(Debug, Deserialize, Serialize, Clone, Builder)]
 pub struct WorkflowStepWithSettings<W: Workflow> {
+    #[builder(into)]
     pub step: W::Step,
     pub settings: StepSettings,
 }
