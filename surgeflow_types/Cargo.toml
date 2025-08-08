@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bon = "3.6.5"
 derive_more = { version = "2.0.1", features = ["full"] }
 schemars = {version = "1.0.4", features = ["uuid1"] }
 serde = { version = "1.0.219", features = ["derive"] }

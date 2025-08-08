@@ -1,3 +1,4 @@
+use bon::Builder;
 use derive_more::{Debug, Display, From, Into};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -342,7 +343,7 @@ pub struct ProjectStepWithSettings<P: Project> {
     pub settings: StepSettings,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Builder)]
 pub struct WorkflowStepWithSettings<W: Workflow> {
     pub step: W::Step,
     pub settings: StepSettings,
