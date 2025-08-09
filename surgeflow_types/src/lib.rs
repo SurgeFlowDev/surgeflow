@@ -1,4 +1,4 @@
-use bon::Builder;
+use bon::{Builder, builder};
 use derive_more::{Debug, Display, From, Into};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -311,7 +311,21 @@ pub trait Event:
 
 ////////////////////////////////////////////////
 
-#[derive(Debug, Deserialize, Serialize, Clone, Copy, Builder)]
+pub type StepResult<S> =
+    Result<Option<WorkflowStepWithSettings<<S as Step>::Workflow>>, <S as Step>::Error>;
+
+#[builder]
+pub fn step_result<S: Step>(
+    #[builder(into)] step: <S::Workflow as Workflow>::Step,
+    max_retries: u32,
+) -> StepResult<S> {
+    Ok(Some(WorkflowStepWithSettings {
+        step,
+        settings: StepSettings { max_retries },
+    }))
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub struct StepSettings {
     pub max_retries: u32,
     // TODO
@@ -343,9 +357,8 @@ pub struct ProjectStepWithSettings<P: Project> {
     pub settings: StepSettings,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, Builder)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct WorkflowStepWithSettings<W: Workflow> {
-    #[builder(into)]
     pub step: W::Step,
     pub settings: StepSettings,
 }
