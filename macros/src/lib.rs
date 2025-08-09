@@ -5,6 +5,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::{
     ImplItem, ImplItemType, ItemImpl, Token, Type, parse_macro_input, punctuated::Punctuated,
 };
+use syn::LitStr;
 
 /// Attribute macro to expand a Workflow impl with step!(...) and event!(...) into
 /// concrete enums `<Name>Step` and `<Name>Event`, and rewrites associated types
@@ -85,6 +86,27 @@ pub fn workflow(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
+    // Generate <Name>StepError with variants A/B wrapping each step's <Step as Step>::Error
+    let step_error_enum_ident = format_ident!("{}StepError", self_ty_ident);
+    let step_error_variants: Vec<TokenStream2> = step_types
+        .iter()
+        .zip(step_letters.iter())
+        .map(|(ty, letter)| {
+            let step_name = step_type_display_name(ty).unwrap_or_else(|| "Step".to_string());
+            let msg = LitStr::new(&format!("{} error: {{0}}", step_name), Span::call_site());
+            quote! {
+                #[error(#msg)]
+                #letter(<#ty as Step>::Error),
+            }
+        })
+        .collect();
+    let step_error_enum: TokenStream2 = quote! {
+        #[derive(thiserror::Error, Debug)]
+        pub enum #step_error_enum_ident {
+            #(#step_error_variants)*
+        }
+    };
+
     // Generate conversions between per-step error types and workflow step error type
     let mut per_step_error_items: Vec<TokenStream2> = Vec::new();
     for (i, ty) in step_types.iter().enumerate() {
@@ -123,6 +145,7 @@ pub fn workflow(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #impl_item
         #step_enum
         #event_enum
+        #step_error_enum
         #(#per_step_error_items)*
     };
 
@@ -187,7 +210,13 @@ impl Parse for TypeList {
     }
 }
 
-// (no longer needed)
+fn step_type_display_name(ty: &Type) -> Option<String> {
+    if let Type::Path(p) = ty {
+        p.path.segments.last().map(|s| s.ident.to_string())
+    } else {
+        None
+    }
+}
 
 struct MaybeParens<T>(T);
 
