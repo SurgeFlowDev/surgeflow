@@ -235,8 +235,8 @@ pub trait WorkflowStep:
     //     >,
     // > + Send;
 
-    fn is_event<T: Event + 'static>(&self) -> bool;
-    fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool;
+    // fn is_event<T: Event + 'static>(&self) -> bool;
+    // fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool;
 }
 
 pub trait WorkflowEvent:
