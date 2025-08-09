@@ -80,11 +80,11 @@ pub trait ProjectStep:
     type Project: Project<Step = Self>;
     type Error: Error + Send + Sync + 'static;
 
-    fn is_event<T: Event + 'static>(&self) -> bool;
-    fn is_project_event(
-        &self,
-        event: &<Self::Project as Project>::Event,
-    ) -> Result<bool, SurgeflowProjectStepError<Self::Error>>;
+    // fn is_event<T: Event + 'static>(&self) -> bool;
+    // fn is_project_event(
+    //     &self,
+    //     event: &<Self::Project as Project>::Event,
+    // ) -> Result<bool, SurgeflowProjectStepError<Self::Error>>;
     fn run(
         &self,
         wf: <Self::Project as Project>::Workflow,
