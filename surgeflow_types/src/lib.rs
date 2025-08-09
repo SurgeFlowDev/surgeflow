@@ -303,6 +303,9 @@ pub trait Step<W: Workflow>:
     fn value_has_event<T: Event + 'static>(&self) -> bool {
         Self::has_event::<T>()
     }
+    fn value_has_event_value<T: Event + 'static>(&self, _: &T) -> bool {
+        self.value_has_event::<T>()
+    }
 }
 
 pub trait Event:
