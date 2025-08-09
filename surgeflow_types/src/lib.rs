@@ -251,9 +251,10 @@ pub trait WorkflowEvent:
     + From<Immediate>
     + TryInto<Immediate>
     + JsonSchema
+    + Event
 {
     type Workflow: Workflow<Event = Self>;
-    fn is_event<T: Event + 'static>(&self) -> bool;
+    // fn is_event<T: Event + 'static>(&self) -> bool;
 }
 
 pub trait TryFromRef<T: ?Sized> {
