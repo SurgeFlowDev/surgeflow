@@ -9,9 +9,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::routing::TypedPath;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use surgeflow_types::{
-    InstanceEvent, Project, ProjectWorkflow, Workflow, WorkflowInstance, WorkflowInstanceId,
-};
+use surgeflow_types::{__Workflow, InstanceEvent, Project, WorkflowInstance, WorkflowInstanceId};
 
 pub struct AppState<P: Project, E: EventSender<P>, I: NewInstanceSender<P>> {
     pub dependencies: ControlServerDependencies<P, E, I>,
@@ -42,12 +40,11 @@ pub async fn init_app_state<
         _marker: PhantomData,
     })))
 }
-pub trait WorkflowControl: Workflow {
+pub trait WorkflowControl<P: Project>: __Workflow<P> {
     fn control_router<
-        E: EventSender<Self::Project> + Send + Sync + 'static,
-        N: NewInstanceSender<Self::Project> + Send + Sync + 'static,
-    >() -> impl Future<Output = anyhow::Result<ApiRouter<ArcAppState<Self::Project, E, N>>>> + Send
-    {
+        E: EventSender<P> + Send + Sync + 'static,
+        N: NewInstanceSender<P> + Send + Sync + 'static,
+    >() -> impl Future<Output = anyhow::Result<ApiRouter<ArcAppState<P, E, N>>>> + Send {
         async {
             let post_workflow_event_api_route = Self::post_workflow_event_api_route::<E, N>();
             let post_workflow_instance_api_route = Self::post_workflow_instance_api_route::<E, N>();
@@ -63,9 +60,9 @@ pub trait WorkflowControl: Workflow {
     }
 
     fn post_workflow_event_api_route<
-        E: EventSender<Self::Project> + Send + Sync + 'static,
-        N: NewInstanceSender<Self::Project> + Send + Sync + 'static,
-    >() -> ApiRouter<ArcAppState<Self::Project, E, N>> {
+        E: EventSender<P> + Send + Sync + 'static,
+        N: NewInstanceSender<P> + Send + Sync + 'static,
+    >() -> ApiRouter<ArcAppState<P, E, N>> {
         #[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
         #[typed_path("/{instance_id}/event")]
         pub struct PostWorkflowEvent {
@@ -90,12 +87,13 @@ pub trait WorkflowControl: Workflow {
 
         // more readable than a closure
         async fn handler<
-            T: Workflow,
-            E: EventSender<T::Project>,
-            N: NewInstanceSender<T::Project>,
+            P: Project,
+            T: __Workflow<P>,
+            E: EventSender<P>,
+            N: NewInstanceSender<P>,
         >(
             PostWorkflowEvent { instance_id }: PostWorkflowEvent,
-            State(ArcAppState(state)): State<ArcAppState<T::Project, E, N>>,
+            State(ArcAppState(state)): State<ArcAppState<P, E, N>>,
             Json(event): Json<T::Event>,
         ) -> Result<(), PostWorkflowEventError> {
             state
@@ -110,7 +108,7 @@ pub trait WorkflowControl: Workflow {
             Ok(())
         }
 
-        ApiRouter::new().typed_post_with(handler::<Self, _, _>, |op| {
+        ApiRouter::new().typed_post_with(handler::<P, Self, _, _>, |op| {
             op.description("Send event")
                 .summary("Send event")
                 .id("post-event")
@@ -120,9 +118,9 @@ pub trait WorkflowControl: Workflow {
     }
 
     fn post_workflow_instance_api_route<
-        E: EventSender<Self::Project> + Send + Sync + 'static,
-        N: NewInstanceSender<Self::Project> + Send + Sync + 'static,
-    >() -> ApiRouter<ArcAppState<Self::Project, E, N>> {
+        E: EventSender<P> + Send + Sync + 'static,
+        N: NewInstanceSender<P> + Send + Sync + 'static,
+    >() -> ApiRouter<ArcAppState<P, E, N>> {
         #[derive(TypedPath, Deserialize, JsonSchema, OperationIo)]
         #[typed_path("/")]
         pub struct PostWorkflowInstance;
@@ -145,12 +143,13 @@ pub trait WorkflowControl: Workflow {
 
         // more readable than a closure
         async fn handler<
-            T: Workflow,
-            E: EventSender<T::Project>,
-            N: NewInstanceSender<T::Project>,
+            P: Project,
+            T: __Workflow<P>,
+            E: EventSender<P>,
+            N: NewInstanceSender<P>,
         >(
             _: PostWorkflowInstance,
-            State(ArcAppState(state)): State<ArcAppState<T::Project, E, N>>,
+            State(ArcAppState(state)): State<ArcAppState<P, E, N>>,
         ) -> Result<Json<WorkflowInstanceId>, PostWorkflowInstanceError> {
             tracing::debug!("creating instance...");
             let external_id = WorkflowInstanceId::new();
@@ -158,15 +157,16 @@ pub trait WorkflowControl: Workflow {
                 .dependencies
                 .new_instance_sender
                 .send(WorkflowInstance {
+                    workflow: P::workflow::<T>(),
                     external_id,
-                    workflow_name: T::NAME.into(),
+                    // workflow_name: T::NAME.into(),
                 })
                 .await
                 .map_err(|_| PostWorkflowInstanceError::CouldntCreateInstance)?;
 
             Ok(Json(external_id))
         }
-        ApiRouter::new().typed_post_with(handler::<Self, _, _>, |op| {
+        ApiRouter::new().typed_post_with(handler::<P, Self, _, _>, |op| {
             op.description("Create instance")
                 .summary("Create instance")
                 .id("post-workflow-instance")
@@ -176,15 +176,11 @@ pub trait WorkflowControl: Workflow {
     }
 }
 
-impl<T: Workflow> WorkflowControl for T {}
+impl<P: Project, T: __Workflow<P>> WorkflowControl<P> for T {}
 
-pub trait ProjectWorkflowControl: ProjectWorkflow {
-    fn control_router<
-        NewEventSenderT: EventSender<Self::Project>,
-        NewInstanceSenderT: NewInstanceSender<Self::Project>,
-    >() -> impl Future<
-        Output = anyhow::Result<
-            ApiRouter<ArcAppState<Self::Project, NewEventSenderT, NewInstanceSenderT>>,
-        >,
+pub trait ProjectWorkflowControl<P: Project>: __Workflow<P> {
+    fn control_router<NewEventSenderT: EventSender<P>, NewInstanceSenderT: NewInstanceSender<P>>()
+    -> impl Future<
+        Output = anyhow::Result<ApiRouter<ArcAppState<P, NewEventSenderT, NewInstanceSenderT>>>,
     > + Send;
 }

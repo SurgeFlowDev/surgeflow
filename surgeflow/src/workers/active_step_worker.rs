@@ -1,3 +1,5 @@
+use std::convert;
+
 use adapter_types::{
     dependencies::active_step_worker::ActiveStepWorkerDependencies,
     managers::PersistenceManager,
@@ -5,7 +7,7 @@ use adapter_types::{
     senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
 };
 use anyhow::Context;
-use surgeflow_types::{FullyQualifiedStep, Immediate, Project, ProjectStep};
+use surgeflow_types::{__Step, __Workflow, FullyQualifiedStep, Immediate, Project};
 
 async fn process<
     P,
@@ -34,11 +36,12 @@ where
         .await
         .context("TODO: handle error")?;
 
-    let next_step = step
-        .step
-        .step
-        .run(wf.clone(), step.event.clone().unwrap_or(Immediate.into()))
-        .await;
+    let event = step
+        .event
+        .clone()
+        .unwrap_or(<P::Workflow as __Workflow<P>>::Event::from(Immediate).into());
+
+    let next_step = step.step.step.run(wf.clone(), event).await;
     step.retry_count += 1;
     if let Ok(next_step) = next_step {
         completed_step_sender

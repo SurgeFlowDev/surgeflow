@@ -73,7 +73,7 @@ pub trait NewInstanceReceiver<P: Project>: Sized + Send + 'static + Clone {
     type Handle: Send + Sync + 'static;
     fn receive(
         &mut self,
-    ) -> impl Future<Output = Result<(WorkflowInstance, Self::Handle), Self::Error>> + Send;
+    ) -> impl Future<Output = Result<(WorkflowInstance<P>, Self::Handle), Self::Error>> + Send;
     fn accept(
         &mut self,
         handle: Self::Handle,
@@ -85,7 +85,7 @@ pub trait CompletedInstanceReceiver<P: Project>: Sized + Send + 'static + Clone 
     type Handle: Send + Sync + 'static;
     fn receive(
         &mut self,
-    ) -> impl Future<Output = Result<(WorkflowInstance, Self::Handle), Self::Error>> + Send;
+    ) -> impl Future<Output = Result<(WorkflowInstance<P>, Self::Handle), Self::Error>> + Send;
     fn accept(
         &mut self,
         handle: Self::Handle,
@@ -97,7 +97,7 @@ pub trait FailedInstanceReceiver<P: Project>: Sized + Send + 'static + Clone {
     type Handle: Send + Sync + 'static;
     fn receive(
         &mut self,
-    ) -> impl Future<Output = Result<(WorkflowInstance, Self::Handle), Self::Error>> + Send;
+    ) -> impl Future<Output = Result<(WorkflowInstance<P>, Self::Handle), Self::Error>> + Send;
     fn accept(
         &mut self,
         handle: Self::Handle,

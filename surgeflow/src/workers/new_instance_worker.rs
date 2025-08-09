@@ -2,19 +2,21 @@ use adapter_types::{
     dependencies::new_instance_worker::NewInstanceWorkerDependencies, managers::PersistenceManager,
     receivers::NewInstanceReceiver, senders::NextStepSender,
 };
-use surgeflow_types::{FullyQualifiedStep, Project, ProjectWorkflow, StepId, WorkflowInstance};
+use surgeflow_types::__Workflow;
+use surgeflow_types::{FullyQualifiedStep, Project, StepId, WorkflowInstance};
 
 async fn process<P, NextStepSenderT, PersistenceManagerT>(
     next_step_sender: &mut NextStepSenderT,
     persistence_manager: &mut PersistenceManagerT,
-    instance: WorkflowInstance,
+    instance: WorkflowInstance<P>,
 ) -> anyhow::Result<()>
 where
     P: Project,
     NextStepSenderT: NextStepSender<P>,
     PersistenceManagerT: PersistenceManager<P>,
 {
-    let workflow_name = instance.workflow_name.clone();
+    let entrypoint = instance.workflow.entrypoint();
+
     persistence_manager
         .insert_instance(instance.clone())
         .await
@@ -22,7 +24,7 @@ where
 
     let entrypoint = FullyQualifiedStep {
         instance,
-        step: <<P as Project>::Workflow as ProjectWorkflow>::entrypoint(workflow_name),
+        step: entrypoint,
         retry_count: 0,
         step_id: StepId::new(),
         event: None,

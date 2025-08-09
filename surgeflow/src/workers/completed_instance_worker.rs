@@ -4,7 +4,7 @@ use adapter_types::{
 };
 use surgeflow_types::{Project, WorkflowInstance};
 
-async fn process(instance: WorkflowInstance) -> anyhow::Result<()> {
+async fn process<P: Project>(instance: WorkflowInstance<P>) -> anyhow::Result<()> {
     tracing::debug!("Completed instance: {:?}", instance);
 
     Ok(())

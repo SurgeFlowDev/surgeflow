@@ -49,7 +49,7 @@ mod persistence_manager {
 
         fn insert_instance(
             &self,
-            workflow_instance: WorkflowInstance,
+            workflow_instance: WorkflowInstance<P>,
         ) -> impl Future<Output = Result<WorkflowInstanceId, Self::Error>> + Send;
     }
 }

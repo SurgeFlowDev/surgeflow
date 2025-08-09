@@ -16,9 +16,9 @@ compile_error!(
 pub mod workers;
 pub use adapter_types::*;
 pub use control_server::*;
+pub use macros::*;
 pub use main_handler::main_handler;
 pub use surgeflow_types::*;
-pub use macros::*;
 
 #[cfg(any(
     feature = "active_step_worker",
@@ -52,7 +52,7 @@ mod main_handler {
     ) -> anyhow::Result<()>
     where
         D: DependencyManager<P>,
-        P::Workflow: ProjectWorkflowControl,
+        P::Workflow: ProjectWorkflowControl<P>,
     {
         try_join!(
             #[cfg(feature = "control_server")]

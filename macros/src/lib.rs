@@ -1,11 +1,11 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span, TokenStream as TokenStream2};
 use quote::{format_ident, quote};
+use syn::LitStr;
 use syn::parse::{Parse, ParseStream};
 use syn::{
     ImplItem, ImplItemType, ItemImpl, Token, Type, parse_macro_input, punctuated::Punctuated,
 };
-use syn::LitStr;
 
 /// Attribute macro to expand a Workflow impl with step!(...) and event!(...) into
 /// concrete enums `<Name>Step` and `<Name>Event`, and rewrites associated types

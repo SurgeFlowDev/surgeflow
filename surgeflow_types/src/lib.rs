@@ -4,7 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::any::TypeId;
 use std::error::Error;
-use std::fmt;
+use std::fmt::{self};
 use uuid::Uuid;
 
 #[derive(
@@ -67,72 +67,115 @@ pub struct WorkflowId(i32);
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait Project: Sized + Send + Sync + 'static + Clone {
-    type Step: ProjectStep<Project = Self>;
-    type Event: ProjectEvent<Project = Self>;
-    type Workflow: ProjectWorkflow<Project = Self>;
+    type Step: __Step<Self, Self::Workflow, Event = Self::Event, Error = Self::Error>;
+    type Event: __Event<Self, Self::Workflow> + From<<Self::Workflow as __Workflow<Self>>::Event>;
+    type Workflow: __Workflow<Self, Error = Self::Error>
+        + Serialize
+        + for<'de> Deserialize<'de>
+        + JsonSchema
+        + fmt::Debug;
+    type Error: std::error::Error + Send + Sync + 'static;
 
     fn workflow_for_step(&self, step: &Self::Step) -> Self::Workflow;
+
+    /// Given any workflow type, return the corresponding Project level workflow
+    fn workflow<T: __Workflow<Self>>() -> Self::Workflow;
 }
 
-pub trait ProjectStep:
-    fmt::Debug + Sized + Send + Sync + 'static + Clone + Serialize + for<'de> Deserialize<'de>
-{
-    type Project: Project<Step = Self>;
-    type Error: Error + Send + Sync + 'static;
+// pub trait ProjectStep:
+//     fmt::Debug
+//     + Sized
+//     + Send
+//     + Sync
+//     + 'static
+//     + Clone
+//     + Serialize
+//     + for<'de> Deserialize<'de>
+//     + WorkflowStep<Workflow = Self::Project, Error = <Self as ProjectStep>::Error>
+// {
+//     type Project: Project<Step = Self>;
+//     type Error: Error + Send + Sync + 'static;
 
-    // fn is_event<T: Event + 'static>(&self) -> bool;
-    // fn is_project_event(
-    //     &self,
-    //     event: &<Self::Project as Project>::Event,
-    // ) -> Result<bool, SurgeflowProjectStepError<Self::Error>>;
-    fn run(
-        &self,
-        wf: <Self::Project as Project>::Workflow,
-        event: <Self::Project as Project>::Event,
-    ) -> impl std::future::Future<
-        Output = Result<
-            Option<ProjectStepWithSettings<Self::Project>>,
-            SurgeflowProjectStepError<Self::Error>,
-        >,
-    > + Send;
-}
-pub trait ProjectEvent:
-    Sized
-    + fmt::Debug
-    + Send
-    + Sync
-    + 'static
-    + Clone
-    + Serialize
-    + for<'de> Deserialize<'de>
-    + From<Immediate>
-    + TryInto<Immediate>
-{
-    type Project: Project<Event = Self>;
-}
-pub trait ProjectWorkflow: Sized + Send + Sync + 'static + Clone {
-    type Project: Project<Workflow = Self>;
+//     // fn is_event<T: Event + 'static>(&self) -> bool;
+//     // fn is_project_event(
+//     //     &self,
+//     //     event: &<Self::Project as Project>::Event,
+//     // ) -> Result<bool, SurgeflowProjectStepError<Self::Error>>;
+//     fn run(
+//         &self,
+//         wf: <Self::Project as Project>::Workflow,
+//         event: <Self::Project as Project>::Event,
+//     ) -> impl std::future::Future<
+//         Output = Result<
+//             Option<ProjectStepWithSettings<Self::Project>>,
+//             SurgeflowProjectStepError<Self::Error>,
+//         >,
+//     > + Send;
+// }
+// pub trait ProjectEvent:
+//     Sized
+//     + fmt::Debug
+//     + Send
+//     + Sync
+//     + 'static
+//     + Clone
+//     + Serialize
+//     + for<'de> Deserialize<'de>
+//     + From<Immediate>
+//     + TryInto<Immediate>
+//     + Event
+// {
+//     type Project: Project<Event = Self>;
+// }
+// pub trait ProjectWorkflow: Sized + Send + Sync + 'static + Clone + Workflow<Self, E {
+//     type Project: Project<Workflow = Self>;
 
-    // TODO: this should be based on some sort of enum, not WorkflowName
-    fn entrypoint(workflow_name: WorkflowName) -> ProjectStepWithSettings<Self::Project>;
-}
+//     // TODO: this should be based on some sort of enum, not WorkflowName
+//     fn entrypoint(workflow_name: WorkflowName) -> ProjectStepWithSettings<Self::Project>;
+// }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait Workflow:
-    Clone
-    + Send
-    + Sync
-    + 'static
-    + Into<<Self::Project as Project>::Workflow>
-    + TryFrom<<Self::Project as Project>::Workflow>
+pub trait Workflow<P: Project>:
+    __Workflow<
+        P,
+        Event = <Self as Workflow<P>>::Event,
+        Step = <Self as Workflow<P>>::Step,
+        Error = <Self as Workflow<P>>::Error,
+    >
 {
-    type Project: Project;
-    type Event: WorkflowEvent<Workflow = Self>;
-    type Step: WorkflowStep<Workflow = Self>;
+    type Event: Event<P, Self>
+        + From<<<Self as Workflow<P>>::Step as __Step<P, Self>>::Event>
+        + Into<P::Event>
+        + From<Immediate>;
+    type Step: __Step<P, Self, Event = <Self as Workflow<P>>::Event, Error = <Self as Workflow<P>>::Error>;
+    type Error: Error + Send + Sync + 'static;
+    const NAME: &'static str;
+    fn entrypoint() -> StepWithSettings<P>;
+}
+
+impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
+    type Event = <W as Workflow<P>>::Event;
+    type Step = <W as Workflow<P>>::Step;
+    type Error = <W as Workflow<P>>::Error;
+    const NAME: &'static str = <W as Workflow<P>>::NAME;
+    fn entrypoint(&self) -> StepWithSettings<P> {
+        <W as Workflow<P>>::entrypoint()
+    }
+}
+
+pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
+    // type Project: Project;
+    type Event: __Event<P, Self>
+        + From<<Self::Step as __Step<P, Self>>::Event>
+        + Into<P::Event>
+        + From<Immediate>;
+    type Step: __Step<P, Self, Event = Self::Event, Error = Self::Error>;
+    type Error: std::error::Error + Send + Sync + 'static;
     const NAME: &'static str;
 
-    fn entrypoint() -> WorkflowStepWithSettings<Self>;
+    // TODO: make an entrypoint without &self on a new BareWorkflow trait
+    fn entrypoint(&self) -> StepWithSettings<P>;
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -199,63 +242,63 @@ pub struct ConvertingProjectWorkflowToWorkflowError;
 #[error("converting project event to workflow event failed")]
 pub struct ConvertingProjectEventToWorkflowEventError;
 
-pub trait WorkflowStep:
-    Sync
-    + Serialize
-    + for<'de> Deserialize<'de>
-    + Clone
-    + Send
-    + fmt::Debug
-    + Into<<<Self::Workflow as Workflow>::Project as Project>::Step>
-    + TryFrom<<<Self::Workflow as Workflow>::Project as Project>::Step>
-    + Step<
-        Self::Workflow,
-        Event = <Self::Workflow as Workflow>::Event,
-        Error = <Self as WorkflowStep>::Error,
-    >
-{
-    type Workflow: Workflow<Step = Self>;
-    type Error: Error
-        + Send
-        + Sync
-        + 'static
-        // TODO: creating a ProjectStepError/WorkflowStepError/StepError trait would make this cleaner
-        // but this would come at the expense of users getting less clear error messaages when implementing these traits
-        + TryFrom<<<<Self::Workflow as Workflow>::Project as Project>::Step as ProjectStep>::Error>
-        + Into<<<<Self::Workflow as Workflow>::Project as Project>::Step as ProjectStep>::Error>;
+// pub trait WorkflowStep:
+//     Sync
+//     + Serialize
+//     + for<'de> Deserialize<'de>
+//     + Clone
+//     + Send
+//     + fmt::Debug
+//     + Into<<<Self::Workflow as Workflow>::Project as Project>::Step>
+//     + TryFrom<<<Self::Workflow as Workflow>::Project as Project>::Step>
+//     + Step<
+//         Self::Workflow,
+//         Event = <Self::Workflow as Workflow>::Event,
+//         Error = <Self as WorkflowStep>::Error,
+//     >
+// {
+//     type Workflow: Workflow<Step = Self>;
+//     type Error: Error
+//         + Send
+//         + Sync
+//         + 'static
+//         // TODO: creating a ProjectStepError/WorkflowStepError/StepError trait would make this cleaner
+//         // but this would come at the expense of users getting less clear error messaages when implementing these traits
+//         + TryFrom<<<<Self::Workflow as Workflow>::Project as Project>::Step as ProjectStep>::Error>
+//         + Into<<<<Self::Workflow as Workflow>::Project as Project>::Step as ProjectStep>::Error>;
 
-    // fn run(
-    //     &self,
-    //     wf: Self::Workflow,
-    //     event: <Self::Workflow as Workflow>::Event,
-    // ) -> impl std::future::Future<
-    //     Output = Result<
-    //         Option<WorkflowStepWithSettings<Self::Workflow>>,
-    //         SurgeflowWorkflowStepError<<Self as WorkflowStep>::Error>,
-    //     >,
-    // > + Send;
+//     // fn run(
+//     //     &self,
+//     //     wf: Self::Workflow,
+//     //     event: <Self::Workflow as Workflow>::Event,
+//     // ) -> impl std::future::Future<
+//     //     Output = Result<
+//     //         Option<WorkflowStepWithSettings<Self::Workflow>>,
+//     //         SurgeflowWorkflowStepError<<Self as WorkflowStep>::Error>,
+//     //     >,
+//     // > + Send;
 
-    // fn is_event<T: Event + 'static>(&self) -> bool;
-    // fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool;
-}
+//     // fn is_event<T: Event + 'static>(&self) -> bool;
+//     // fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool;
+// }
 
-pub trait WorkflowEvent:
-    Serialize
-    + for<'de> Deserialize<'de>
-    + fmt::Debug
-    + Send
-    + Clone
-    + Into<<<Self::Workflow as Workflow>::Project as Project>::Event>
-    + TryFrom<<<Self::Workflow as Workflow>::Project as Project>::Event>
-    + TryFromRef<<<Self::Workflow as Workflow>::Project as Project>::Event>
-    + From<Immediate>
-    + TryInto<Immediate>
-    + JsonSchema
-    + Event
-{
-    type Workflow: Workflow<Event = Self>;
-    // fn is_event<T: Event + 'static>(&self) -> bool;
-}
+// pub trait WorkflowEvent:
+//     Serialize
+//     + for<'de> Deserialize<'de>
+//     + fmt::Debug
+//     + Send
+//     + Clone
+//     + Into<<<Self::Workflow as Workflow>::Project as Project>::Event>
+//     + TryFrom<<<Self::Workflow as Workflow>::Project as Project>::Event>
+//     + TryFromRef<<<Self::Workflow as Workflow>::Project as Project>::Event>
+//     + From<Immediate>
+//     + TryInto<Immediate>
+//     + JsonSchema
+//     + Event
+// {
+//     type Workflow: Workflow<Event = Self>;
+//     // fn is_event<T: Event + 'static>(&self) -> bool;
+// }
 
 pub trait TryFromRef<T: ?Sized> {
     type Error;
@@ -277,61 +320,82 @@ impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
 
 //////////////////////////////////
 
-pub trait Step<W: Workflow>:
-    Serialize + for<'a> Deserialize<'a> + fmt::Debug + Into<W::Step> + TryFrom<W::Step> + Send + Clone
+pub trait Step<P: Project, W: Workflow<P>>:
+    __Step<P, W, Event = <Self as Step<P, W>>::Event, Error = <Self as Step<P, W>>::Error>
 {
-    type Event: Event + 'static;
-    type Error: Error
-        + Send
-        + Sync
-        + 'static
-        // TODO: creating a ProjectStepError/WorkflowStepError/StepError trait would make this cleaner
-        // but this would come at the expense of users getting less clear error messaages when implementing these traits
-        + TryFrom<<W::Step as WorkflowStep>::Error>
-        + Into<<W::Step as WorkflowStep>::Error>;
+    type Event: Event<P, W> + 'static;
+    type Error: Error + Send + Sync + 'static;
+
+    fn run(
+        &self,
+        wf: W,
+        event: <Self as Step<P, W>>::Event,
+    ) -> impl std::future::Future<
+        Output = Result<Option<StepWithSettings<P>>, <Self as Step<P, W>>::Error>,
+    > + Send;
+    fn value_has_event_value<T: Event<P, W> + 'static>(&self, e: &T) -> bool {
+        e.value_is::<<Self as Step<P, W>>::Event>()
+    }
+}
+impl<P: Project, W: Workflow<P>, S: Step<P, W>> __Step<P, W> for S {
+    type Event = <S as Step<P, W>>::Event;
+    type Error = <S as Step<P, W>>::Error;
 
     fn run(
         &self,
         wf: W,
         event: Self::Event,
     ) -> impl std::future::Future<
-        Output = Result<Option<WorkflowStepWithSettings<W>>, <Self as Step<W>>::Error>,
-    > + Send;
+        Output = Result<Option<StepWithSettings<P>>, <Self as __Step<P, W>>::Error>,
+    > + Send {
+        async move { Step::run(self, wf, event).await }
+    }
+}
 
-    // fn has_event<T: Event + 'static>() -> bool {
-    //     T::is::<Self::Event>()
-    // }
-    // fn value_has_event<T: Event + 'static>(&self) -> bool {
-    //     Self::value_is::<T>()
-    // }
-    fn value_has_event_value<T: Event + 'static>(&self, e: &T) -> bool {
+pub trait __Step<P: Project, W: __Workflow<P>>:
+    Serialize + for<'a> Deserialize<'a> + fmt::Debug + Send + Clone
+    // TODO: is this needed?
+    + Sync
+{
+    type Event: __Event<P, W> + 'static;
+    type Error: Error + Send + Sync + 'static;
+
+    fn run(
+        &self,
+        wf: W,
+        event: Self::Event,
+    ) -> impl std::future::Future<
+        Output = Result<Option<StepWithSettings<P>>, <Self as __Step<P, W>>::Error>,
+    > + Send;
+    fn value_has_event_value<T: __Event<P, W> + 'static>(&self, e: &T) -> bool {
         e.value_is::<Self::Event>()
     }
 }
 
-pub trait Event:
+pub trait __Event<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static
 {
-    fn value_is<T: Event + 'static>(&self) -> bool;
+    fn value_is<T: __Event<P, W> + 'static>(&self) -> bool;
 }
 
-pub trait BareEvent: Event {}
-impl<E: BareEvent> Event for E {
-    fn value_is<T: Event + 'static>(&self) -> bool {
+pub trait Event<P: Project, W: __Workflow<P>>: __Event<P, W> {}
+
+impl<E: Event<P, W>, P: Project, W: __Workflow<P>> __Event<P, W> for E {
+    fn value_is<T: __Event<P, W> + 'static>(&self) -> bool {
         TypeId::of::<Self>() == TypeId::of::<T>()
     }
 }
 
 ////////////////////////////////////////////////
 
-pub type StepResult<W, S> = Result<Option<WorkflowStepWithSettings<W>>, <S as Step<W>>::Error>;
+pub type StepResult<P, W, S> = Result<Option<StepWithSettings<P>>, <S as __Step<P, W>>::Error>;
 
 #[builder]
-pub fn next_step<W: Workflow>(
-    #[builder(into, start_fn)] step: W::Step,
+pub fn next_step<P: Project>(
+    #[builder(into, start_fn)] step: P::Step,
     max_retries: u32,
-) -> WorkflowStepWithSettings<W> {
-    WorkflowStepWithSettings {
+) -> StepWithSettings<P> {
+    StepWithSettings {
         step,
         settings: StepSettings { max_retries },
     }
@@ -349,10 +413,10 @@ pub struct StepSettings {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FullyQualifiedStep<P: Project> {
     // TODO: should probably just be a WorkflowInstanceId
-    pub instance: WorkflowInstance,
+    pub instance: WorkflowInstance<P>,
     pub step_id: StepId,
     #[serde(bound = "")]
-    pub step: ProjectStepWithSettings<P>,
+    pub step: StepWithSettings<P>,
 
     /// Eventful steps can be initialized without an event, but it will be set when the step is triggered.
     pub event: Option<P::Event>,
@@ -360,29 +424,15 @@ pub struct FullyQualifiedStep<P: Project> {
 
     pub previous_step_id: Option<StepId>,
     #[serde(bound = "")]
-    pub next_step: Option<ProjectStepWithSettings<P>>,
+    pub next_step: Option<StepWithSettings<P>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ProjectStepWithSettings<P: Project> {
+pub struct StepWithSettings<P: Project> {
     pub step: P::Step,
     pub settings: StepSettings,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct WorkflowStepWithSettings<W: Workflow> {
-    pub step: W::Step,
-    pub settings: StepSettings,
-}
-
-impl<W: Workflow> From<WorkflowStepWithSettings<W>> for ProjectStepWithSettings<W::Project> {
-    fn from(value: WorkflowStepWithSettings<W>) -> Self {
-        ProjectStepWithSettings {
-            step: value.step.into(),
-            settings: value.settings,
-        }
-    }
-}
 // TODO: implement the inverse TryFrom?
 
 ////////////////////////////////////////
@@ -390,7 +440,7 @@ impl<W: Workflow> From<WorkflowStepWithSettings<W>> for ProjectStepWithSettings<
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, JsonSchema)]
 pub struct Immediate;
 
-impl BareEvent for Immediate {}
+impl<P: Project, W: __Workflow<P>> Event<P, W> for Immediate {}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InstanceEvent<P: Project> {
@@ -400,9 +450,10 @@ pub struct InstanceEvent<P: Project> {
 }
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
-pub struct WorkflowInstance {
+pub struct WorkflowInstance<P: Project> {
     pub external_id: WorkflowInstanceId,
-    pub workflow_name: WorkflowName,
+    // pub workflow_name: WorkflowName,
+    pub workflow: P::Workflow,
 }
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone, From, Into, PartialEq, Eq)]
 #[serde(transparent)]

@@ -18,7 +18,7 @@ pub async fn main<P, EventSenderT, NewInstanceSenderT>(
     dependencies: ControlServerDependencies<P, EventSenderT, NewInstanceSenderT>,
 ) -> anyhow::Result<()>
 where
-    P::Workflow: ProjectWorkflowControl,
+    P::Workflow: ProjectWorkflowControl<P>,
     P: Project,
     EventSenderT: EventSender<P> + std::marker::Send + std::marker::Sync + 'static,
     NewInstanceSenderT: NewInstanceSender<P> + std::marker::Send + std::marker::Sync + 'static,
