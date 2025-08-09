@@ -311,13 +311,14 @@ pub trait Event:
 
 ////////////////////////////////////////////////
 
-pub type StepResult<W, S> = Result<Option<WorkflowStepWithSettings<W>>, <S as Step>::Error>;
+pub type StepResult<S> =
+    Result<Option<WorkflowStepWithSettings<<S as Step>::Workflow>>, <S as Step>::Error>;
 
 #[builder]
 pub fn step_result<W: Workflow, S: Step<Workflow = W>>(
     #[builder(into, start_fn)] step: W::Step,
     max_retries: u32,
-) -> StepResult<W, S> {
+) -> StepResult<S> {
     Ok(Some(WorkflowStepWithSettings {
         step,
         settings: StepSettings { max_retries },
