@@ -314,7 +314,7 @@ pub trait Event:
 pub type StepResult<S> = Result<Option<WorkflowStepWithSettings<<S as Step>::Workflow>>, <S as Step>::Error>;
 
 #[builder]
-pub fn step<W: Workflow>(
+pub fn next_step<W: Workflow>(
     #[builder(into, start_fn)] step: W::Step,
     max_retries: u32,
 ) -> WorkflowStepWithSettings<W> {
