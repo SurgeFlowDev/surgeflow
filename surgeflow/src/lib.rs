@@ -18,6 +18,7 @@ pub use adapter_types::*;
 pub use control_server::*;
 pub use main_handler::main_handler;
 pub use surgeflow_types::*;
+pub use macros::*;
 
 #[cfg(any(
     feature = "active_step_worker",
