@@ -307,6 +307,10 @@ pub trait Event:
     fn is<T: Event + 'static>() -> bool {
         TypeId::of::<Self>() == TypeId::of::<T>()
     }
+    // move to extension trait so it can't be overridden
+    fn value_is<T: Event + 'static>(&self) -> bool {
+        Self::is::<T>()
+    }
 }
 
 ////////////////////////////////////////////////
