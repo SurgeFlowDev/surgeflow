@@ -298,6 +298,13 @@ pub trait Step:
     ) -> impl std::future::Future<
         Output = Result<Option<WorkflowStepWithSettings<Self::Workflow>>, <Self as Step>::Error>,
     > + Send;
+
+    fn has_event<T: Event + 'static>() -> bool {
+        T::is::<Self::Event>()
+    }
+    fn value_has_event<T: Event + 'static>(&self) -> bool {
+        Self::has_event::<T>()
+    }
 }
 
 pub trait Event:
@@ -307,15 +314,12 @@ pub trait Event:
     fn is<T: Event + 'static>() -> bool {
         TypeId::of::<Self>() == TypeId::of::<T>()
     }
-    // move to extension trait so it can't be overridden
-    fn value_is<T: Event + 'static>(&self) -> bool {
-        Self::is::<T>()
-    }
 }
 
 ////////////////////////////////////////////////
 
-pub type StepResult<S> = Result<Option<WorkflowStepWithSettings<<S as Step>::Workflow>>, <S as Step>::Error>;
+pub type StepResult<S> =
+    Result<Option<WorkflowStepWithSettings<<S as Step>::Workflow>>, <S as Step>::Error>;
 
 #[builder]
 pub fn next_step<W: Workflow>(
