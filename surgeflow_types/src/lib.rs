@@ -1,4 +1,4 @@
-use bon::{Builder, builder};
+use bon::builder;
 use derive_more::{Debug, Display, From, Into};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -208,6 +208,11 @@ pub trait WorkflowStep:
     + fmt::Debug
     + Into<<<Self::Workflow as Workflow>::Project as Project>::Step>
     + TryFrom<<<Self::Workflow as Workflow>::Project as Project>::Step>
+    + Step<
+        Self::Workflow,
+        Event = <Self::Workflow as Workflow>::Event,
+        Error = <Self as WorkflowStep>::Error,
+    >
 {
     type Workflow: Workflow<Step = Self>;
     type Error: Error
@@ -219,16 +224,16 @@ pub trait WorkflowStep:
         + TryFrom<<<<Self::Workflow as Workflow>::Project as Project>::Step as ProjectStep>::Error>
         + Into<<<<Self::Workflow as Workflow>::Project as Project>::Step as ProjectStep>::Error>;
 
-    fn run(
-        &self,
-        wf: Self::Workflow,
-        event: <Self::Workflow as Workflow>::Event,
-    ) -> impl std::future::Future<
-        Output = Result<
-            Option<WorkflowStepWithSettings<Self::Workflow>>,
-            SurgeflowWorkflowStepError<<Self as WorkflowStep>::Error>,
-        >,
-    > + Send;
+    // fn run(
+    //     &self,
+    //     wf: Self::Workflow,
+    //     event: <Self::Workflow as Workflow>::Event,
+    // ) -> impl std::future::Future<
+    //     Output = Result<
+    //         Option<WorkflowStepWithSettings<Self::Workflow>>,
+    //         SurgeflowWorkflowStepError<<Self as WorkflowStep>::Error>,
+    //     >,
+    // > + Send;
 
     fn is_event<T: Event + 'static>(&self) -> bool;
     fn is_workflow_event(&self, event: &<Self::Workflow as Workflow>::Event) -> bool;
@@ -271,32 +276,25 @@ impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
 
 //////////////////////////////////
 
-pub trait Step:
-    Serialize
-    + for<'a> Deserialize<'a>
-    + fmt::Debug
-    + Into<<Self::Workflow as Workflow>::Step>
-    + TryFrom<<Self::Workflow as Workflow>::Step>
-    + Send
-    + Clone
+pub trait Step<W: Workflow>:
+    Serialize + for<'a> Deserialize<'a> + fmt::Debug + Into<W::Step> + TryFrom<W::Step> + Send + Clone
 {
     type Event: Event + 'static;
-    type Workflow: Workflow;
     type Error: Error
         + Send
         + Sync
         + 'static
         // TODO: creating a ProjectStepError/WorkflowStepError/StepError trait would make this cleaner
         // but this would come at the expense of users getting less clear error messaages when implementing these traits
-        + TryFrom<<<Self::Workflow as Workflow>::Step as WorkflowStep>::Error>
-        + Into<<<Self::Workflow as Workflow>::Step as WorkflowStep>::Error>;
+        + TryFrom<<W::Step as WorkflowStep>::Error>
+        + Into<<W::Step as WorkflowStep>::Error>;
 
     fn run(
         &self,
-        wf: Self::Workflow,
+        wf: W,
         event: Self::Event,
     ) -> impl std::future::Future<
-        Output = Result<Option<WorkflowStepWithSettings<Self::Workflow>>, <Self as Step>::Error>,
+        Output = Result<Option<WorkflowStepWithSettings<W>>, <Self as Step<W>>::Error>,
     > + Send;
 
     fn has_event<T: Event + 'static>() -> bool {
@@ -318,8 +316,7 @@ pub trait Event:
 
 ////////////////////////////////////////////////
 
-pub type StepResult<S> =
-    Result<Option<WorkflowStepWithSettings<<S as Step>::Workflow>>, <S as Step>::Error>;
+pub type StepResult<W, S> = Result<Option<WorkflowStepWithSettings<W>>, <S as Step<W>>::Error>;
 
 #[builder]
 pub fn next_step<W: Workflow>(
