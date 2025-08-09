@@ -311,9 +311,17 @@ pub trait Step<W: Workflow>:
 pub trait Event:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static
 {
-    // move to extension trait so it can't be overridden
+    fn is<T: Event + 'static>() -> bool;
+}
+
+pub trait BareEvent: Event {
     fn is<T: Event + 'static>() -> bool {
         TypeId::of::<Self>() == TypeId::of::<T>()
+    }
+}
+impl<E: BareEvent> Event for E {
+    fn is<T: Event + 'static>() -> bool {
+        <E as BareEvent>::is::<T>()
     }
 }
 
@@ -385,7 +393,7 @@ impl<W: Workflow> From<WorkflowStepWithSettings<W>> for ProjectStepWithSettings<
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, JsonSchema)]
 pub struct Immediate;
 
-impl Event for Immediate {}
+impl BareEvent for Immediate {}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InstanceEvent<P: Project> {
