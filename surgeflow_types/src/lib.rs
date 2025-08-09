@@ -211,7 +211,7 @@ pub trait WorkflowStep:
     + Step<
         Self::Workflow,
         Event = <Self::Workflow as Workflow>::Event,
-        Error = <Self as WorkflowStep>::Error,
+        Error = SurgeflowWorkflowStepError<<Self as WorkflowStep>::Error>,
     >
 {
     type Workflow: Workflow<Step = Self>;
