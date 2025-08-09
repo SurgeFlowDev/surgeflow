@@ -105,8 +105,9 @@ pub fn workflow(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 type Error = ConvertingWorkflowStepToStepError;
 
                 fn try_from(error: <<#self_ty_ident as Workflow>::Step as WorkflowStep>::Error) -> Result<Self, Self::Error> {
+                    type WfError = <<#self_ty_ident as Workflow>::Step as WorkflowStep>::Error;
                     match error {
-                        <<#self_ty_ident as Workflow>::Step as WorkflowStep>::Error::#variant_ident(e) => Ok(e),
+                        WfError::#variant_ident(e) => Ok(e),
                         _ => Err(ConvertingWorkflowStepToStepError),
                     }
                 }
