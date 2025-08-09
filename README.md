@@ -9,6 +9,9 @@ This will be achieved through adapter crates:
 
 Documentation is non-existent at the moment.
 
+The adapter crates have examples, but they are not polished at all.
+There's a lot of boilerplate code, that won't be necessary in the final version.
+
 # Surgeflow Cloud 
 Serverless surgeflow. A specialized adapter will be able to run surgeflow on surgeflow cloud with minimal configuration. This will be a fully managed service. The goal is to make it as easy as possible to run surgeflow workflows without having to worry about infrastructure.
 ### [cloud.surgeflow.dev](https://cloud.surgeflow.dev)
