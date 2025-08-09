@@ -297,26 +297,26 @@ pub trait Step<W: Workflow>:
         Output = Result<Option<WorkflowStepWithSettings<W>>, <Self as Step<W>>::Error>,
     > + Send;
 
-    fn has_event<T: Event + 'static>() -> bool {
-        T::is::<Self::Event>()
-    }
-    fn value_has_event<T: Event + 'static>(&self) -> bool {
-        Self::has_event::<T>()
-    }
-    fn value_has_event_value<T: Event + 'static>(&self, _: &T) -> bool {
-        self.value_has_event::<T>()
+    // fn has_event<T: Event + 'static>() -> bool {
+    //     T::is::<Self::Event>()
+    // }
+    // fn value_has_event<T: Event + 'static>(&self) -> bool {
+    //     Self::value_is::<T>()
+    // }
+    fn value_has_event_value<T: Event + 'static>(&self, e: &T) -> bool {
+        e.value_is::<Self::Event>()
     }
 }
 
 pub trait Event:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static
 {
-    fn is<T: Event + 'static>() -> bool;
+    fn value_is<T: Event + 'static>(&self) -> bool;
 }
 
 pub trait BareEvent: Event {}
 impl<E: BareEvent> Event for E {
-    fn is<T: Event + 'static>() -> bool {
+    fn value_is<T: Event + 'static>(&self) -> bool {
         TypeId::of::<Self>() == TypeId::of::<T>()
     }
 }
