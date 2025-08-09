@@ -53,7 +53,14 @@ pub fn workflow(_attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     // Build enum variants A, B, C, ... for steps and events
-    let step_variants = make_letter_variants(&step_types);
+    let step_letters: Vec<Ident> = (0..step_types.len())
+        .map(|i| Ident::new(&make_letters(i), Span::call_site()))
+        .collect();
+    let step_variants: Vec<TokenStream2> = step_types
+        .iter()
+        .zip(step_letters.iter())
+        .map(|(ty, letter)| quote! { #letter(#ty), })
+        .collect();
     let event_variants = make_letter_variants(&event_types);
 
     // Always include Immediate(Immediate) for events, with serde(skip)
@@ -78,11 +85,44 @@ pub fn workflow(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    // Output the rewritten impl followed by the generated enums
+    // Generate conversions between per-step error types and workflow step error type
+    let mut per_step_error_items: Vec<TokenStream2> = Vec::new();
+    for (i, ty) in step_types.iter().enumerate() {
+        let variant_ident = &step_letters[i];
+
+        // impl From<<StepX as Step>::Error> for <<Workflow as Workflow>::Step as WorkflowStep>::Error
+        let from_impl = quote! {
+            impl From<<#ty as Step>::Error> for <<#self_ty_ident as Workflow>::Step as WorkflowStep>::Error {
+                fn from(error: <#ty as Step>::Error) -> Self {
+                    <<#self_ty_ident as Workflow>::Step as WorkflowStep>::Error::#variant_ident(error)
+                }
+            }
+        };
+
+        // impl TryFrom<<<Workflow as Workflow>::Step as WorkflowStep>::Error> for <StepX as Step>::Error
+        let tryfrom_impl = quote! {
+            impl TryFrom<<<#self_ty_ident as Workflow>::Step as WorkflowStep>::Error> for <#ty as Step>::Error {
+                type Error = ConvertingWorkflowStepToStepError;
+
+                fn try_from(error: <<#self_ty_ident as Workflow>::Step as WorkflowStep>::Error) -> Result<Self, Self::Error> {
+                    match error {
+                        <<#self_ty_ident as Workflow>::Step as WorkflowStep>::Error::#variant_ident(e) => Ok(e),
+                        _ => Err(ConvertingWorkflowStepToStepError),
+                    }
+                }
+            }
+        };
+
+        per_step_error_items.push(from_impl);
+        per_step_error_items.push(tryfrom_impl);
+    }
+
+    // Output the rewritten impl followed by the generated enums and conversions
     let output = quote! {
         #impl_item
         #step_enum
         #event_enum
+        #(#per_step_error_items)*
     };
 
     TokenStream::from(output)
@@ -145,6 +185,8 @@ impl Parse for TypeList {
         )?))
     }
 }
+
+// (no longer needed)
 
 struct MaybeParens<T>(T);
 
