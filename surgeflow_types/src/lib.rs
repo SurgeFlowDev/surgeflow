@@ -314,14 +314,10 @@ pub trait Event:
     fn is<T: Event + 'static>() -> bool;
 }
 
-pub trait BareEvent: Event {
-    fn is<T: Event + 'static>() -> bool {
-        TypeId::of::<Self>() == TypeId::of::<T>()
-    }
-}
+pub trait BareEvent: Event {}
 impl<E: BareEvent> Event for E {
     fn is<T: Event + 'static>() -> bool {
-        <E as BareEvent>::is::<T>()
+        TypeId::of::<Self>() == TypeId::of::<T>()
     }
 }
 
