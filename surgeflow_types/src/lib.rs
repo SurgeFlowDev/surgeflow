@@ -316,7 +316,7 @@ pub type StepResult<S> =
 
 #[builder]
 pub fn step_result<S: Step>(
-    #[builder(into)] step: <S::Workflow as Workflow>::Step,
+    #[builder(into, start_fn)] step: <S::Workflow as Workflow>::Step,
     max_retries: u32,
 ) -> StepResult<S> {
     Ok(Some(WorkflowStepWithSettings {
