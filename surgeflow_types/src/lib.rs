@@ -94,13 +94,13 @@ pub trait Workflow<P: Project>:
         Error = <Self as Workflow<P>>::Error,
     >
 {
-    type Event: Event<P, Self>
-        + From<<<Self as Workflow<P>>::Step as Step<P, Self>>::Event>
+    type Event: __Event<P, Self>
+        + From<<<Self as Workflow<P>>::Step as __Step<P, Self>>::Event>
         + Into<P::Event>;
-    type Step: Step<P, Self, Event = <Self as Workflow<P>>::Event, Error = <Self as Workflow<P>>::Error>;
+    type Step: __Step<P, Self, Event = <Self as Workflow<P>>::Event, Error = <Self as Workflow<P>>::Error>;
     type Error: Error + Send + Sync + 'static;
     const NAME: &'static str;
-    
+
     fn entrypoint() -> StepWithSettings<P>;
 }
 
@@ -116,8 +116,6 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
         <W as Workflow<P>>::entrypoint()
     }
 }
-
-
 
 pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
     // type Project: Project;
@@ -250,7 +248,6 @@ pub trait __Event<P: Project, W: __Workflow<P>>:
 pub trait Event<P: Project, W: Workflow<P>>: __Event<P, W> {}
 
 impl<E: Event<P, W>, P: Project, W: Workflow<P>> __Event<P, W> for E {
-
     // TODO: this functions should live in an extension trait, so that this blanket implementation can implement
     // that extension trait and not the full __Workflow trait
     fn value_is<T: __Event<P, W> + 'static>(&self) -> bool {
