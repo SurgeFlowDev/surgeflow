@@ -39,7 +39,7 @@ where
     let event = step
         .event
         .clone()
-        .unwrap_or(<P::Workflow as __Workflow<P>>::Event::from(Immediate).into());
+        .unwrap_or(P::Event::from(Immediate).into());
 
     let next_step = step.step.step.run(wf.clone(), event).await;
     step.retry_count += 1;

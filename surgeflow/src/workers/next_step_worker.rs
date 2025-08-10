@@ -148,7 +148,11 @@ where
         .await
         .map_err(NextStepWorkerError::DatabaseError)?;
 
-    if step.step.step.value_has_event_value(&Immediate) {
+    if step
+        .step
+        .step
+        .value_has_event_value(&P::Event::from(Immediate))
+    {
         active_step_sender
             .send(step)
             .await
