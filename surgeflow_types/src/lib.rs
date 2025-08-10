@@ -74,6 +74,7 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
     // but it isn't used for anything except static, associated methods so the exact shape that the type takes
     // is more flexible, allowing for the implementation of Serialize and Deserialize
     type ShallowWorkflow: EntrypointExt<Self>
+        + NameExt<Self>
         + Serialize
         + Clone
         + Copy
@@ -87,14 +88,6 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
         &self,
         step: &<Self::Workflow as __Workflow<Self>>::Step,
     ) -> Self::Workflow;
-
-    // Given any workflow type, return the corresponding Project level workflow
-    // fn workflow<T: __Workflow<Self>>() -> Self::Workflow;
-
-    //  {
-
-    //     // <T as  __Workflow<Self>>::project_workflow()
-    // }
 }
 
 pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
@@ -111,7 +104,7 @@ where
     // fn entrypoint(&self) -> StepWithSettings<P>;
 
     // TODO: we should allow a "&self" receiver here, and then create a "Workflow" trait that restricts it to not have the &self receiver
-    fn name(&self) -> &'static str;
+    // fn name(&self) -> &'static str;
 
     fn shallow_workflow(&self) -> P::ShallowWorkflow;
 }
@@ -133,11 +126,12 @@ pub trait EntrypointExt<P: Project> {
     fn entrypoint(&self) -> StepWithSettings<P>;
 }
 
+pub trait NameExt<P: Project> {
+    fn name(&self) -> &'static str;
+}
+
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     type Step = <W as Workflow<P>>::Step;
-    fn name(&self) -> &'static str {
-        W::NAME
-    }
     fn shallow_workflow(&self) -> P::ShallowWorkflow {
         <W as Workflow<P>>::SHALLOW_WORKFLOW
     }
@@ -146,6 +140,12 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
 impl<P: Project, W: Workflow<P>> EntrypointExt<P> for W {
     fn entrypoint(&self) -> StepWithSettings<P> {
         <W as Workflow<P>>::entrypoint()
+    }
+}
+
+impl<P: Project, W: Workflow<P>> NameExt<P> for W {
+    fn name(&self) -> &'static str {
+        <W as Workflow<P>>::NAME
     }
 }
 
