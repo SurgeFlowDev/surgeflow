@@ -100,6 +100,7 @@ pub trait Workflow<P: Project>:
     type Step: Step<P, Self, Event = <Self as Workflow<P>>::Event, Error = <Self as Workflow<P>>::Error>;
     type Error: Error + Send + Sync + 'static;
     const NAME: &'static str;
+    
     fn entrypoint() -> StepWithSettings<P>;
 }
 
@@ -108,10 +109,15 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     type Step = <W as Workflow<P>>::Step;
     type Error = <W as Workflow<P>>::Error;
     const NAME: &'static str = <W as Workflow<P>>::NAME;
+
+    // TODO: this functions should live in an extension trait, so that this blanket implementation can implement
+    // that extension trait and not the full __Workflow trait
     fn entrypoint(&self) -> StepWithSettings<P> {
         <W as Workflow<P>>::entrypoint()
     }
 }
+
+
 
 pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
     // type Project: Project;
@@ -209,30 +215,14 @@ impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
 //////////////////////////////////
 
 pub trait Step<P: Project, W: Workflow<P>>:
-    __Step<
-        P,
-        W,
-        Event = <Self as Step<P, W>>::Event,
-        Error = <Self as Step<P, W>>::Error,
-        RunFuture = <Self as Step<P, W>>::RunFuture,
-    >
+    __Step<P, W, Event = <Self as Step<P, W>>::Event, Error = <Self as Step<P, W>>::Error>
 {
     type Event: Event<P, W> + 'static;
     type Error: Error + Send + Sync + 'static;
-    type RunFuture: Future<Output = Result<Option<StepWithSettings<P>>, <Self as Step<P, W>>::Error>>
-        + Send;
 
-    fn run(&self, wf: W, event: <Self as Step<P, W>>::Event) -> <Self as Step<P, W>>::RunFuture;
-}
-
-impl<P: Project, W: Workflow<P>, S: Step<P, W>> __Step<P, W> for S {
-    type Event = <S as Step<P, W>>::Event;
-    type Error = <S as Step<P, W>>::Error;
-    type RunFuture = <S as Step<P, W>>::RunFuture;
-
-    fn run(&self, wf: W, event: Self::Event) -> Self::RunFuture {
-        <S as Step<P, W>>::run(self, wf, event)
-    }
+    // TODO: waiting on https://rust-lang.github.io/rfcs/3654-return-type-notation.html
+    // then can add a blanket implementation for `__Step`
+    // fn run(&self, wf: W, event: <Self as Step<P, W>>::Event) -> <Self as __Step<P, W>>::run(..);
 }
 
 pub trait __Step<P: Project, W: __Workflow<P>>:
@@ -240,10 +230,12 @@ pub trait __Step<P: Project, W: __Workflow<P>>:
 {
     type Event: __Event<P, W> + 'static;
     type Error: Error + Send + Sync + 'static;
-    type RunFuture: Future<Output = Result<Option<StepWithSettings<P>>, <Self as __Step<P, W>>::Error>>
-        + Send;
 
-    fn run(&self, wf: W, event: Self::Event) -> Self::RunFuture;
+    fn run(
+        &self,
+        wf: W,
+        event: Self::Event,
+    ) -> impl Future<Output = Result<Option<StepWithSettings<P>>, <Self as __Step<P, W>>::Error>> + Send;
     fn value_has_event_value<T: __Event<P, W> + 'static>(&self, e: &T) -> bool {
         e.value_is::<Self::Event>()
     }
@@ -258,6 +250,9 @@ pub trait __Event<P: Project, W: __Workflow<P>>:
 pub trait Event<P: Project, W: Workflow<P>>: __Event<P, W> {}
 
 impl<E: Event<P, W>, P: Project, W: Workflow<P>> __Event<P, W> for E {
+
+    // TODO: this functions should live in an extension trait, so that this blanket implementation can implement
+    // that extension trait and not the full __Workflow trait
     fn value_is<T: __Event<P, W> + 'static>(&self) -> bool {
         TypeId::of::<Self>() == TypeId::of::<T>()
     }
