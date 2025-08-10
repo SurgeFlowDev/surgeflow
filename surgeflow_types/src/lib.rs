@@ -98,8 +98,6 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
 }
 
 pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
-// TODO: is this needed?
-+ EntrypointExt<P>
 where
     <Self::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
