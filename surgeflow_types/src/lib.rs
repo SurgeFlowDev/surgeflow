@@ -68,7 +68,9 @@ pub struct WorkflowId(i32);
 
 pub trait Project: Sized + Send + Sync + 'static + Clone {
     type Step: __Step<Self, Self::Workflow, Event = Self::Event, Error = Self::Error>;
-    type Event: __Event<Self, Self::Workflow> + From<<Self::Workflow as __Workflow<Self>>::Event> + From<Immediate>;
+    type Event: __Event<Self, Self::Workflow>
+        + From<<Self::Workflow as __Workflow<Self>>::Event>
+        + From<Immediate>;
     type Workflow: __Workflow<Self, Error = Self::Error>
         + Serialize
         + for<'de> Deserialize<'de>
@@ -94,9 +96,7 @@ pub trait Workflow<P: Project>:
 {
     type Event: Event<P, Self>
         + From<<<Self as Workflow<P>>::Step as Step<P, Self>>::Event>
-        + Into<P::Event>
-        // + From<Immediate>
-        ;
+        + Into<P::Event>;
     type Step: Step<P, Self, Event = <Self as Workflow<P>>::Event, Error = <Self as Workflow<P>>::Error>;
     type Error: Error + Send + Sync + 'static;
     const NAME: &'static str;
@@ -113,13 +113,9 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     }
 }
 
-pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
+pub trait __Workflow<P: Project>: Clone + Send + 'static {
     // type Project: Project;
-    type Event: __Event<P, Self>
-        + From<<Self::Step as __Step<P, Self>>::Event>
-        + Into<P::Event>
-        // + From<Immediate>
-        ;
+    type Event: __Event<P, Self> + From<<Self::Step as __Step<P, Self>>::Event> + Into<P::Event>;
     type Step: __Step<P, Self, Event = Self::Event, Error = Self::Error>;
     type Error: std::error::Error + Send + Sync + 'static;
     const NAME: &'static str;
