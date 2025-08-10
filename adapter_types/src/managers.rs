@@ -22,7 +22,7 @@ pub trait StepsAwaitingEventManager<P: Project>: Sized + Send + 'static + Clone 
 
 mod persistence_manager {
     use std::error::Error;
-    use surgeflow_types::{Project, StepId, WorkflowInstance, WorkflowInstanceId};
+    use surgeflow_types::{Project, StepId, WorkflowInstance, WorkflowInstanceId, __Workflow};
 
     // TODO: should these take references instead of ownership?
     pub trait PersistenceManager<P: Project>: Sized + Send + 'static + Clone {
@@ -38,13 +38,13 @@ mod persistence_manager {
             &self,
             workflow_instance_id: WorkflowInstanceId,
             step_id: StepId,
-            step: &P::Step,
+            step: &<P::Workflow as __Workflow<P>>::Step,
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
         fn insert_step_output(
             &self,
             step_id: StepId,
-            output: Option<&P::Step>,
+            output: Option<&<P::Workflow as __Workflow<P>>::Step>,
         ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
         fn insert_instance(

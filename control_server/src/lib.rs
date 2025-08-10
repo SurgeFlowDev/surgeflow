@@ -9,7 +9,7 @@ use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::routing::TypedPath;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use surgeflow_types::{InstanceEvent, Project, Workflow, WorkflowInstance, WorkflowInstanceId, __Workflow};
+use surgeflow_types::{InstanceEvent, Project, WorkflowInstance, WorkflowInstanceId, __Step, __Workflow};
 
 pub struct AppState<P: Project, E: EventSender<P>, I: NewInstanceSender<P>> {
     pub dependencies: ControlServerDependencies<P, E, I>,
@@ -40,7 +40,7 @@ pub async fn init_app_state<
         _marker: PhantomData,
     })))
 }
-pub trait WorkflowControl<P: Project>: Workflow<P> {
+pub trait WorkflowControl<P: Project>: __Workflow<P> {
     fn control_router<
         E: EventSender<P> + Send + Sync + 'static,
         N: NewInstanceSender<P> + Send + Sync + 'static,
@@ -50,7 +50,7 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
             let post_workflow_instance_api_route = Self::post_workflow_instance_api_route::<E, N>();
 
             let router = ApiRouter::new().nest(
-                &format!("/workflow/{}", <Self as Workflow<P>>::NAME),
+                &format!("/workflow/{}", <Self as __Workflow<P>>::name()),
                 ApiRouter::new()
                     .merge(post_workflow_instance_api_route)
                     .merge(post_workflow_event_api_route),
@@ -94,7 +94,7 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
         >(
             PostWorkflowEvent { instance_id }: PostWorkflowEvent,
             State(ArcAppState(state)): State<ArcAppState<P, E, N>>,
-            Json(event): Json<T::Event>,
+            Json(event): Json<<T::Step as __Step<P, T>>::Event>,
         ) -> Result<(), PostWorkflowEventError> {
             state
                 .dependencies
@@ -112,7 +112,7 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
             op.description("Send event")
                 .summary("Send event")
                 .id("post-event")
-                .tag(<Self as Workflow<P>>::NAME)
+                .tag(<Self as __Workflow<P>>::name())
                 .hidden(false)
         })
     }
@@ -144,7 +144,7 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
         // more readable than a closure
         async fn handler<
             P: Project,
-            T: Workflow<P>,
+            T: __Workflow<P>,
             E: EventSender<P>,
             N: NewInstanceSender<P>,
         >(
@@ -170,13 +170,13 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
             op.description("Create instance")
                 .summary("Create instance")
                 .id("post-workflow-instance")
-                .tag(<Self as Workflow<P>>::NAME)
+                .tag(<Self as __Workflow<P>>::name())
                 .hidden(false)
         })
     }
 }
 
-impl<P: Project, T: Workflow<P>> WorkflowControl<P> for T {}
+impl<P: Project, T: __Workflow<P>> WorkflowControl<P> for T {}
 
 pub trait ProjectWorkflowControl<P: Project>: __Workflow<P> {
     fn control_router<NewEventSenderT: EventSender<P>, NewInstanceSenderT: NewInstanceSender<P>>()
