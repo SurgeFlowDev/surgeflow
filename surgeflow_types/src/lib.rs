@@ -107,15 +107,18 @@ where
 
 pub trait Workflow<P: Project>: __Workflow<P>
 where
-    <Self::Step as __Step<P, Self>>::Event: From<Immediate>,
+    <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
+    type Step: __Step<P, Self>
+        + Into<<P::Workflow as __Workflow<P>>::Step>
+        + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
     const NAME: &'static str;
 
     fn entrypoint() -> StepWithSettings<P>;
 }
 
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
-    type Step = W::Step;
+    type Step = <W as Workflow<P>>::Step;
     fn entrypoint(&self) -> StepWithSettings<P> {
         <W as Workflow<P>>::entrypoint()
     }
