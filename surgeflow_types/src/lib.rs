@@ -105,8 +105,6 @@ where
 
     // TODO: we should allow a "&self" receiver here, and then create a "Workflow" trait that restricts it to not have the &self receiver
     // fn name(&self) -> &'static str;
-
-    fn shallow_workflow(&self) -> P::ShallowWorkflow;
 }
 
 pub trait Workflow<P: Project>: __Workflow<P, Step = <Self as Workflow<P>>::Step>
@@ -132,9 +130,6 @@ pub trait NameExt<P: Project> {
 
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     type Step = <W as Workflow<P>>::Step;
-    fn shallow_workflow(&self) -> P::ShallowWorkflow {
-        <W as Workflow<P>>::SHALLOW_WORKFLOW
-    }
 }
 
 impl<P: Project, W: Workflow<P>> EntrypointExt<P> for W {
