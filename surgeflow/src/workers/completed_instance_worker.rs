@@ -35,7 +35,7 @@ async fn receive_and_process<
     let (step, handle) = completed_instance_receiver.receive().await?;
 
     tokio::spawn(async move {
-        if let Err(err) = process(step).await {
+        if let Err(err) = process::<P>(step).await {
             tracing::error!("Error processing workflow instance: {:?}", err);
         }
 

@@ -144,7 +144,7 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
         // more readable than a closure
         async fn handler<
             P: Project,
-            T: __Workflow<P>,
+            T: Workflow<P>,
             E: EventSender<P>,
             N: NewInstanceSender<P>,
         >(
@@ -157,7 +157,7 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
                 .dependencies
                 .new_instance_sender
                 .send(WorkflowInstance {
-                    workflow: P::workflow::<T>(),
+                    workflow: <T as Workflow<P>>::SHALLOW_WORKFLOW,
                     external_id,
                     // workflow_name: T::NAME.into(),
                 })

@@ -3,6 +3,7 @@ use derive_more::{Debug, Display, From, Into};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::any::TypeId;
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{self};
 use uuid::Uuid;
@@ -67,20 +68,24 @@ pub struct WorkflowId(i32);
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait Project: Sized + Send + Sync + 'static + Clone {
-    type Workflow: __Workflow<Self>
+    type Workflow: __Workflow<Self>;
+
+    // shallow workflow, is a type that implements Workflow, but has to implement additional traits,
+    // but it isn't used for anything except static, associated methods so the exact shape that the type takes
+    // is more flexible, allowing for the implementation of Serialize and Deserialize
+    type ShallowWorkflow: __Workflow<Self>
         + Serialize
-        + for<'de> Deserialize<'de>
-        + JsonSchema
-        + fmt::Debug;
-    // type Error: std::error::Error + Send + Sync + 'static;
+        + for<'a> Deserialize<'a>
+        + fmt::Debug
+        + JsonSchema;
 
     fn workflow_for_step(
         &self,
         step: &<Self::Workflow as __Workflow<Self>>::Step,
     ) -> Self::Workflow;
 
-    /// Given any workflow type, return the corresponding Project level workflow
-    fn workflow<T: __Workflow<Self>>() -> Self::Workflow;
+    // Given any workflow type, return the corresponding Project level workflow
+    // fn workflow<T: __Workflow<Self>>() -> Self::Workflow;
 
     //  {
 
@@ -92,6 +97,7 @@ pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
 where
     <Self::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
+    const SHALLOW_WORKFLOW: P::ShallowWorkflow;
     type Step: __Step<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::Step>
         + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
@@ -109,6 +115,7 @@ pub trait Workflow<P: Project>: __Workflow<P, Step = <Self as Workflow<P>>::Step
 where
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
+    const SHALLOW_WORKFLOW: P::ShallowWorkflow;
     type Step: __Step<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::Step>
         + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
@@ -118,6 +125,7 @@ where
 }
 
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
+    const SHALLOW_WORKFLOW: P::ShallowWorkflow = <W as Workflow<P>>::SHALLOW_WORKFLOW;
     type Step = <W as Workflow<P>>::Step;
     fn entrypoint(&self) -> StepWithSettings<P> {
         <W as Workflow<P>>::entrypoint()
@@ -324,8 +332,8 @@ pub struct InstanceEvent<P: Project> {
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
 pub struct WorkflowInstance<P: Project> {
     pub external_id: WorkflowInstanceId,
-    // pub workflow_name: WorkflowName,
-    pub workflow: P::Workflow,
+    // pub workflow_name: String,
+    pub workflow: P::ShallowWorkflow,
 }
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone, From, Into, PartialEq, Eq)]
 #[serde(transparent)]

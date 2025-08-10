@@ -40,7 +40,7 @@ where
     let (step, handle) = failed_instance_receiver.receive().await?;
 
     tokio::spawn(async move {
-        if let Err(err) = process(step).await {
+        if let Err(err) = process::<P>(step).await {
             tracing::error!("Error processing workflow instance: {:?}", err);
         }
 
