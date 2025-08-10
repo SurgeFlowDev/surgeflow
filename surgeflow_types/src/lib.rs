@@ -122,8 +122,6 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     fn name(&self) -> &'static str {
         W::NAME
     }
-    
-    
 }
 
 #[derive(thiserror::Error, Debug)]
