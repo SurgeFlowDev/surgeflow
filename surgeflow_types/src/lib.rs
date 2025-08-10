@@ -81,7 +81,9 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
     fn workflow_for_step(&self, step: &Self::Step) -> Self::Workflow;
 
     /// Given any workflow type, return the corresponding Project level workflow
-    fn workflow<T: Workflow<Self>>() -> Self::Workflow;
+    fn workflow<T: Workflow<Self>>() -> Self::Workflow {
+        <T as Workflow<Self>>::project_workflow()
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -102,6 +104,8 @@ pub trait Workflow<P: Project>:
     const NAME: &'static str;
 
     fn entrypoint() -> StepWithSettings<P>;
+
+    fn project_workflow() -> P::Workflow;
 }
 
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
@@ -115,6 +119,9 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     fn entrypoint(&self) -> StepWithSettings<P> {
         <W as Workflow<P>>::entrypoint()
     }
+    fn project_workflow() -> P::Workflow {
+        <W as Workflow<P>>::project_workflow()
+    }
 }
 
 pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
@@ -126,6 +133,8 @@ pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
 
     // TODO: make an entrypoint without &self on a new BareWorkflow trait
     fn entrypoint(&self) -> StepWithSettings<P>;
+
+    fn project_workflow() -> P::Workflow;
 }
 
 #[derive(thiserror::Error, Debug)]
