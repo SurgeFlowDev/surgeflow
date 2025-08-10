@@ -243,15 +243,13 @@ pub trait __Step<P: Project, W: __Workflow<P>>:
         wf: W,
         event: Self::Event,
     ) -> impl Future<Output = Result<Option<StepWithSettings<P>>, <Self as __Step<P, W>>::Error>> + Send;
-    fn value_has_event_value<T: __Event<P, W> + 'static>(&self, e: &T) -> bool {
-        e.value_is::<Self::Event>()
-    }
+    fn value_has_event_value<T: __Event<P, W> + 'static>(&self, e: &T) -> bool;
 }
 
 pub trait __Event<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send + Sync
 {
-    fn value_is<T: __Event<P, W> + 'static>(&self) -> bool;
+    fn value_is<WInner: Workflow<P>, T: Event<P, WInner> + 'static>(&self) -> bool;
 }
 
 pub trait Event<P: Project, W: Workflow<P>>: __Event<P, W> {}
@@ -259,7 +257,7 @@ pub trait Event<P: Project, W: Workflow<P>>: __Event<P, W> {}
 impl<E: Event<P, W>, P: Project, W: Workflow<P>> __Event<P, W> for E {
     // TODO: this functions should live in an extension trait, so that this blanket implementation can implement
     // that extension trait and not the full __Workflow trait
-    fn value_is<T: __Event<P, W> + 'static>(&self) -> bool {
+    fn value_is<WInner: Workflow<P>, T: Event<P, WInner> + 'static>(&self) -> bool {
         TypeId::of::<Self>() == TypeId::of::<T>()
     }
 }
