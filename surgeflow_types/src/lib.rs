@@ -102,9 +102,28 @@ where
     fn entrypoint(&self) -> StepWithSettings<P>;
 
     // TODO: we should allow a "&self" receiver here, and then create a "Workflow" trait that restricts it to not have the &self receiver
-    fn name() -> &'static str;
+    fn name(&self) -> &'static str;
+}
 
-    fn project_workflow(&self) -> P::Workflow;
+pub trait Workflow<P: Project>: __Workflow<P>
+where
+    <Self::Step as __Step<P, Self>>::Event: From<Immediate>,
+{
+    const NAME: &'static str;
+
+    fn entrypoint() -> StepWithSettings<P>;
+}
+
+impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
+    type Step = W::Step;
+    fn entrypoint(&self) -> StepWithSettings<P> {
+        <W as Workflow<P>>::entrypoint()
+    }
+    fn name(&self) -> &'static str {
+        W::NAME
+    }
+    
+    
 }
 
 #[derive(thiserror::Error, Debug)]
