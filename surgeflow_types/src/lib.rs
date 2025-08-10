@@ -236,7 +236,7 @@ impl<P: Project, W: Workflow<P>, S: Step<P, W>> __Step<P, W> for S {
 }
 
 pub trait __Step<P: Project, W: __Workflow<P>>:
-    Serialize + for<'a> Deserialize<'a> + fmt::Debug + Send + Clone
+    Serialize + for<'a> Deserialize<'a> + fmt::Debug + Send + Sync + Clone
 {
     type Event: __Event<P, W> + 'static;
     type Error: Error + Send + Sync + 'static;
@@ -250,7 +250,7 @@ pub trait __Step<P: Project, W: __Workflow<P>>:
 }
 
 pub trait __Event<P: Project, W: __Workflow<P>>:
-    Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send
+    Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send + Sync
 {
     fn value_is<T: __Event<P, W> + 'static>(&self) -> bool;
 }
