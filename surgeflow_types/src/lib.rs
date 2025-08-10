@@ -67,11 +67,8 @@ pub struct WorkflowId(i32);
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait Project: Sized + Send + Sync + 'static + Clone {
-    // type Step: __Step<Self, Self::Workflow, Event = Self::Event, Error = Self::Error>;
-    // type Event: __Event<Self, Self::Workflow> + From<Immediate>;
-    type Workflow: __Workflow<
-            Self, // , Error = Self::Error, Step = Self::Step, Event = Self::Event
-        > + Serialize
+    type Workflow: __Workflow<Self>
+        + Serialize
         + for<'de> Deserialize<'de>
         + JsonSchema
         + fmt::Debug;
@@ -90,43 +87,6 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
     //     // <T as  __Workflow<Self>>::project_workflow()
     // }
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////
-
-// pub trait Workflow<P: Project>:
-//     __Workflow<
-//         P,
-//         Event = <Self as Workflow<P>>::Event,
-//         Step = <Self as Workflow<P>>::Step,
-//         Error = <Self as Workflow<P>>::Error,
-//     >
-// {
-//     type Event: Event<P, Self>;
-//     type Step: Step<P, Self, Event = <Self as Workflow<P>>::Event, Error = <Self as Workflow<P>>::Error>;
-
-//     type Error: std::error::Error + Send + Sync + 'static;
-//     const NAME: &'static str;
-
-//     fn entrypoint() -> StepWithSettings<P>;
-
-//     fn project_workflow() -> P::Workflow;
-// }
-
-// impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
-//     type Event = <W as Workflow<P>>::Event;
-//     type Step = <W as Workflow<P>>::Step;
-//     type Error = <W as Workflow<P>>::Error;
-//     const NAME: &'static str = <W as Workflow<P>>::NAME;
-
-//     // TODO: this functions should live in an extension trait, so that this blanket implementation can implement
-//     // that extension trait and not the full __Workflow trait
-//     fn entrypoint(&self) -> StepWithSettings<P> {
-//         <W as Workflow<P>>::entrypoint()
-//     }
-//     fn project_workflow(&self) -> P::Workflow {
-//         <W as Workflow<P>>::project_workflow()
-//     }
-// }
 
 pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
 where
@@ -229,19 +189,6 @@ impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
     }
 }
 
-//////////////////////////////////
-
-// pub trait Step<P: Project, W: Workflow<P>>:
-//     __Step<P, W, Event = <Self as Step<P, W>>::Event, Error = <Self as Step<P, W>>::Error>
-// {
-//     type Event: Event<P, W> + 'static;
-//     type Error: Error + Send + Sync + 'static;
-
-//     // TODO: waiting on https://rust-lang.github.io/rfcs/3654-return-type-notation.html
-//     // then can add a blanket implementation for `__Step`
-//     // fn run(&self, wf: W, event: <Self as Step<P, W>>::Event) -> <Self as __Step<P, W>>::run(..);
-// }
-
 pub trait __Step<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + fmt::Debug + Send + Sync + Clone
 {
@@ -249,8 +196,10 @@ pub trait __Step<P: Project, W: __Workflow<P>>:
         + 'static
         + Into<<W::Step as __Step<P, W>>::Event>
         + TryFrom<<W::Step as __Step<P, W>>::Event>
+        + TryFromRef<<W::Step as __Step<P, W>>::Event>
         + Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>;
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>;
     type Error: Error
         + Send
         + Sync
