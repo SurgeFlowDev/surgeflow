@@ -97,14 +97,6 @@ where
     type Step: __Step<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::Step>
         + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
-
-    // const NAME: &'static str;
-
-    // TODO: make an entrypoint without &self on a new BareWorkflow trait
-    // fn entrypoint(&self) -> StepWithSettings<P>;
-
-    // TODO: we should allow a "&self" receiver here, and then create a "Workflow" trait that restricts it to not have the &self receiver
-    // fn name(&self) -> &'static str;
 }
 
 pub trait Workflow<P: Project>: __Workflow<P, Step = <Self as Workflow<P>>::Step>
