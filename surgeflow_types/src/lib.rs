@@ -119,7 +119,7 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     fn entrypoint(&self) -> StepWithSettings<P> {
         <W as Workflow<P>>::entrypoint()
     }
-    fn project_workflow() -> P::Workflow {
+    fn project_workflow(&self) -> P::Workflow {
         <W as Workflow<P>>::project_workflow()
     }
 }
@@ -134,7 +134,7 @@ pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
     // TODO: make an entrypoint without &self on a new BareWorkflow trait
     fn entrypoint(&self) -> StepWithSettings<P>;
 
-    fn project_workflow() -> P::Workflow;
+    fn project_workflow(&self) -> P::Workflow;
 }
 
 #[derive(thiserror::Error, Debug)]
