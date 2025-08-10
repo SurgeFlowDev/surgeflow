@@ -316,3 +316,12 @@ impl From<&str> for WorkflowName {
         Self(value.to_string())
     }
 }
+
+impl TryFromRef<Immediate> for Immediate {
+    // TODO: error type
+    type Error = String;
+
+    fn try_from_ref(value: &Immediate) -> Result<&Self, Self::Error> {
+        Ok(value)
+    }
+}
