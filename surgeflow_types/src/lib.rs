@@ -250,7 +250,7 @@ pub trait __Step<P: Project, W: __Workflow<P>>:
 }
 
 pub trait __Event<P: Project, W: __Workflow<P>>:
-    Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static
+    Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send
 {
     fn value_is<T: __Event<P, W> + 'static>(&self) -> bool;
 }
