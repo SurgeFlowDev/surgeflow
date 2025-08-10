@@ -68,9 +68,7 @@ pub struct WorkflowId(i32);
 
 pub trait Project: Sized + Send + Sync + 'static + Clone {
     type Step: __Step<Self, Self::Workflow, Event = Self::Event, Error = Self::Error>;
-    type Event: __Event<Self, Self::Workflow>
-        + From<<Self::Workflow as __Workflow<Self>>::Event>
-        + From<Immediate>;
+    type Event: __Event<Self, Self::Workflow> + From<Immediate>;
     type Workflow: __Workflow<Self, Error = Self::Error>
         + Serialize
         + for<'de> Deserialize<'de>
@@ -96,17 +94,10 @@ pub trait Workflow<P: Project>:
         Error = <Self as Workflow<P>>::Error,
     >
 {
-    type Event: Event<P, Self>
-        + TryFrom<P::Event>
-        + From<<<Self as Workflow<P>>::Step as Step<P, Self>>::Event>;
-    type Step: Step<P, Self, Event = <Self as Workflow<P>>::Event, Error = <Self as Workflow<P>>::Error>
-        + TryFrom<P::Step>;
-    type Error: std::error::Error
-        + Send
-        + Sync
-        + 'static
-        + TryFrom<P::Error>
-        + From<<<Self as Workflow<P>>::Step as Step<P, Self>>::Error>;
+    type Event: Event<P, Self>;
+    type Step: Step<P, Self, Event = <Self as Workflow<P>>::Event, Error = <Self as Workflow<P>>::Error>;
+
+    type Error: std::error::Error + Send + Sync + 'static;
     const NAME: &'static str;
 
     fn entrypoint() -> StepWithSettings<P>;
@@ -131,14 +122,9 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
 }
 
 pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
-    type Event: __Event<P, Self> + TryFrom<P::Event> + From<<Self::Step as __Step<P, Self>>::Event>;
-    type Step: __Step<P, Self, Event = Self::Event, Error = Self::Error> + TryFrom<P::Step>;
-    type Error: std::error::Error
-        + Send
-        + Sync
-        + 'static
-        + TryFrom<P::Error>
-        + From<<Self::Step as __Step<P, Self>>::Error>;
+    type Event: __Event<P, Self>;
+    type Step: __Step<P, Self, Event = Self::Event, Error = Self::Error>;
+    type Error: std::error::Error + Send + Sync + 'static;
     const NAME: &'static str;
 
     // TODO: make an entrypoint without &self on a new BareWorkflow trait
@@ -234,8 +220,8 @@ impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
 pub trait Step<P: Project, W: Workflow<P>>:
     __Step<P, W, Event = <Self as Step<P, W>>::Event, Error = <Self as Step<P, W>>::Error>
 {
-    type Event: Event<P, W> + 'static + TryFrom<<W as Workflow<P>>::Event>;
-    type Error: Error + Send + Sync + 'static + TryFrom<<W as Workflow<P>>::Error>;
+    type Event: Event<P, W> + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     // TODO: waiting on https://rust-lang.github.io/rfcs/3654-return-type-notation.html
     // then can add a blanket implementation for `__Step`
@@ -245,8 +231,8 @@ pub trait Step<P: Project, W: Workflow<P>>:
 pub trait __Step<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + fmt::Debug + Send + Sync + Clone
 {
-    type Event: __Event<P, W> + 'static + TryFrom<W::Event>;
-    type Error: Error + Send + Sync + 'static + TryFrom<W::Error>;
+    type Event: __Event<P, W> + 'static;
+    type Error: Error + Send + Sync + 'static;
 
     fn run(
         &self,
