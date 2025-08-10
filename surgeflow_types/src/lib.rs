@@ -78,7 +78,7 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
         + Clone
         + Copy
         + Send
-        + 'static
+        + Sync
         + for<'a> Deserialize<'a>
         + fmt::Debug
         + JsonSchema;
