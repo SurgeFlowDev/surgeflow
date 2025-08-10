@@ -73,8 +73,11 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
     // shallow workflow, is a type that implements Workflow, but has to implement additional traits,
     // but it isn't used for anything except static, associated methods so the exact shape that the type takes
     // is more flexible, allowing for the implementation of Serialize and Deserialize
-    type ShallowWorkflow: __Workflow<Self>
+    type ShallowWorkflow: EntrypointExt<Self>
         + Serialize
+        + Clone
+        + Copy
+        + Send
         + for<'a> Deserialize<'a>
         + fmt::Debug
         + JsonSchema;
@@ -94,6 +97,8 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
 }
 
 pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
+// TODO: is this needed?
++ EntrypointExt<P>
 where
     <Self::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
@@ -104,7 +109,7 @@ where
     // const NAME: &'static str;
 
     // TODO: make an entrypoint without &self on a new BareWorkflow trait
-    fn entrypoint(&self) -> StepWithSettings<P>;
+    // fn entrypoint(&self) -> StepWithSettings<P>;
 
     // TODO: we should allow a "&self" receiver here, and then create a "Workflow" trait that restricts it to not have the &self receiver
     fn name(&self) -> &'static str;
@@ -125,16 +130,23 @@ where
     fn entrypoint() -> StepWithSettings<P>;
 }
 
+pub trait EntrypointExt<P: Project> {
+    fn entrypoint(&self) -> StepWithSettings<P>;
+}
+
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     type Step = <W as Workflow<P>>::Step;
-    fn entrypoint(&self) -> StepWithSettings<P> {
-        <W as Workflow<P>>::entrypoint()
-    }
     fn name(&self) -> &'static str {
         W::NAME
     }
     fn shallow_workflow(&self) -> P::ShallowWorkflow {
         <W as Workflow<P>>::SHALLOW_WORKFLOW
+    }
+}
+
+impl<P: Project, W: Workflow<P>> EntrypointExt<P> for W {
+    fn entrypoint(&self) -> StepWithSettings<P> {
+        <W as Workflow<P>>::entrypoint()
     }
 }
 
