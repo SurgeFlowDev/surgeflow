@@ -94,7 +94,7 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
         >(
             PostWorkflowEvent { instance_id }: PostWorkflowEvent,
             State(ArcAppState(state)): State<ArcAppState<P, E, N>>,
-            Json(event): Json<<T::Step as __Step<P, T>>::Event>,
+            Json(event): Json<<<T as Workflow<P>>::Step as __Step<P, T>>::Event>,
         ) -> Result<(), PostWorkflowEventError> {
             state
                 .dependencies

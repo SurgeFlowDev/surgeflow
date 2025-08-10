@@ -105,7 +105,7 @@ where
     fn name(&self) -> &'static str;
 }
 
-pub trait Workflow<P: Project>: __Workflow<P>
+pub trait Workflow<P: Project>: __Workflow<P, Step = <Self as Workflow<P>>::Step>
 where
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
