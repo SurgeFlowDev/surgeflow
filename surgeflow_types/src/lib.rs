@@ -113,7 +113,7 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     }
 }
 
-pub trait __Workflow<P: Project>: Clone + Send + 'static {
+pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
     // type Project: Project;
     type Event: __Event<P, Self> + From<<Self::Step as __Step<P, Self>>::Event> + Into<P::Event>;
     type Step: __Step<P, Self, Event = Self::Event, Error = Self::Error>;
