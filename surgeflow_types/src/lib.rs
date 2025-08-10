@@ -97,7 +97,6 @@ pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
 where
     <Self::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
-    const SHALLOW_WORKFLOW: P::ShallowWorkflow;
     type Step: __Step<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::Step>
         + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
@@ -109,6 +108,8 @@ where
 
     // TODO: we should allow a "&self" receiver here, and then create a "Workflow" trait that restricts it to not have the &self receiver
     fn name(&self) -> &'static str;
+
+    fn shallow_workflow(&self) -> P::ShallowWorkflow;
 }
 
 pub trait Workflow<P: Project>: __Workflow<P, Step = <Self as Workflow<P>>::Step>
@@ -125,13 +126,15 @@ where
 }
 
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
-    const SHALLOW_WORKFLOW: P::ShallowWorkflow = <W as Workflow<P>>::SHALLOW_WORKFLOW;
     type Step = <W as Workflow<P>>::Step;
     fn entrypoint(&self) -> StepWithSettings<P> {
         <W as Workflow<P>>::entrypoint()
     }
     fn name(&self) -> &'static str {
         W::NAME
+    }
+    fn shallow_workflow(&self) -> P::ShallowWorkflow {
+        <W as Workflow<P>>::SHALLOW_WORKFLOW
     }
 }
 
