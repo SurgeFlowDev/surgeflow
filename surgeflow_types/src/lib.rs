@@ -143,18 +143,6 @@ impl<P: Project, W: Workflow<P>> __WorkflowStatic<P, W> for <W as Workflow<P>>::
     }
 }
 
-// impl<P: Project, W: Workflow<P>> EntrypointExt<P> for W {
-//     fn entrypoint(&self) -> StepWithSettings<P> {
-//         <W as Workflow<P>>::entrypoint()
-//     }
-// }
-
-// impl<P: Project, W: Workflow<P>> NameExt<P> for W {
-//     fn name(&self) -> &'static str {
-//         <W as Workflow<P>>::NAME
-//     }
-// }
-
 #[derive(thiserror::Error, Debug)]
 pub enum SurgeflowWorkflowStepError<E> {
     #[error("Step error: {0}")]
@@ -271,15 +259,6 @@ pub trait __Event<P: Project, W: __Workflow<P>>:
     fn value_is<WInner: __Workflow<P>, T: __Event<P, WInner> + 'static>(&self) -> bool;
 }
 
-// pub trait Event<P: Project, W: Workflow<P>>: __Event<P, W> {}
-
-// impl<E: Event<P, W>, P: Project, W: Workflow<P>> __Event<P, W> for E {
-//     // TODO: this functions should live in an extension trait, so that this blanket implementation can implement
-//     // that extension trait and not the full __Workflow trait
-//     fn value_is<WInner: Workflow<P>, T: __Event<P, WInner> + 'static>(&self) -> bool {
-//         TypeId::of::<Self>() == TypeId::of::<T>()
-//     }
-// }
 
 ////////////////////////////////////////////////
 
@@ -307,7 +286,6 @@ pub struct StepSettings {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FullyQualifiedStep<P: Project> {
-    // TODO: should probably just be a WorkflowInstanceId
     pub instance: WorkflowInstance<P>,
     pub step_id: StepId,
     #[serde(bound = "")]
@@ -327,8 +305,6 @@ pub struct StepWithSettings<P: Project> {
     pub step: <P::Workflow as __Workflow<P>>::Step,
     pub settings: StepSettings,
 }
-
-// TODO: implement the inverse TryFrom?
 
 ////////////////////////////////////////
 
@@ -352,7 +328,6 @@ pub struct InstanceEvent<P: Project> {
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
 pub struct WorkflowInstance<P: Project> {
     pub external_id: WorkflowInstanceId,
-    // pub workflow_name: String,
     pub workflow: <P::Workflow as __Workflow<P>>::WorkflowStatic,
 }
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone, From, Into, PartialEq, Eq)]
