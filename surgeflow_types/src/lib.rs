@@ -76,7 +76,14 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
     ) -> Self::Workflow;
 }
 
-pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
+pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
+where
+    <<Self as __Workflow<P>>::Step as __Step<P, Self>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+    <<Self as __Workflow<P>>::Step as __Step<P, Self>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
+{
     type Step: __Step<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::Step>
         + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
@@ -109,6 +116,12 @@ pub trait Workflow<P: Project>:
         Step = <Self as Workflow<P>>::Step,
         WorkflowStatic = <Self as Workflow<P>>::WorkflowStatic,
     >
+where
+    <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+    <<Self as Workflow<P>>::Step as __Step<P, Self>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
 {
     type WorkflowStatic: __WorkflowStatic<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::WorkflowStatic>
@@ -221,23 +234,24 @@ impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
 
 pub trait __Step<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + fmt::Debug + Send + Sync + Clone
+where
+    <W::Step as __Step<P, W>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+    <W::Step as __Step<P, W>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
 {
     type Event: __Event<P, W>
         + 'static
         + Into<<W::Step as __Step<P, W>>::Event>
         + TryFrom<<W::Step as __Step<P, W>>::Event>
-        + TryFromRef<<W::Step as __Step<P, W>>::Event>
-        + Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>;
+        + TryFromRef<<W::Step as __Step<P, W>>::Event>;
     type Error: Error
         + Send
         + Sync
         + 'static
         + Into<<W::Step as __Step<P, W>>::Error>
-        + TryFrom<<W::Step as __Step<P, W>>::Error>
-        + Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
-        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>;
+        + TryFrom<<W::Step as __Step<P, W>>::Error>;
 
     fn run(
         &self,
