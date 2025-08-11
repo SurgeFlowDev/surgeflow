@@ -94,8 +94,6 @@ pub trait __WorkflowStatic<P: Project>:
     + Send
     + Sync
     + 'static
-    + EntrypointExt<P>
-    + NameExt<P>
     + Serialize
     + Clone
     + Copy
@@ -105,6 +103,8 @@ pub trait __WorkflowStatic<P: Project>:
     + fmt::Debug
     + JsonSchema
 {
+    fn entrypoint(&self) -> StepWithSettings<P>;
+    fn name(&self) -> &'static str;
 }
 
 pub trait Workflow<P: Project>:
@@ -128,30 +128,22 @@ where
     fn entrypoint() -> StepWithSettings<P>;
 }
 
-pub trait EntrypointExt<P: Project> {
-    fn entrypoint(&self) -> StepWithSettings<P>;
-}
-
-pub trait NameExt<P: Project> {
-    fn name(&self) -> &'static str;
-}
-
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     type Step = <W as Workflow<P>>::Step;
     type WorkflowStatic = <W as Workflow<P>>::WorkflowStatic;
 }
 
-impl<P: Project, W: Workflow<P>> EntrypointExt<P> for W {
-    fn entrypoint(&self) -> StepWithSettings<P> {
-        <W as Workflow<P>>::entrypoint()
-    }
-}
+// impl<P: Project, W: Workflow<P>> EntrypointExt<P> for W {
+//     fn entrypoint(&self) -> StepWithSettings<P> {
+//         <W as Workflow<P>>::entrypoint()
+//     }
+// }
 
-impl<P: Project, W: Workflow<P>> NameExt<P> for W {
-    fn name(&self) -> &'static str {
-        <W as Workflow<P>>::NAME
-    }
-}
+// impl<P: Project, W: Workflow<P>> NameExt<P> for W {
+//     fn name(&self) -> &'static str {
+//         <W as Workflow<P>>::NAME
+//     }
+// }
 
 #[derive(thiserror::Error, Debug)]
 pub enum SurgeflowWorkflowStepError<E> {
