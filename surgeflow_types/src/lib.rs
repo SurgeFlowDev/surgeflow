@@ -307,6 +307,7 @@ impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {}
 pub fn next_step<P: Project, W: __Workflow<P>>(
     #[builder(into, start_fn)] step: W::Step,
     max_retries: u32,
+    #[builder(into)]
     event: Option<<W::Step as __Step<P, W>>::Event>,
 ) -> RawStep<P, W> {
     RawStep {
