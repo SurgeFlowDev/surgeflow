@@ -99,9 +99,7 @@ where
         return Ok(());
     };
 
-    if step.step.step.event_is_event(&event)
-    // event.value_is::<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>()
-    {
+    if step.step.step.event_is_event(&event) {
         steps_awaiting_event.delete_step(instance_id).await?;
     } else {
         return Ok(());

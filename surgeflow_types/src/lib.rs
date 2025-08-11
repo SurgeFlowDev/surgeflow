@@ -67,9 +67,9 @@ pub struct WorkflowId(i32);
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait Project: Sized + Send + Sync + 'static + Clone
-where
-    <<Self::Workflow as __Workflow<Self>>::Step as __Step<Self, Self::Workflow>>::Event:
-        From<Immediate>,
+// where
+//     <<Self::Workflow as __Workflow<Self>>::Step as __Step<Self, Self::Workflow>>::Event:
+//         From<Immediate>,
 {
     type Workflow: __Workflow<Self>;
 
@@ -109,7 +109,7 @@ pub trait __WorkflowStatic<P: Project, W: __Workflow<P>>:
     + fmt::Debug
     + JsonSchema
 {
-    fn entrypoint(&self) -> StepWithSettings<P>;
+    fn entrypoint(&self) -> RawStep<P>;
     fn name(&self) -> &'static str;
 }
 
@@ -134,7 +134,7 @@ where
     const NAME: &'static str;
     const WORKFLOW_STATIC: <Self as __Workflow<P>>::WorkflowStatic;
 
-    fn entrypoint() -> StepWithSettings<P>;
+    fn entrypoint() -> RawStep<P>;
 }
 
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
@@ -143,7 +143,7 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
 }
 
 impl<P: Project, W: Workflow<P>> __WorkflowStatic<P, W> for <W as Workflow<P>>::WorkflowStatic {
-    fn entrypoint(&self) -> StepWithSettings<P> {
+    fn entrypoint(&self) -> RawStep<P> {
         <W as Workflow<P>>::entrypoint()
     }
 
@@ -258,7 +258,7 @@ where
         &self,
         wf: W,
         event: Self::Event,
-    ) -> impl Future<Output = Result<Option<StepWithSettings<P>>, <Self as __Step<P, W>>::Error>> + Send;
+    ) -> impl Future<Output = Result<Option<RawStep<P>>, <Self as __Step<P, W>>::Error>> + Send;
 
     fn event_is_event(&self, event: &Self::Event) -> bool;
 }
@@ -274,16 +274,18 @@ impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {}
 
 ////////////////////////////////////////////////
 
-pub type StepResult<P, W, S> = Result<Option<StepWithSettings<P>>, <S as __Step<P, W>>::Error>;
+pub type StepResult<P, W, S> = Result<Option<RawStep<P>>, <S as __Step<P, W>>::Error>;
 
 #[builder]
 pub fn next_step<P: Project>(
     #[builder(into, start_fn)] step: <P::Workflow as __Workflow<P>>::Step,
     max_retries: u32,
-) -> StepWithSettings<P> {
-    StepWithSettings {
+    event: Option<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+) -> RawStep<P> {
+    RawStep {
         step,
         settings: StepSettings { max_retries },
+        event,
     }
 }
 
@@ -301,7 +303,7 @@ pub struct FullyQualifiedStep<P: Project> {
     pub instance: WorkflowInstance<P>,
     pub step_id: StepId,
     #[serde(bound = "")]
-    pub step: StepWithSettings<P>,
+    pub step: RawStep<P>,
 
     /// Eventful steps can be initialized without an event, but it will be set when the step is triggered.
     pub event: Option<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
@@ -309,12 +311,13 @@ pub struct FullyQualifiedStep<P: Project> {
 
     pub previous_step_id: Option<StepId>,
     #[serde(bound = "")]
-    pub next_step: Option<StepWithSettings<P>>,
+    pub next_step: Option<RawStep<P>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct StepWithSettings<P: Project> {
+pub struct RawStep<P: Project> {
     pub step: <P::Workflow as __Workflow<P>>::Step,
+    pub event: Option<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
     pub settings: StepSettings,
 }
 
