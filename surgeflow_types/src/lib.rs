@@ -66,11 +66,7 @@ pub struct WorkflowId(i32);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait Project: Sized + Send + Sync + 'static + Clone
-// where
-//     <<Self::Workflow as __Workflow<Self>>::Step as __Step<Self, Self::Workflow>>::Event:
-//         From<Immediate>,
-{
+pub trait Project: Sized + Send + Sync + 'static + Clone {
     type Workflow: __Workflow<Self>;
 
     ///
@@ -109,7 +105,7 @@ pub trait __WorkflowStatic<P: Project, W: __Workflow<P>>:
     + fmt::Debug
     + JsonSchema
 {
-    fn entrypoint(&self) -> RawStep<P>;
+    fn entrypoint(&self) -> RawStep<P, P::Workflow>;
     fn name(&self) -> &'static str;
 }
 
@@ -134,7 +130,7 @@ where
     const NAME: &'static str;
     const WORKFLOW_STATIC: <Self as __Workflow<P>>::WorkflowStatic;
 
-    fn entrypoint() -> RawStep<P>;
+    fn entrypoint() -> RawStep<P, P::Workflow>;
 }
 
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
@@ -143,7 +139,7 @@ impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
 }
 
 impl<P: Project, W: Workflow<P>> __WorkflowStatic<P, W> for <W as Workflow<P>>::WorkflowStatic {
-    fn entrypoint(&self) -> RawStep<P> {
+    fn entrypoint(&self) -> RawStep<P, P::Workflow> {
         <W as Workflow<P>>::entrypoint()
     }
 
@@ -258,10 +254,63 @@ where
         &self,
         wf: W,
         event: Self::Event,
-    ) -> impl Future<Output = Result<Option<RawStep<P>>, <Self as __Step<P, W>>::Error>> + Send;
+    ) -> impl Future<Output = Result<Option<RawStep<P, P::Workflow>>, <Self as __Step<P, W>>::Error>>
+    + Send;
 
     fn event_is_event(&self, event: &Self::Event) -> bool;
 }
+
+pub trait Step<P: Project, W: __Workflow<P>>:
+    __Step<P, W, Event = <Self as Step<P, W>>::Event, Error = <Self as Step<P, W>>::Error>
+where
+    <W::Step as __Step<P, W>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+    <W::Step as __Step<P, W>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
+{
+    type Event: __Event<P, W>
+        + 'static
+        + Into<<W::Step as __Step<P, W>>::Event>
+        + TryFrom<<W::Step as __Step<P, W>>::Event>
+        + TryFromRef<<W::Step as __Step<P, W>>::Event>;
+    type Error: Error
+        + Send
+        + Sync
+        + 'static
+        + Into<<W::Step as __Step<P, W>>::Error>
+        + TryFrom<<W::Step as __Step<P, W>>::Error>;
+
+    fn run(
+        &self,
+        wf: W,
+        event: <Self as Step<P, W>>::Event,
+    ) -> impl Future<Output = Result<Option<RawStep<P, W>>, <Self as __Step<P, W>>::Error>> + Send;
+
+    fn event_is_event(&self, _: &<Self as Step<P, W>>::Event) -> bool {
+        // TODO: make this non-overridable, use a marker trait
+        true
+    }
+}
+impl<P: Project, W: __Workflow<P>, S: Step<P, W>> __Step<P, W> for S {
+    type Event = <S as Step<P, W>>::Event;
+    type Error = <S as Step<P, W>>::Error;
+
+    async fn run(
+        &self,
+        wf: W,
+        event: Self::Event,
+    ) -> impl Future<Output = Result<Option<RawStep<P, P::Workflow>>, Self::Error>> + Send {
+        
+    }
+
+    fn event_is_event(&self, event: &Self::Event) -> bool {
+        Step::event_is_event(self, event)
+    }
+}
+
+
+
+
 
 pub trait __Event<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send + Sync
@@ -274,14 +323,12 @@ impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {}
 
 ////////////////////////////////////////////////
 
-pub type StepResult<P, W, S> = Result<Option<RawStep<P>>, <S as __Step<P, W>>::Error>;
-
 #[builder]
-pub fn next_step<P: Project>(
-    #[builder(into, start_fn)] step: <P::Workflow as __Workflow<P>>::Step,
+pub fn next_step<P: Project, W: __Workflow<P>>(
+    #[builder(into, start_fn)] step: W::Step,
     max_retries: u32,
-    event: Option<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
-) -> RawStep<P> {
+    event: Option<<W::Step as __Step<P, W>>::Event>,
+) -> RawStep<P, W> {
     RawStep {
         step,
         settings: StepSettings { max_retries },
@@ -302,20 +349,17 @@ pub struct StepSettings {
 pub struct FullyQualifiedStep<P: Project> {
     pub instance: WorkflowInstance<P>,
     pub step_id: StepId,
-    #[serde(bound = "")]
-    pub step: RawStep<P>,
-
+    pub step: RawStep<P, P::Workflow>,
     pub retry_count: u32,
-
     pub previous_step_id: Option<StepId>,
-    #[serde(bound = "")]
-    pub next_step: Option<RawStep<P>>,
+    pub next_step: Option<RawStep<P, P::Workflow>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct RawStep<P: Project> {
-    pub step: <P::Workflow as __Workflow<P>>::Step,
-    pub event: Option<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+#[serde(bound = "")]
+pub struct RawStep<P: Project, W: __Workflow<P>> {
+    pub step: W::Step,
+    pub event: Option<<W::Step as __Step<P, W>>::Event>,
     pub settings: StepSettings,
 }
 
