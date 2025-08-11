@@ -261,7 +261,7 @@ where
 
     fn event_is_event(
         &self,
-        event: &<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event,
+        event: &Self::Event,
     ) -> bool;
 
 
