@@ -259,7 +259,15 @@ where
         event: Self::Event,
     ) -> impl Future<Output = Result<Option<StepWithSettings<P>>, <Self as __Step<P, W>>::Error>> + Send;
 
-    fn event_is<T: __Event<P, W>>(&self, event: &T) -> bool;
+    fn event_is_event(
+        &self,
+        event: &<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event,
+    ) -> bool;
+
+
+    fn event_is<T: __Event<P, W>>(&self, _: &T) -> bool {
+        TypeId::of::<Self::Event>() == TypeId::of::<T>()
+    }
 }
 
 pub trait __Event<P: Project, W: __Workflow<P>>:

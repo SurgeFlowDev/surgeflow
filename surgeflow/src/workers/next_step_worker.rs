@@ -5,7 +5,7 @@ use adapter_types::{
     senders::ActiveStepSender,
 };
 use derive_more::Debug;
-use surgeflow_types::{__Event, __Step, __Workflow, FullyQualifiedStep, Immediate, Project};
+use surgeflow_types::{__Step, FullyQualifiedStep, Immediate, Project};
 
 pub async fn main<
     P,
@@ -148,14 +148,7 @@ where
         .await
         .map_err(NextStepWorkerError::DatabaseError)?;
 
-    if step.step.step.event_is(&Immediate)
-    // <Immediate as __Event<P, P::Workflow>>::value_is::<
-    //     <<<P as Project>::Workflow as __Workflow<P>>::Step as __Step<
-    //         P,
-    //         <P as Project>::Workflow,
-    //     >>::Event,
-    // >(&Immediate)
-    {
+    if step.step.step.event_is(&Immediate) {
         active_step_sender
             .send(step)
             .await
