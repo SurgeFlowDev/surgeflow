@@ -70,10 +70,8 @@ pub struct WorkflowId(i32);
 pub trait Project: Sized + Send + Sync + 'static + Clone {
     type Workflow: __Workflow<Self>;
 
-    // shallow workflow, is a type that implements Workflow, but has to implement additional traits,
-    // but it isn't used for anything except static, associated methods so the exact shape that the type takes
-    // is more flexible, allowing for the implementation of Serialize and Deserialize
-    type ShallowWorkflow: EntrypointExt<Self>
+    // Workflow Static Data
+    type StaticWorkflow: EntrypointExt<Self>
         + NameExt<Self>
         + Serialize
         + Clone
@@ -84,6 +82,7 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
         + fmt::Debug
         + JsonSchema;
 
+    /// 
     fn workflow_for_step(
         &self,
         step: &<Self::Workflow as __Workflow<Self>>::Step,
@@ -103,7 +102,7 @@ pub trait Workflow<P: Project>: __Workflow<P, Step = <Self as Workflow<P>>::Step
 where
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
-    const SHALLOW_WORKFLOW: P::ShallowWorkflow;
+    const STATIC_DATA: P::StaticWorkflow;
     type Step: __Step<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::Step>
         + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
@@ -334,7 +333,7 @@ pub struct InstanceEvent<P: Project> {
 pub struct WorkflowInstance<P: Project> {
     pub external_id: WorkflowInstanceId,
     // pub workflow_name: String,
-    pub workflow: P::ShallowWorkflow,
+    pub workflow: P::StaticWorkflow,
 }
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone, From, Into, PartialEq, Eq)]
 #[serde(transparent)]
