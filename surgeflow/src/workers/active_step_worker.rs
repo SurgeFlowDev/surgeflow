@@ -5,7 +5,7 @@ use adapter_types::{
     senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
 };
 use anyhow::Context;
-use surgeflow_types::{__Step, FullyQualifiedStep, Project};
+use surgeflow_types::{__Step, FullyQualifiedStep, Immediate, Project};
 
 async fn process<
     P,
@@ -34,13 +34,7 @@ where
         .await
         .context("TODO: handle error")?;
 
-    let event = step
-        .event
-        .clone()
-        .unwrap()
-        // TODO
-        // .unwrap_or(<P::Workflow as __Workflow<P>>::Event::from(Immediate).into())
-        ;
+    let event = step.event.clone().unwrap_or(Immediate.into());
 
     let next_step = step.step.step.run(wf.clone(), event).await;
     step.retry_count += 1;
