@@ -83,10 +83,7 @@ where
 pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
 where
     <<Self as __Workflow<P>>::Step as __Step<P, Self>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        // + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        
-        ,
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
     <<Self as __Workflow<P>>::Step as __Step<P, Self>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
 {
@@ -124,9 +121,7 @@ pub trait Workflow<P: Project>:
     >
 where
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        // + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        ,
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
 {
@@ -221,39 +216,36 @@ pub struct ConvertingProjectWorkflowToWorkflowError;
 #[error("converting project event to workflow event failed")]
 pub struct ConvertingProjectEventToWorkflowEventError;
 
-pub trait TryFromRef<T: ?Sized> {
-    type Error;
-    fn try_from_ref(value: &T) -> Result<&Self, Self::Error>;
-}
+// pub trait TryFromRef<T: ?Sized> {
+//     type Error;
+//     fn try_from_ref(value: &T) -> Result<&Self, Self::Error>;
+// }
 
-pub trait TryAsRef<T: ?Sized> {
-    type Error;
-    fn try_as_ref(&self) -> Result<&T, Self::Error>;
-}
+// pub trait TryAsRef<T: ?Sized> {
+//     type Error;
+//     fn try_as_ref(&self) -> Result<&T, Self::Error>;
+// }
 
-impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
-    type Error = U::Error;
+// impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
+//     type Error = U::Error;
 
-    fn try_as_ref(&self) -> Result<&U, Self::Error> {
-        U::try_from_ref(self)
-    }
-}
+//     fn try_as_ref(&self) -> Result<&U, Self::Error> {
+//         U::try_from_ref(self)
+//     }
+// }
 
 pub trait __Step<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + fmt::Debug + Send + Sync + Clone
 where
     <W::Step as __Step<P, W>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        // + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        ,
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
     <W::Step as __Step<P, W>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
 {
     type Event: __Event<P, W>
         + 'static
         + Into<<W::Step as __Step<P, W>>::Event>
-        + TryFrom<<W::Step as __Step<P, W>>::Event>
-        + TryFromRef<<W::Step as __Step<P, W>>::Event>;
+        + TryFrom<<W::Step as __Step<P, W>>::Event>;
     type Error: Error
         + Send
         + Sync
@@ -273,16 +265,11 @@ where
 pub trait __Event<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send + Sync
 {
-    // fn value_is<T: __Event<P, W>>(&self) -> bool;
 }
 
 pub trait Event<P: Project, W: __Workflow<P>>: __Event<P, W> {}
 
-impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {
-    // fn value_is<T: __Event<P, W>>(&self) -> bool {
-    //     TypeId::of::<Self>() == TypeId::of::<T>()
-    // }
-}
+impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {}
 
 ////////////////////////////////////////////////
 
@@ -356,15 +343,6 @@ pub struct WorkflowName(String);
 impl From<&str> for WorkflowName {
     fn from(value: &str) -> Self {
         Self(value.to_string())
-    }
-}
-
-impl TryFromRef<Immediate> for Immediate {
-    // TODO: error type
-    type Error = String;
-
-    fn try_from_ref(value: &Immediate) -> Result<&Self, Self::Error> {
-        Ok(value)
     }
 }
 
