@@ -125,7 +125,8 @@ pub trait Workflow<P: Project>:
 where
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+        // + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        ,
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
 {
