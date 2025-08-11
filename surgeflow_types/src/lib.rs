@@ -76,10 +76,7 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
     ) -> Self::Workflow;
 }
 
-pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
-where
-    <Self::Step as __Step<P, Self>>::Event: From<Immediate>,
-{
+pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static {
     type Step: __Step<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::Step>
         + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
@@ -112,8 +109,6 @@ pub trait Workflow<P: Project>:
         Step = <Self as Workflow<P>>::Step,
         WorkflowStatic = <Self as Workflow<P>>::WorkflowStatic,
     >
-where
-    <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
     type WorkflowStatic: __WorkflowStatic<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::WorkflowStatic>
@@ -348,3 +343,23 @@ impl TryFromRef<Immediate> for Immediate {
         Ok(value)
     }
 }
+
+// #[generic]
+// mod IAmGeneric {
+//     type A = generic!(); // placeholder, removed by the macro
+
+//     impl ::core::fmt::Display for A {
+//         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+//             f.write_str("common implementation")
+//         }
+//     }
+// }
+
+// struct A;
+// struct B;
+
+// #[concrete(IAmGeneric)]
+// mod IamConcreteA { type A = crate::A; }
+
+// #[concrete(IAmGeneric)]
+// mod IamConcreteB { type A = crate::B; }
