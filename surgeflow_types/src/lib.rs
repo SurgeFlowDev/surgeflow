@@ -3,7 +3,6 @@ use derive_more::{Debug, Display, From, Into};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::any::TypeId;
-use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{self};
 use uuid::Uuid;
@@ -258,7 +257,6 @@ pub trait __Event<P: Project, W: __Workflow<P>>:
 {
     fn value_is<WInner: __Workflow<P>, T: __Event<P, WInner> + 'static>(&self) -> bool;
 }
-
 
 ////////////////////////////////////////////////
 

@@ -1,5 +1,3 @@
-use std::convert;
-
 use adapter_types::{
     dependencies::active_step_worker::ActiveStepWorkerDependencies,
     managers::PersistenceManager,
@@ -7,7 +5,7 @@ use adapter_types::{
     senders::{ActiveStepSender, CompletedStepSender, FailedStepSender},
 };
 use anyhow::Context;
-use surgeflow_types::{__Step, __Workflow, FullyQualifiedStep, Immediate, Project};
+use surgeflow_types::{__Step, FullyQualifiedStep, Project};
 
 async fn process<
     P,

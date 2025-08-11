@@ -9,7 +9,9 @@ use axum::{Json, extract::State, http::StatusCode};
 use axum_extra::routing::TypedPath;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use surgeflow_types::{InstanceEvent, Project, Workflow, WorkflowInstance, WorkflowInstanceId, __Step, __Workflow};
+use surgeflow_types::{
+    __Step, __Workflow, InstanceEvent, Project, Workflow, WorkflowInstance, WorkflowInstanceId,
+};
 
 pub struct AppState<P: Project, E: EventSender<P>, I: NewInstanceSender<P>> {
     pub dependencies: ControlServerDependencies<P, E, I>,
@@ -86,12 +88,7 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
         }
 
         // more readable than a closure
-        async fn handler<
-            P: Project,
-            T: Workflow<P>,
-            E: EventSender<P>,
-            N: NewInstanceSender<P>,
-        >(
+        async fn handler<P: Project, T: Workflow<P>, E: EventSender<P>, N: NewInstanceSender<P>>(
             PostWorkflowEvent { instance_id }: PostWorkflowEvent,
             State(ArcAppState(state)): State<ArcAppState<P, E, N>>,
             Json(event): Json<<<T as Workflow<P>>::Step as __Step<P, T>>::Event>,
@@ -142,12 +139,7 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
         }
 
         // more readable than a closure
-        async fn handler<
-            P: Project,
-            T: Workflow<P>,
-            E: EventSender<P>,
-            N: NewInstanceSender<P>,
-        >(
+        async fn handler<P: Project, T: Workflow<P>, E: EventSender<P>, N: NewInstanceSender<P>>(
             _: PostWorkflowInstance,
             State(ArcAppState(state)): State<ArcAppState<P, E, N>>,
         ) -> Result<Json<WorkflowInstanceId>, PostWorkflowInstanceError> {

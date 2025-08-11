@@ -2,7 +2,7 @@ use adapter_types::{
     dependencies::new_event_worker::NewEventWorkerDependencies,
     managers::StepsAwaitingEventManager, receivers::EventReceiver, senders::ActiveStepSender,
 };
-use surgeflow_types::{__Event, __Step, FullyQualifiedStep, InstanceEvent, Project};
+use surgeflow_types::{__Step, FullyQualifiedStep, InstanceEvent, Project};
 
 pub async fn main<P, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>(
     dependencies: NewEventWorkerDependencies<

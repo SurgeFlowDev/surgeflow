@@ -2,8 +2,8 @@ use adapter_types::{
     dependencies::new_instance_worker::NewInstanceWorkerDependencies, managers::PersistenceManager,
     receivers::NewInstanceReceiver, senders::NextStepSender,
 };
-use surgeflow_types::{FullyQualifiedStep, Project, StepId, WorkflowInstance};
 use surgeflow_types::__WorkflowStatic;
+use surgeflow_types::{FullyQualifiedStep, Project, StepId, WorkflowInstance};
 
 async fn process<P, NextStepSenderT, PersistenceManagerT>(
     next_step_sender: &mut NextStepSenderT,
