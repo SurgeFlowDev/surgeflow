@@ -265,8 +265,8 @@ where
     ) -> bool;
 
 
-    fn event_is<T: __Event<P, W>>(&self, _: &T) -> bool {
-        TypeId::of::<Self::Event>() == TypeId::of::<T>()
+    fn event_is_immediate(&self) -> bool {
+        TypeId::of::<Self::Event>() == TypeId::of::<Immediate>()
     }
 }
 
