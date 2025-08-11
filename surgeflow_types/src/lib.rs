@@ -253,7 +253,7 @@ where
     fn run(
         &self,
         wf: W,
-        event: Self::Event,
+        event: <Self as __Step<P, W>>::Event,
     ) -> impl Future<Output = Result<Option<RawStep<P, P::Workflow>>, <Self as __Step<P, W>>::Error>>
     + Send;
 
@@ -283,7 +283,7 @@ where
     fn run(
         &self,
         wf: W,
-        event: <Self as Step<P, W>>::Event,
+        event: <Self as __Step<P, W>>::Event,
     ) -> impl Future<Output = Result<Option<RawStep<P, W>>, <Self as __Step<P, W>>::Error>> + Send;
 
     fn event_is_event(&self, _: &<Self as Step<P, W>>::Event) -> bool {
@@ -291,26 +291,6 @@ where
         true
     }
 }
-impl<P: Project, W: __Workflow<P>, S: Step<P, W>> __Step<P, W> for S {
-    type Event = <S as Step<P, W>>::Event;
-    type Error = <S as Step<P, W>>::Error;
-
-    async fn run(
-        &self,
-        wf: W,
-        event: Self::Event,
-    ) -> impl Future<Output = Result<Option<RawStep<P, P::Workflow>>, Self::Error>> + Send {
-        
-    }
-
-    fn event_is_event(&self, event: &Self::Event) -> bool {
-        Step::event_is_event(self, event)
-    }
-}
-
-
-
-
 
 pub trait __Event<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send + Sync
