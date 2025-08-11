@@ -84,7 +84,9 @@ pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
 where
     <<Self as __Workflow<P>>::Step as __Step<P, Self>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+        // + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        
+        ,
     <<Self as __Workflow<P>>::Step as __Step<P, Self>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
 {
@@ -241,7 +243,8 @@ pub trait __Step<P: Project, W: __Workflow<P>>:
 where
     <W::Step as __Step<P, W>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+        // + TryFromRef<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        ,
     <W::Step as __Step<P, W>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
 {
