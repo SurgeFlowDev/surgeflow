@@ -216,23 +216,23 @@ pub struct ConvertingProjectWorkflowToWorkflowError;
 #[error("converting project event to workflow event failed")]
 pub struct ConvertingProjectEventToWorkflowEventError;
 
-// pub trait TryFromRef<T: ?Sized> {
-//     type Error;
-//     fn try_from_ref(value: &T) -> Result<&Self, Self::Error>;
-// }
+pub trait TryFromRef<T: ?Sized> {
+    type Error;
+    fn try_from_ref(value: &T) -> Result<&Self, Self::Error>;
+}
 
-// pub trait TryAsRef<T: ?Sized> {
-//     type Error;
-//     fn try_as_ref(&self) -> Result<&T, Self::Error>;
-// }
+pub trait TryAsRef<T: ?Sized> {
+    type Error;
+    fn try_as_ref(&self) -> Result<&T, Self::Error>;
+}
 
-// impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
-//     type Error = U::Error;
+impl<T: ?Sized, U: TryFromRef<T>> TryAsRef<U> for T {
+    type Error = U::Error;
 
-//     fn try_as_ref(&self) -> Result<&U, Self::Error> {
-//         U::try_from_ref(self)
-//     }
-// }
+    fn try_as_ref(&self) -> Result<&U, Self::Error> {
+        U::try_from_ref(self)
+    }
+}
 
 pub trait __Step<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + fmt::Debug + Send + Sync + Clone
@@ -245,7 +245,9 @@ where
     type Event: __Event<P, W>
         + 'static
         + Into<<W::Step as __Step<P, W>>::Event>
-        + TryFrom<<W::Step as __Step<P, W>>::Event>;
+        + TryFrom<<W::Step as __Step<P, W>>::Event>
+        + TryFromRef<<W::Step as __Step<P, W>>::Event>
+        ;
     type Error: Error
         + Send
         + Sync
