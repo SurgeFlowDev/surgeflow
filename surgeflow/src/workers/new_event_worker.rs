@@ -1,8 +1,12 @@
+use std::sync::WaitTimeoutResult;
+
 use adapter_types::{
     dependencies::new_event_worker::NewEventWorkerDependencies,
     managers::StepsAwaitingEventManager, receivers::EventReceiver, senders::ActiveStepSender,
 };
-use surgeflow_types::{__Step, FullyQualifiedStep, InstanceEvent, Project};
+use surgeflow_types::{
+    __Event, __Step, __Workflow, FullyQualifiedStep, InstanceEvent, Project, Workflow,
+};
 
 pub async fn main<P, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>(
     dependencies: NewEventWorkerDependencies<
@@ -94,7 +98,7 @@ where
         tracing::debug!("No step awaiting event for instance {}", instance_id);
         return Ok(());
     };
-    if step.step.step.value_has_event_value(&event) {
+    if event.value_is::<P::Workflow, <<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>() {
         steps_awaiting_event.delete_step(instance_id).await?;
     } else {
         return Ok(());

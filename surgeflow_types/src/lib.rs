@@ -249,7 +249,6 @@ pub trait __Step<P: Project, W: __Workflow<P>>:
         wf: W,
         event: Self::Event,
     ) -> impl Future<Output = Result<Option<StepWithSettings<P>>, <Self as __Step<P, W>>::Error>> + Send;
-    fn value_has_event_value(&self, e: &Self::Event) -> bool;
 }
 
 pub trait __Event<P: Project, W: __Workflow<P>>:
