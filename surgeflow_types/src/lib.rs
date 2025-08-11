@@ -70,19 +70,7 @@ pub struct WorkflowId(i32);
 pub trait Project: Sized + Send + Sync + 'static + Clone {
     type Workflow: __Workflow<Self>;
 
-    // Workflow Static Data
-    type StaticWorkflow: EntrypointExt<Self>
-        + NameExt<Self>
-        + Serialize
-        + Clone
-        + Copy
-        + Send
-        + Sync
-        + for<'a> Deserialize<'a>
-        + fmt::Debug
-        + JsonSchema;
-
-    /// 
+    ///
     fn workflow_for_step(
         &self,
         step: &<Self::Workflow as __Workflow<Self>>::Step,
@@ -96,17 +84,46 @@ where
     type Step: __Step<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::Step>
         + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
+    type WorkflowStatic: __WorkflowStatic<P>
+        + Into<<P::Workflow as __Workflow<P>>::WorkflowStatic>
+        + TryFrom<<P::Workflow as __Workflow<P>>::WorkflowStatic>;
 }
 
-pub trait Workflow<P: Project>: __Workflow<P, Step = <Self as Workflow<P>>::Step>
+pub trait __WorkflowStatic<P: Project>:
+    Clone
+    + Send
+    + Sync
+    + 'static
+    + EntrypointExt<P>
+    + NameExt<P>
+    + Serialize
+    + Clone
+    + Copy
+    + Send
+    + Sync
+    + for<'a> Deserialize<'a>
+    + fmt::Debug
+    + JsonSchema
+{
+}
+
+pub trait Workflow<P: Project>:
+    __Workflow<
+        P,
+        Step = <Self as Workflow<P>>::Step,
+        WorkflowStatic = <Self as Workflow<P>>::WorkflowStatic,
+    >
 where
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
-    const STATIC_DATA: P::StaticWorkflow;
+    type WorkflowStatic: __WorkflowStatic<P>
+        + Into<<P::Workflow as __Workflow<P>>::WorkflowStatic>
+        + TryFrom<<P::Workflow as __Workflow<P>>::WorkflowStatic>;
     type Step: __Step<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::Step>
         + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
     const NAME: &'static str;
+    const WORKFLOW_STATIC: <Self as __Workflow<P>>::WorkflowStatic;
 
     fn entrypoint() -> StepWithSettings<P>;
 }
@@ -121,6 +138,7 @@ pub trait NameExt<P: Project> {
 
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     type Step = <W as Workflow<P>>::Step;
+    type WorkflowStatic = <W as Workflow<P>>::WorkflowStatic;
 }
 
 impl<P: Project, W: Workflow<P>> EntrypointExt<P> for W {
@@ -333,7 +351,7 @@ pub struct InstanceEvent<P: Project> {
 pub struct WorkflowInstance<P: Project> {
     pub external_id: WorkflowInstanceId,
     // pub workflow_name: String,
-    pub workflow: P::StaticWorkflow,
+    pub workflow: <P::Workflow as __Workflow<P>>::WorkflowStatic,
 }
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone, From, Into, PartialEq, Eq)]
 #[serde(transparent)]

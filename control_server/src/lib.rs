@@ -157,7 +157,7 @@ pub trait WorkflowControl<P: Project>: Workflow<P> {
                 .dependencies
                 .new_instance_sender
                 .send(WorkflowInstance {
-                    workflow: <T as Workflow<P>>::STATIC_DATA,
+                    workflow: <T as Workflow<P>>::WORKFLOW_STATIC.into(),
                     external_id,
                     // workflow_name: T::NAME.into(),
                 })
