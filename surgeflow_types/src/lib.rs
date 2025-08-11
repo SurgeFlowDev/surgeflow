@@ -84,12 +84,12 @@ where
     type Step: __Step<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::Step>
         + TryFrom<<P::Workflow as __Workflow<P>>::Step>;
-    type WorkflowStatic: __WorkflowStatic<P>
+    type WorkflowStatic: __WorkflowStatic<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::WorkflowStatic>
         + TryFrom<<P::Workflow as __Workflow<P>>::WorkflowStatic>;
 }
 
-pub trait __WorkflowStatic<P: Project>:
+pub trait __WorkflowStatic<P: Project, W: __Workflow<P>>:
     Clone
     + Send
     + Sync
@@ -116,7 +116,7 @@ pub trait Workflow<P: Project>:
 where
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: From<Immediate>,
 {
-    type WorkflowStatic: __WorkflowStatic<P>
+    type WorkflowStatic: __WorkflowStatic<P, Self>
         + Into<<P::Workflow as __Workflow<P>>::WorkflowStatic>
         + TryFrom<<P::Workflow as __Workflow<P>>::WorkflowStatic>;
     type Step: __Step<P, Self>
@@ -131,6 +131,16 @@ where
 impl<P: Project, W: Workflow<P>> __Workflow<P> for W {
     type Step = <W as Workflow<P>>::Step;
     type WorkflowStatic = <W as Workflow<P>>::WorkflowStatic;
+}
+
+impl<P: Project, W: Workflow<P>> __WorkflowStatic<P, W> for <W as Workflow<P>>::WorkflowStatic {
+    fn entrypoint(&self) -> StepWithSettings<P> {
+        <W as Workflow<P>>::entrypoint()
+    }
+
+    fn name(&self) -> &'static str {
+        <W as Workflow<P>>::NAME
+    }
 }
 
 // impl<P: Project, W: Workflow<P>> EntrypointExt<P> for W {
