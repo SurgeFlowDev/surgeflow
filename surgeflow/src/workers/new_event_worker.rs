@@ -5,7 +5,7 @@ use adapter_types::{
     managers::StepsAwaitingEventManager, receivers::EventReceiver, senders::ActiveStepSender,
 };
 use surgeflow_types::{
-    __Event, __Step, __Workflow, FullyQualifiedStep, InstanceEvent, Project, Workflow,
+    __Event, __Step, __Workflow, FullyQualifiedStep, InstanceEvent, Project, RawStep, Workflow,
 };
 
 pub async fn main<P, ActiveStepSenderT, EventReceiverT, StepsAwaitingEventManagerT>(
@@ -104,9 +104,13 @@ where
     } else {
         return Ok(());
     }
+    let raw_step = RawStep {
+        event: Some(event),
+        ..step.step
+    };
     active_step_sender
         .send(FullyQualifiedStep {
-            event: Some(event),
+            step: raw_step,
             ..step
         })
         .await?;

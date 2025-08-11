@@ -305,8 +305,6 @@ pub struct FullyQualifiedStep<P: Project> {
     #[serde(bound = "")]
     pub step: RawStep<P>,
 
-    /// Eventful steps can be initialized without an event, but it will be set when the step is triggered.
-    pub event: Option<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
     pub retry_count: u32,
 
     pub previous_step_id: Option<StepId>,

@@ -27,7 +27,7 @@ where
         step: entrypoint,
         retry_count: 0,
         step_id: StepId::new(),
-        event: None,
+        
         previous_step_id: None,
         next_step: None,
     };

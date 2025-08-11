@@ -119,7 +119,7 @@ where
                 instance: step.instance,
                 step_id: StepId::new(),
                 step: next_step,
-                event: None,
+                
                 retry_count: 0,
                 previous_step_id: Some(step.step_id),
                 next_step: None,

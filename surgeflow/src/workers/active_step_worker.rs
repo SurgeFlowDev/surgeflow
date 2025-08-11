@@ -34,7 +34,7 @@ where
         .await
         .context("TODO: handle error")?;
 
-    let event = step.event.clone().ok_or(
+    let event = step.step.event.clone().ok_or(
         // TODO: at this point, this error will never happen, event is guaranteed to be Some(_)
         // TODO: Could we have a FullyQualifiedStep where event isn't optional and thus avoid this "fake" error handling?
         anyhow::anyhow!("Step event is missing for step: {}", step.step_id),
