@@ -258,20 +258,22 @@ where
         wf: W,
         event: Self::Event,
     ) -> impl Future<Output = Result<Option<StepWithSettings<P>>, <Self as __Step<P, W>>::Error>> + Send;
+
+    fn event_is<T: __Event<P, W>>(&self, event: &T) -> bool;
 }
 
 pub trait __Event<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send + Sync
 {
-    fn value_is<T: __Event<P, W>>(&self) -> bool;
+    // fn value_is<T: __Event<P, W>>(&self) -> bool;
 }
 
 pub trait Event<P: Project, W: __Workflow<P>>: __Event<P, W> {}
 
 impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {
-    fn value_is<T: __Event<P, W>>(&self) -> bool {
-        TypeId::of::<Self>() == TypeId::of::<T>()
-    }
+    // fn value_is<T: __Event<P, W>>(&self) -> bool {
+    //     TypeId::of::<Self>() == TypeId::of::<T>()
+    // }
 }
 
 ////////////////////////////////////////////////

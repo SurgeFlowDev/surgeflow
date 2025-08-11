@@ -96,10 +96,12 @@ where
 
     let Some(step) = step else {
         tracing::debug!("No step awaiting event for instance {}", instance_id);
-        return Ok(()); 
+        return Ok(());
     };
-    
-    if event.value_is::<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>() {
+
+    if step.step.step.event_is(&event)
+    // event.value_is::<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>()
+    {
         steps_awaiting_event.delete_step(instance_id).await?;
     } else {
         return Ok(());

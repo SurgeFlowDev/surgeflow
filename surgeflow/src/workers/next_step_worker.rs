@@ -148,18 +148,13 @@ where
         .await
         .map_err(NextStepWorkerError::DatabaseError)?;
 
-    type PEvent<P> = <<<P as Project>::Workflow as __Workflow<P>>::Step as __Step<
-        P,
-        <P as Project>::Workflow,
-    >>::Event;
-
-    // let immediate = PEvent::<P>::from(Immediate);
-    if <Immediate as __Event<P, P::Workflow>>::value_is::<
-        <<<P as Project>::Workflow as __Workflow<P>>::Step as __Step<
-            P,
-            <P as Project>::Workflow,
-        >>::Event,
-    >(&Immediate)
+    if step.step.step.event_is(&Immediate)
+    // <Immediate as __Event<P, P::Workflow>>::value_is::<
+    //     <<<P as Project>::Workflow as __Workflow<P>>::Step as __Step<
+    //         P,
+    //         <P as Project>::Workflow,
+    //     >>::Event,
+    // >(&Immediate)
     {
         active_step_sender
             .send(step)
