@@ -153,13 +153,12 @@ where
         <P as Project>::Workflow,
     >>::Event;
 
-    // let immediate = PEvent::<P>::from(Immediate);
-    if <Immediate as __Event<P, P::Workflow>>::value_is::<
-        <<<P as Project>::Workflow as __Workflow<P>>::Step as __Step<
+    
+    if <<<<P as Project>::Workflow as __Workflow<P>>::Step as __Step<
             P,
             <P as Project>::Workflow,
-        >>::Event,
-    >(&Immediate)
+        >>::Event as __Event<P, <P as Project>::Workflow>>::value_is(&Immediate)
+    
     {
         active_step_sender
             .send(step)
