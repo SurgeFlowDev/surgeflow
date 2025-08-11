@@ -255,7 +255,15 @@ pub trait __Step<P: Project, W: __Workflow<P>>:
 pub trait __Event<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send + Sync
 {
-    fn value_is<WInner: __Workflow<P>, T: __Event<P, WInner> + 'static>(&self) -> bool;
+    fn value_is<EventW: __Workflow<P>, E: __Event<P, EventW> + 'static>(&self) -> bool;
+}
+
+pub trait Event<P: Project, W: __Workflow<P>>: __Event<P, W> {}
+
+impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {
+    fn value_is<WInner: __Workflow<P>, T: __Event<P, WInner> + 'static>(&self) -> bool {
+        TypeId::of::<Self>() == TypeId::of::<T>()
+    }
 }
 
 ////////////////////////////////////////////////
@@ -309,12 +317,7 @@ pub struct StepWithSettings<P: Project> {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, JsonSchema)]
 pub struct Immediate;
 
-impl<P: Project, W: __Workflow<P>> __Event<P, W> for Immediate {
-    fn value_is<WInner: __Workflow<P>, T: __Event<P, WInner> + 'static>(&self) -> bool {
-        // TODO: Event trait
-        TypeId::of::<Self>() == TypeId::of::<T>()
-    }
-}
+impl<P: Project, W: __Workflow<P>> Event<P, W> for Immediate {}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InstanceEvent<P: Project> {
