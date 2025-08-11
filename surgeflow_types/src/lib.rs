@@ -66,7 +66,11 @@ pub struct WorkflowId(i32);
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait Project: Sized + Send + Sync + 'static + Clone {
+pub trait Project: Sized + Send + Sync + 'static + Clone
+where
+    <<Self::Workflow as __Workflow<Self>>::Step as __Step<Self, Self::Workflow>>::Event:
+        From<Immediate>,
+{
     type Workflow: __Workflow<Self>;
 
     ///
@@ -259,15 +263,11 @@ where
         event: Self::Event,
     ) -> impl Future<Output = Result<Option<StepWithSettings<P>>, <Self as __Step<P, W>>::Error>> + Send;
 
-    fn event_is_event(
-        &self,
-        event: &Self::Event,
-    ) -> bool;
+    fn event_is_event(&self, event: &Self::Event) -> bool;
 
-
-    fn event_is_immediate(&self) -> bool {
-        TypeId::of::<Self::Event>() == TypeId::of::<Immediate>()
-    }
+    // fn event_is_immediate(&self) -> bool {
+    //     TypeId::of::<Self::Event>() == TypeId::of::<Immediate>()
+    // }
 }
 
 pub trait __Event<P: Project, W: __Workflow<P>>:
