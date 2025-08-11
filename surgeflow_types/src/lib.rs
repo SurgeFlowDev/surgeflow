@@ -265,9 +265,7 @@ where
     ) -> bool;
 
 
-    fn event_is_immediate(&self) -> bool {
-        TypeId::of::<Self::Event>() == TypeId::of::<Immediate>()
-    }
+    fn event_is_immediate(&self) -> bool;
 }
 
 pub trait __Event<P: Project, W: __Workflow<P>>:
