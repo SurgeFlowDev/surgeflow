@@ -127,7 +127,7 @@ async fn process<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceMa
     active_step_sender: &mut ActiveStepSenderT,
     steps_awaiting_event_manager: &mut StepsAwaitingEventManagerT,
     persistence_manager: &mut PersistenceManagerT,
-    step: FullyQualifiedStep<P>,
+    mut step: FullyQualifiedStep<P>,
 ) -> Result<
     (),
     NextStepWorkerError<P, ActiveStepSenderT, StepsAwaitingEventManagerT, PersistenceManagerT>,
@@ -147,6 +147,9 @@ where
         .insert_step(step.instance.external_id, step.step_id, &step.step.step)
         .await
         .map_err(NextStepWorkerError::DatabaseError)?;
+
+    // TODO(semantics): this requires step be muttable. Would shadowing be better here?
+    step.step.event = step.step.step.init_event();
 
     if step.step.event.is_some() {
         active_step_sender

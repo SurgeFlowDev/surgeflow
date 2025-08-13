@@ -2,7 +2,6 @@ use bon::builder;
 use derive_more::{Debug, Display, From, Into};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::any::TypeId;
 use std::error::Error;
 use std::fmt::{self};
 use uuid::Uuid;
@@ -250,12 +249,10 @@ where
         + Into<<W::Step as __Step<P, W>>::Error>
         + TryFrom<<W::Step as __Step<P, W>>::Error>;
 
-    // fn run(
-    //     &self,
-    //     wf: W,
-    //     event: <Self as __Step<P, W>>::Event,
-    // ) -> impl Future<Output = Result<Option<RawStep<P, P::Workflow>>, <Self as __Step<P, W>>::Error>>
-    // + Send;
+    fn init_event(&self) -> Option<Self::Event> {
+        <Self::Event as __Event<P, W>>::maybe_init()
+    }
+
     fn run(
         &self,
         wf: W,
@@ -300,11 +297,20 @@ where
 pub trait __Event<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send + Sync
 {
+    fn maybe_init() -> Option<Self>;
 }
 
-pub trait Event<P: Project, W: __Workflow<P>>: __Event<P, W> {}
+pub trait Event<P: Project, W: __Workflow<P>>: __Event<P, W> {
+    fn maybe_init() -> Option<Self> {
+        None
+    }
+}
 
-impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {}
+impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {
+    fn maybe_init() -> Option<Self> {
+        Event::maybe_init()
+    }
+}
 
 ////////////////////////////////////////////////
 
@@ -312,8 +318,7 @@ impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {}
 pub fn next_step<P: Project, W: __Workflow<P>>(
     #[builder(into, start_fn)] step: W::Step,
     max_retries: u32,
-    #[builder(into)]
-    event: Option<<W::Step as __Step<P, W>>::Event>,
+    #[builder(into)] event: Option<<W::Step as __Step<P, W>>::Event>,
 ) -> RawStep<P, W> {
     RawStep {
         step,
@@ -354,7 +359,11 @@ pub struct RawStep<P: Project, W: __Workflow<P>> {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, JsonSchema)]
 pub struct Immediate;
 
-impl<P: Project, W: __Workflow<P>> Event<P, W> for Immediate {}
+impl<P: Project, W: __Workflow<P>> Event<P, W> for Immediate {
+    fn maybe_init() -> Option<Self> {
+        Some(Self)
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InstanceEvent<P: Project> {
