@@ -250,47 +250,52 @@ where
         + Into<<W::Step as __Step<P, W>>::Error>
         + TryFrom<<W::Step as __Step<P, W>>::Error>;
 
-    fn run(
-        &self,
-        wf: W,
-        event: <Self as __Step<P, W>>::Event,
-    ) -> impl Future<Output = Result<Option<RawStep<P, P::Workflow>>, <Self as __Step<P, W>>::Error>>
-    + Send;
-
-    fn event_is_event(&self, event: &Self::Event) -> bool;
-}
-
-pub trait Step<P: Project, W: __Workflow<P>>:
-    __Step<P, W, Event = <Self as Step<P, W>>::Event, Error = <Self as Step<P, W>>::Error>
-where
-    <W::Step as __Step<P, W>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
-    <W::Step as __Step<P, W>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
-        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
-{
-    type Event: __Event<P, W>
-        + 'static
-        + Into<<W::Step as __Step<P, W>>::Event>
-        + TryFrom<<W::Step as __Step<P, W>>::Event>
-        + TryFromRef<<W::Step as __Step<P, W>>::Event>;
-    type Error: Error
-        + Send
-        + Sync
-        + 'static
-        + Into<<W::Step as __Step<P, W>>::Error>
-        + TryFrom<<W::Step as __Step<P, W>>::Error>;
-
+    // fn run(
+    //     &self,
+    //     wf: W,
+    //     event: <Self as __Step<P, W>>::Event,
+    // ) -> impl Future<Output = Result<Option<RawStep<P, P::Workflow>>, <Self as __Step<P, W>>::Error>>
+    // + Send;
     fn run(
         &self,
         wf: W,
         event: <Self as __Step<P, W>>::Event,
     ) -> impl Future<Output = Result<Option<RawStep<P, W>>, <Self as __Step<P, W>>::Error>> + Send;
 
-    fn event_is_event(&self, _: &<Self as Step<P, W>>::Event) -> bool {
-        // TODO: make this non-overridable, use a marker trait
-        true
-    }
+    fn event_is_event(&self, event: &Self::Event) -> bool;
 }
+
+// pub trait Step<P: Project, W: __Workflow<P>>:
+//     __Step<P, W, Event = <Self as Step<P, W>>::Event, Error = <Self as Step<P, W>>::Error>
+// where
+//     <W::Step as __Step<P, W>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+//         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+//     <W::Step as __Step<P, W>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
+//         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
+// {
+//     type Event: __Event<P, W>
+//         + 'static
+//         + Into<<W::Step as __Step<P, W>>::Event>
+//         + TryFrom<<W::Step as __Step<P, W>>::Event>
+//         + TryFromRef<<W::Step as __Step<P, W>>::Event>;
+//     type Error: Error
+//         + Send
+//         + Sync
+//         + 'static
+//         + Into<<W::Step as __Step<P, W>>::Error>
+//         + TryFrom<<W::Step as __Step<P, W>>::Error>;
+
+//     fn run(
+//         &self,
+//         wf: W,
+//         event: <Self as __Step<P, W>>::Event,
+//     ) -> impl Future<Output = Result<Option<RawStep<P, W>>, <Self as __Step<P, W>>::Error>> + Send;
+
+//     fn event_is_event(&self, _: &<Self as Step<P, W>>::Event) -> bool {
+//         // TODO: make this non-overridable, use a marker trait
+//         true
+//     }
+// }
 
 pub trait __Event<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send + Sync
