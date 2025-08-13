@@ -79,7 +79,8 @@ pub trait Project: Sized + Send + Sync + 'static + Clone {
 pub trait __Workflow<P: Project>: Clone + Send + Sync + 'static
 where
     <<Self as __Workflow<P>>::Step as __Step<P, Self>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        + From<Immediate>,
     <<Self as __Workflow<P>>::Step as __Step<P, Self>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
 {
@@ -117,7 +118,8 @@ pub trait Workflow<P: Project>:
     >
 where
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Event: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
-        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>,
+        + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Event>
+        + From<Immediate>,
     <<Self as Workflow<P>>::Step as __Step<P, Self>>::Error: Into<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>
         + TryFrom<<<P::Workflow as __Workflow<P>>::Step as __Step<P, P::Workflow>>::Error>,
 {
@@ -250,12 +252,19 @@ where
         + Into<<W::Step as __Step<P, W>>::Error>
         + TryFrom<<W::Step as __Step<P, W>>::Error>;
 
-    // fn run(
-    //     &self,
-    //     wf: W,
-    //     event: <Self as __Step<P, W>>::Event,
-    // ) -> impl Future<Output = Result<Option<RawStep<P, P::Workflow>>, <Self as __Step<P, W>>::Error>>
-    // + Send;
+    fn run_raw(
+        &self,
+        wf: W,
+        event: <Self as __Step<P, W>>::Event,
+    ) -> impl Future<Output = Result<Option<RawStep<P, W>>, <Self as __Step<P, W>>::Error>> + Send
+    {
+        async move {
+            Ok(self
+                .run(wf, event)
+                .await?
+                .map(|step| Self::Event::prepare_event(step)))
+        }
+    }
     fn run(
         &self,
         wf: W,
@@ -300,11 +309,20 @@ where
 pub trait __Event<P: Project, W: __Workflow<P>>:
     Serialize + for<'a> Deserialize<'a> + Clone + fmt::Debug + Send + JsonSchema + 'static + Send + Sync
 {
+    fn prepare_event(step: RawStep<P, W>) -> RawStep<P, W> {
+        step
+    }
 }
 
-pub trait Event<P: Project, W: __Workflow<P>>: __Event<P, W> {}
+pub trait Event<P: Project, W: __Workflow<P>>: __Event<P, W> {
+    fn prepare_event(step: RawStep<P, W>) -> RawStep<P, W>;
+}
 
-impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {}
+impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {
+    fn prepare_event(step: RawStep<P, W>) -> RawStep<P, W> {
+        <Self as Event<P, W>>::prepare_event(step)
+    }
+}
 
 ////////////////////////////////////////////////
 
@@ -312,8 +330,7 @@ impl<P: Project, W: __Workflow<P>, E: Event<P, W>> __Event<P, W> for E {}
 pub fn next_step<P: Project, W: __Workflow<P>>(
     #[builder(into, start_fn)] step: W::Step,
     max_retries: u32,
-    #[builder(into)]
-    event: Option<<W::Step as __Step<P, W>>::Event>,
+    #[builder(into)] event: Option<<W::Step as __Step<P, W>>::Event>,
 ) -> RawStep<P, W> {
     RawStep {
         step,
@@ -354,7 +371,12 @@ pub struct RawStep<P: Project, W: __Workflow<P>> {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, JsonSchema)]
 pub struct Immediate;
 
-impl<P: Project, W: __Workflow<P>> Event<P, W> for Immediate {}
+impl<P: Project, W: __Workflow<P>> Event<P, W> for Immediate {
+    fn prepare_event(mut step: RawStep<P, W>) -> RawStep<P, W> {
+        step.event = Some(Immediate.into());
+        step
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InstanceEvent<P: Project> {

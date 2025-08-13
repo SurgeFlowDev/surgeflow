@@ -40,7 +40,7 @@ where
         anyhow::anyhow!("Step event is missing for step: {}", step.step_id),
     )?;
 
-    let next_step = step.step.step.run(wf.clone(), event).await;
+    let next_step = step.step.step.run_raw(wf.clone(), event).await;
     step.retry_count += 1;
     if let Ok(next_step) = next_step {
         completed_step_sender
