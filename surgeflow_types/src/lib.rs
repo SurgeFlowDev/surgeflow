@@ -249,9 +249,7 @@ where
         + Into<<W::Step as __Step<P, W>>::Error>
         + TryFrom<<W::Step as __Step<P, W>>::Error>;
 
-    fn init_event(&self) -> Option<Self::Event> {
-        <Self::Event as __Event<P, W>>::maybe_init()
-    }
+    fn init_event(&self) -> Option<Self::Event>;
 
     fn run(
         &self,
@@ -287,6 +285,10 @@ where
         wf: W,
         event: <Self as __Step<P, W>>::Event,
     ) -> impl Future<Output = Result<Option<RawStep<P, W>>, <Self as __Step<P, W>>::Error>> + Send;
+
+    fn init_event(&self) -> Option<<Self as Step<P, W>>::Event> {
+        __Event::maybe_init()
+    }
 
     fn event_is_event(&self, _: &<Self as Step<P, W>>::Event) -> bool {
         // TODO: make this non-overridable, use a marker trait
